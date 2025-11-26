@@ -53,6 +53,16 @@
     .cal-slot-cell.timeoff-block{
       background:linear-gradient(to right, rgba(141,141,141,0.25), rgba(141,141,141,0.35));
     }
+        .cal-slot-cell.shop-closed{
+      background:repeating-linear-gradient(
+        45deg,
+        rgba(220,38,38,0.06),
+        rgba(220,38,38,0.06) 4px,
+        rgba(220,38,38,0.16) 4px,
+        rgba(220,38,38,0.16) 8px
+      );
+    }
+
     .event-pill{border-radius:999px;padding:1px 6px;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(15,23,42,.25);display:inline-flex;align-items:center;gap:3px;}
     .event-detailing{background:var(--dept-detail);}
     .event-tint{background:var(--dept-tint);color:#fff;}
@@ -369,11 +379,18 @@
               </div>
             </div>
           </div>
-          <div class="field-group">
-            <label>Notes</label>
-            <textarea id="inputNotes" placeholder="Deposit paid? Keys in drop box?"></textarea>
-          </div>
-          <div class="status" id="statusText">Click a tech/time slot on the left or pick a date here to start. Click an existing pill to edit.</div>
+<div class="field-group">
+  <label>Notes</label>
+  <textarea id="inputNotes" placeholder="Deposit paid? Keys in drop box?"></textarea>
+</div>
+
+<div class="inline-checkbox" style="margin-top:4px;">
+  <input type="checkbox" id="checkboxOverrideClosed" />
+  <span>Override shop hours & holidays for this booking</span>
+</div>
+
+<div class="status" id="statusText">Click a tech/time slot on the left or pick a date here to start. Click an existing pill to edit.</div>
+
           <div class="actions">
             <button type="button" class="btn btn-clear" id="btnClear">Clear</button>
             <button type="button" class="btn btn-danger" id="btnDeleteAppointment">Delete</button>
@@ -499,6 +516,70 @@
           <div class="actions">
             <button type="button" class="btn btn-primary" id="btnSaveSchedules">Save Tech Schedule</button>
           </div>
+                    <!-- ⬇️ BEGIN SHOP HOURS & HOLIDAYS BLOCK ⬇️ -->
+          <div class="panel-divider" style="margin-top:12px;"></div>
+          <div class="panel-title" style="font-size:11px;">Shop Hours</div>
+
+          <div class="weekly-card" id="officeHoursCard">
+            <div class="week-row">
+              <div class="week-row-label">Monday</div>
+              <select id="office_Monday_open"></select>
+              <select id="office_Monday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Monday_closed" /><span>Closed?</span></div>
+            </div>
+            <div class="week-row">
+              <div class="week-row-label">Tuesday</div>
+              <select id="office_Tuesday_open"></select>
+              <select id="office_Tuesday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Tuesday_closed" /><span>Closed?</span></div>
+            </div>
+            <div class="week-row">
+              <div class="week-row-label">Wednesday</div>
+              <select id="office_Wednesday_open"></select>
+              <select id="office_Wednesday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Wednesday_closed" /><span>Closed?</span></div>
+            </div>
+            <div class="week-row">
+              <div class="week-row-label">Thursday</div>
+              <select id="office_Thursday_open"></select>
+              <select id="office_Thursday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Thursday_closed" /><span>Closed?</span></div>
+            </div>
+            <div class="week-row">
+              <div class="week-row-label">Friday</div>
+              <select id="office_Friday_open"></select>
+              <select id="office_Friday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Friday_closed" /><span>Closed?</span></div>
+            </div>
+            <div class="week-row">
+              <div class="week-row-label">Saturday</div>
+              <select id="office_Saturday_open"></select>
+              <select id="office_Saturday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Saturday_closed" /><span>Closed?</span></div>
+            </div>
+            <div class="week-row">
+              <div class="week-row-label">Sunday</div>
+              <select id="office_Sunday_open"></select>
+              <select id="office_Sunday_close"></select>
+              <div class="week-row-off"><input type="checkbox" id="office_Sunday_closed" /><span>Closed?</span></div>
+            </div>
+          </div>
+
+          <div class="panel-title" style="font-size:11px;margin-top:8px;">Shop Holidays</div>
+          <div class="weekly-card">
+            <div class="week-row" style="grid-template-columns:120px 1fr 120px;">
+              <div class="week-row-label">Add Holiday</div>
+              <input id="holidayDateInput" class="date-input" placeholder="YYYY-MM-DD" readonly />
+              <input id="holidayLabelInput" placeholder="e.g., New Year's Day" />
+            </div>
+            <div class="actions" style="margin-top:4px;">
+              <button type="button" class="btn btn-primary" id="btnAddHoliday">Add Holiday</button>
+            </div>
+            <div class="timeoff-note" style="margin-top:4px;">These dates are treated as fully closed unless overridden on an appointment.</div>
+            <div id="holidayList" class="timeoff-note" style="margin-top:6px;">No holidays configured.</div>
+          </div>
+          <!-- ⬆️ END SHOP HOURS & HOLIDAYS BLOCK ⬆️ -->
+
           <div class="status" id="scheduleStatus"></div>
         </form>
       </div>
@@ -553,6 +634,9 @@ const defaultServicePackages={
 let servicePackages={};
 
 const ZAPIER_WEBHOOK_URL="https://hooks.zapier.com/hooks/catch/23565840/uzuiw0k/";
+// Global shop hours (open/close per weekday) + holidays
+let officeHours = {};
+let shopHolidays = []; // array of { date: "YYYY-MM-DD", label: "New Year's Day" }
 
 let storageAvailable=true;
 try{
@@ -661,6 +745,11 @@ function initTimeDropdowns(){
     populateTimeSelect(document.getElementById(`sched_${d}_end`),false);
   });
 }
+  // Office hours dropdowns
+  days.forEach(d=>{
+    populateTimeSelect(document.getElementById(`office_${d}_open`), false);
+    populateTimeSelect(document.getElementById(`office_${d}_close`), false);
+  });
 
 // Tech schedules storage
 function initDefaultSchedules(){
@@ -698,6 +787,74 @@ function loadSchedulesFromStorage(){
 function saveSchedulesToStorage(){
   if(!storageAvailable) return;
   localStorage.setItem("patriotTechSchedules",JSON.stringify(techSchedules));
+}
+// ----- Shop hours (global) -----
+function initDefaultOfficeHours(){
+  days.forEach(d=>{
+    const weekend = (d==="Saturday" || d==="Sunday");
+    officeHours[d] = {
+      open: weekend ? "09:00" : "09:00",
+      close: weekend ? "15:00" : "17:00",
+      closed: weekend
+    };
+  });
+}
+
+function loadOfficeHoursFromStorage(){
+  if(!storageAvailable){
+    initDefaultOfficeHours();
+    return;
+  }
+  const raw = localStorage.getItem("patriotOfficeHours");
+  if(!raw){
+    initDefaultOfficeHours();
+    return;
+  }
+  try{
+    const parsed = JSON.parse(raw);
+    officeHours = {};
+    days.forEach(d=>{
+      const v = parsed[d] || null;
+      if(v){
+        officeHours[d] = v;
+      }else{
+        officeHours[d] = { open:"09:00", close:"17:00", closed:false };
+      }
+    });
+  }catch(e){
+    console.error("Failed to parse office hours",e);
+    initDefaultOfficeHours();
+  }
+}
+
+function saveOfficeHoursToStorage(){
+  if(!storageAvailable) return;
+  localStorage.setItem("patriotOfficeHours", JSON.stringify(officeHours));
+}
+
+// ----- Shop holidays -----
+function loadShopHolidaysFromStorage(){
+  if(!storageAvailable){
+    shopHolidays = [];
+    return;
+  }
+  const raw = localStorage.getItem("patriotShopHolidays");
+  if(!raw){
+    shopHolidays = [];
+    return;
+  }
+  try{
+    const parsed = JSON.parse(raw);
+    shopHolidays = Array.isArray(parsed) ? parsed : [];
+  }catch(e){
+    console.error("Failed to parse shop holidays",e);
+    shopHolidays = [];
+  }
+}
+
+function saveShopHolidaysToStorage(){
+  if(!storageAvailable) return;
+  localStorage.setItem("patriotShopHolidays", JSON.stringify(shopHolidays));
 }
 
 // Service packages storage
@@ -1012,6 +1169,22 @@ function generateDeptColor(dept) {
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue}, 70%, 55%)`;
 }
+function isShopClosedAt(dateIso, time){
+  const d = parseISODate(dateIso);
+  if(!d) return false;
+  const dow = getDayName(d);
+
+  // Holiday?
+  if(shopHolidays.some(h=>h.date===dateIso)) return true;
+
+  const cfg = officeHours[dow];
+  if(!cfg || cfg.closed) return true;
+
+  const mins = timeToMinutes(time);
+  const openMin = timeToMinutes(cfg.open);
+  const closeMin = timeToMinutes(cfg.close);
+  return (mins < openMin || mins >= closeMin);
+}
 
 function renderDeptChips() {
   const container = document.getElementById("chipsContainer");
@@ -1230,6 +1403,27 @@ function renderCalendar(){
         const s=timeToMinutes(sched.start),e=timeToMinutes(sched.end);
         if(mins<s || mins>=e) cell.classList.add("off-shift");
       }
+      // Shop closed logic (office hours + holidays)
+      const dateIso = toISODate(currentDate);
+      const officeCfg = officeHours[dayName];
+      let shopClosed = false;
+
+      // Holiday = always closed
+      if(shopHolidays.some(h=>h.date===dateIso)){
+        shopClosed = true;
+      }else if(!officeCfg || officeCfg.closed){
+        shopClosed = true;
+      }else{
+        const openMin = timeToMinutes(officeCfg.open);
+        const closeMin = timeToMinutes(officeCfg.close);
+        if(mins < openMin || mins >= closeMin){
+          shopClosed = true;
+        }
+      }
+
+      if(shopClosed){
+        cell.classList.add("shop-closed");
+      }
 
       const inner=document.createElement("div");
       inner.className="cal-slot-inner";
@@ -1410,6 +1604,116 @@ function attachOffCheckboxHandlers(){
     });
   });
 }
+function loadOfficeHoursIntoForm(){
+  days.forEach(d=>{
+    const openEl = document.getElementById(`office_${d}_open`);
+    const closeEl = document.getElementById(`office_${d}_close`);
+    const closedEl = document.getElementById(`office_${d}_closed`);
+    const cfg = officeHours[d] || { open:"09:00", close:"17:00", closed:false };
+
+    if(openEl) openEl.value = cfg.open;
+    if(closeEl) closeEl.value = cfg.close;
+    if(closedEl){
+      closedEl.checked = !!cfg.closed;
+      const disabled = !!cfg.closed;
+      if(openEl) openEl.disabled = disabled;
+      if(closeEl) closeEl.disabled = disabled;
+    }
+  });
+}
+
+function attachOfficeClosedCheckboxHandlers(){
+  days.forEach(d=>{
+    const closedEl = document.getElementById(`office_${d}_closed`);
+    const openEl = document.getElementById(`office_${d}_open`);
+    const closeEl = document.getElementById(`office_${d}_close`);
+    if(!closedEl) return;
+    closedEl.addEventListener("change",()=>{
+      const disabled = closedEl.checked;
+      if(openEl) openEl.disabled = disabled;
+      if(closeEl) closeEl.disabled = disabled;
+    });
+  });
+}
+
+function saveOfficeHoursFromForm(){
+  days.forEach(d=>{
+    const openEl = document.getElementById(`office_${d}_open`);
+    const closeEl = document.getElementById(`office_${d}_close`);
+    const closedEl = document.getElementById(`office_${d}_closed`);
+    officeHours[d] = {
+      open: openEl && openEl.value ? openEl.value : "09:00",
+      close: closeEl && closeEl.value ? closeEl.value : "17:00",
+      closed: !!(closedEl && closedEl.checked)
+    };
+  });
+  saveOfficeHoursToStorage();
+  renderCalendar();
+}
+function renderHolidayList(){
+  const listEl = document.getElementById("holidayList");
+  if(!listEl) return;
+  if(!shopHolidays.length){
+    listEl.textContent = "No holidays configured.";
+    listEl.className = "timeoff-note";
+    return;
+  }
+  listEl.innerHTML = "";
+  shopHolidays
+    .slice()
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .forEach((h,idx)=>{
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.justifyContent = "space-between";
+      row.style.alignItems = "center";
+      row.style.fontSize = "12px";
+      row.style.padding = "2px 0";
+
+      const left = document.createElement("div");
+      left.textContent = `${h.date} – ${h.label || "Holiday"}`;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Remove";
+      btn.className = "btn btn-clear";
+      btn.style.padding = "4px 8px";
+      btn.style.fontSize = "10px";
+      btn.addEventListener("click",()=>{
+        shopHolidays.splice(idx,1);
+        saveShopHolidaysToStorage();
+        renderHolidayList();
+        renderCalendar();
+      });
+
+      row.appendChild(left);
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    });
+}
+const btnAddHoliday = document.getElementById("btnAddHoliday");
+if(btnAddHoliday){
+  btnAddHoliday.addEventListener("click",()=>{
+    const dateEl = document.getElementById("holidayDateInput");
+    const labelEl = document.getElementById("holidayLabelInput");
+    const date = dateEl ? dateEl.value.trim() : "";
+    const label = labelEl ? labelEl.value.trim() : "";
+    if(!date){
+      alert("Pick a holiday date first.");
+      return;
+    }
+    if(shopHolidays.some(h=>h.date===date)){
+      alert("That date is already in the holiday list.");
+      return;
+    }
+    shopHolidays.push({date,label});
+    saveShopHolidaysToStorage();
+    renderHolidayList();
+    renderCalendar();
+    if(labelEl) labelEl.value = "";
+  });
+}
+
 function saveScheduleFromForm(){
   const tech=scheduleTechSelect.value;
   if(!tech){scheduleStatus.textContent="Choose a tech first.";return;}
@@ -1498,6 +1802,7 @@ function deleteTimeOff(){
 
 // Appointment create/update
 async function createOrUpdateAppointment(){
+  const overrideClosed = document.getElementById("checkboxOverrideClosed").checked;
   const customerName=document.getElementById("inputCustomerName").value.trim();
   const phone=document.getElementById("inputCustomerPhone").value.trim();
   const email=document.getElementById("inputCustomerEmail").value.trim();
@@ -1532,6 +1837,13 @@ async function createOrUpdateAppointment(){
     if(!tech) missingTech=true;
     return {dept,serviceName,tech,time};
   });
+  if(!overrideClosed){
+    const blocked = services.some(svc => isShopClosedAt(date, svc.time));
+    if(blocked){
+      alert("One or more service times are outside shop hours or on a holiday. Check 'Override shop hours & holidays for this booking' if you want to schedule anyway.");
+      return;
+    }
+  }
 
   if(missingDept || missingTech || missingTime){
     let msg="Each service row must have:";
@@ -1549,28 +1861,16 @@ async function createOrUpdateAppointment(){
 
   services.forEach((svc,index)=>{
     const id=groupId+"-"+index+"-"+Date.now();
-    events.push({
+     events.push({
       id,
       jobGroupId:groupId,
       type:"job",
       tech:svc.tech,
-      dept:svc.dept,
-      serviceName:svc.serviceName,
-      label:svc.serviceName||svc.dept,
-      date,
-      time:svc.time,
-      customerName,
-      phone,
-      email,
-      dealer,
-      customerWaiting:waiting,
-      rideNeeded,
-      rideTime,
-      pickupDelivery,
-      pickupTime,
-      deliveryTime,
-      notes
+      ...
+      notes,
+      overrideClosed
     });
+
   });
 
   editingJobGroupId=groupId;
@@ -1970,12 +2270,18 @@ document.addEventListener("click",e=>{
 initTimeDropdowns();
 attachOffCheckboxHandlers();
 loadSchedulesFromStorage();
+loadOfficeHoursFromStorage();
+loadShopHolidaysFromStorage();
 loadServicePackagesFromStorage();
-renderDeptChips();              // <-- NEW
+renderDeptChips();
+loadOfficeHoursIntoForm();
+attachOfficeClosedCheckboxHandlers();
+renderHolidayList();
 seedDummyEvents();
 ensureAtLeastOneServiceRow();
 refreshAllServiceAssignmentRows();
 renderCalendar();
+
 
 </script>
 </body>
