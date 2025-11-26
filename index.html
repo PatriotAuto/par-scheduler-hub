@@ -51,6 +51,8 @@
     .cal-slot-cell.off-shift{background:repeating-linear-gradient(45deg,rgba(15,23,42,.02),rgba(15,23,42,.02) 4px,rgba(15,23,42,.07) 4px,rgba(15,23,42,.07) 8px);}
     .cal-slot-cell.blocked-slot{background:linear-gradient(to right, rgba(227,6,19,0.08), rgba(227,6,19,0.14));}
     .cal-slot-inner{padding:1px 4px;height:100%;display:flex;align-items:center;gap:2px;overflow:hidden;}
+    .blocked-preview{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.85);color:#111827;font-size:10px;box-shadow:0 1px 2px rgba(15,23,42,.18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .blocked-preview .blocked-text{max-width:140px;overflow:hidden;text-overflow:ellipsis;}
     .cal-slot-cell.timeoff-block{
       background:linear-gradient(to right, rgba(141,141,141,0.25), rgba(141,141,141,0.35));
     }
@@ -81,6 +83,8 @@
     .invoice-icon.pending{background:#fef3c7;color:#b45309;}
     .invoice-icon.paid{background:#dcfce7;color:#15803d;}
     .status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:10px;border:1px solid rgba(0,0,0,.1);background:#fff;color:#111827;}
+    .status-summary{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:24px;}
+    .status-summary-note{font-size:10px;color:#6b7280;}
     .small-badge{font-size:9px;padding:0 4px;border-radius:999px;background:rgba(0,0,0,.2);color:#f9fafb;text-transform:uppercase;}
     .cal-legend{margin:6px 8px 4px;display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:#4b5563;}
     .legend-item{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.8);border-radius:999px;padding:2px 8px;border:1px solid rgba(0,0,0,.06);}
@@ -412,27 +416,20 @@
   <textarea id="inputNotes" placeholder="Deposit paid? Keys in drop box?"></textarea>
 </div>
 
-<div class="field-row">
-  <div class="field-group">
-    <label>Status</label>
-    <select id="inputStatus">
-      <option value="Scheduled">Scheduled</option>
-      <option value="Check In">Check In</option>
-      <option value="Cancelled">Cancelled</option>
-      <option value="No Show">No Show</option>
-      <option value="Completed">Completed</option>
-    </select>
-  </div>
-  <div class="field-group">
-    <label>Billing</label>
-    <div class="inline-checkbox">
-      <input type="checkbox" id="checkboxInvoiced" />
-      <span>Invoiced <span class="invoice-icon pending" style="margin-left:4px;">$</span></span>
-    </div>
-    <div class="inline-checkbox">
-      <input type="checkbox" id="checkboxPaid" />
-      <span>Paid <span class="invoice-icon paid" style="margin-left:4px;">$</span></span>
-    </div>
+<div class="field-group">
+  <label>Status &amp; Billing</label>
+  <div id="statusSummary" class="status-summary"></div>
+  <div class="timeoff-note">Update status or billing from the appointment pop-up.</div>
+  <select id="inputStatus" style="display:none;" disabled>
+    <option value="Scheduled">Scheduled</option>
+    <option value="Check In">Check In</option>
+    <option value="Cancelled">Cancelled</option>
+    <option value="No Show">No Show</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <div style="display:none;">
+    <input type="checkbox" id="checkboxInvoiced" />
+    <input type="checkbox" id="checkboxPaid" />
   </div>
 </div>
 
@@ -812,6 +809,7 @@ const btnDeleteAppointment=document.getElementById("btnDeleteAppointment");
 const statusField=document.getElementById("inputStatus");
 const checkboxInvoiced=document.getElementById("checkboxInvoiced");
 const checkboxPaid=document.getElementById("checkboxPaid");
+const statusSummary=document.getElementById("statusSummary");
 
 const appointmentPopup=document.getElementById("appointmentPopup");
 const popupStatusSelect=document.getElementById("popupStatusSelect");
@@ -1076,17 +1074,56 @@ function setPopupEditable(enabled){
   if(btnUnlockEditing) btnUnlockEditing.textContent=enabled?"Editing" : "✏️ Edit";
 }
 
-function syncPopupFromForm(){
-  if(!statusField) return;
-  if(popupStatusSelect) popupStatusSelect.value=statusField.value||"Scheduled";
-  if(popupInvoiced) popupInvoiced.checked=checkboxInvoiced.checked;
-  if(popupPaid) popupPaid.checked=checkboxPaid.checked;
-  const meta=statusMeta(statusField.value||"Scheduled");
+function getCurrentStatusState(){
+  const status=statusField?statusField.value||"Scheduled":"Scheduled";
+  const paid=!!(checkboxPaid&&checkboxPaid.checked);
+  const invoiced=paid?true:!!(checkboxInvoiced&&checkboxInvoiced.checked);
+  return {status,invoiced,paid};
+}
+
+function updateStatusSummaryDisplay(){
+  if(!statusSummary) return;
+  const {status,invoiced,paid}=getCurrentStatusState();
+  statusSummary.innerHTML="";
+  const meta=statusMeta(status);
+  const chip=document.createElement("div");
+  chip.className=`status-chip`;
+  const icon=document.createElement("span");
+  icon.className=`event-status-icon ${meta.className}`;
+  icon.textContent=meta.icon;
+  const text=document.createElement("span");
+  text.textContent=status;
+  chip.appendChild(icon);
+  chip.appendChild(text);
+  statusSummary.appendChild(chip);
+
+  if(invoiced||paid){
+    const dollar=document.createElement("span");
+    dollar.className=`invoice-icon ${paid?"paid":"pending"}`;
+    dollar.textContent="$";
+    statusSummary.appendChild(dollar);
+  }
+}
+
+function setStatusState(status,invoiced,paid){
+  if(statusField) statusField.value=status||"Scheduled";
+  if(checkboxPaid) checkboxPaid.checked=!!paid;
+  if(checkboxInvoiced) checkboxInvoiced.checked=!!invoiced||!!paid;
+  syncPopupFromStatusFields();
+}
+
+function syncPopupFromStatusFields(){
+  const {status,invoiced,paid}=getCurrentStatusState();
+  if(popupStatusSelect) popupStatusSelect.value=status;
+  if(popupInvoiced) popupInvoiced.checked=invoiced;
+  if(popupPaid) popupPaid.checked=paid;
+  const meta=statusMeta(status);
   if(popupStatusIcon){
     popupStatusIcon.className=`event-status-icon ${meta.className}`;
     popupStatusIcon.textContent=meta.icon;
   }
-  if(popupStatusLabel) popupStatusLabel.textContent=statusField.value||"Scheduled";
+  if(popupStatusLabel) popupStatusLabel.textContent=status;
+  updateStatusSummaryDisplay();
 }
 
 function applyMetaToGroup(status,invoiced,paid){
@@ -1148,19 +1185,10 @@ function openAppointmentPopup(ev){
   const status=ev.status||"Scheduled";
   const invoiced=!!ev.invoiced;
   const paid=!!ev.paid;
-  if(popupStatusSelect) popupStatusSelect.value=status;
-  if(popupInvoiced) popupInvoiced.checked=invoiced;
-  if(popupPaid) popupPaid.checked=paid;
-  const meta=statusMeta(status);
-  if(popupStatusIcon){
-    popupStatusIcon.className=`event-status-icon ${meta.className}`;
-    popupStatusIcon.textContent=meta.icon;
-  }
-  if(popupStatusLabel) popupStatusLabel.textContent=status;
+  setStatusState(status,invoiced,paid);
   if(popupStatusChip) popupStatusChip.className=`status-chip`;
   buildPopupServices(groupEvents);
   setPopupFlags(ev);
-  syncPopupFromForm();
   appointmentPopup.style.display="flex";
   setPopupEditable(false);
 }
@@ -1838,6 +1866,33 @@ function renderEventDetails(ev){
         const inner=document.createElement("div");
         inner.className="cal-slot-inner";
 
+        if(coveringJobs.length && !hasStartHere){
+          const previewJob=[...coveringJobs].sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time))[0];
+          if(previewJob){
+            const preview=document.createElement("div");
+            preview.className="blocked-preview";
+            const meta=statusMeta(previewJob.status||"Scheduled");
+            const icon=document.createElement("span");
+            icon.className=`event-status-icon ${meta.className}`;
+            icon.textContent=meta.icon;
+            preview.appendChild(icon);
+            const text=document.createElement("span");
+            text.className="blocked-text";
+            const parts=[];
+            if(previewJob.customerName) parts.push(previewJob.customerName);
+            if(previewJob.serviceName||previewJob.label) parts.push(previewJob.serviceName||previewJob.label);
+            text.textContent=parts.join(" • ")||"Booked";
+            preview.appendChild(text);
+            if(previewJob.invoiced||previewJob.paid){
+              const dollar=document.createElement("span");
+              dollar.className=`invoice-icon ${previewJob.paid?"paid":"pending"}`;
+              dollar.textContent="$";
+              preview.appendChild(dollar);
+            }
+            inner.appendChild(preview);
+          }
+        }
+
       const cellEvents=todays.filter(ev=>
         ev.tech===tech &&
         ev.time===time &&
@@ -2378,9 +2433,7 @@ async function createOrUpdateAppointment(){
   document.getElementById("appointmentForm").reset();
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
-  if(statusField) statusField.value="Scheduled";
-  if(checkboxInvoiced) checkboxInvoiced.checked=false;
-  if(checkboxPaid) checkboxPaid.checked=false;
+  setStatusState("Scheduled",false,false);
   selectedSlot=null;
   selectedEventId=null;
   editingJobGroupId=null;
@@ -2403,6 +2456,7 @@ function deleteAppointment(){
   document.getElementById("appointmentForm").reset();
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
+  setStatusState("Scheduled",false,false);
   btnCreateAppointment.textContent="Save to Zapier";
   if(statusEl)statusEl.textContent="Appointment deleted.";
   renderCalendar();
@@ -2428,6 +2482,7 @@ function clearAppointmentForm(){
   document.getElementById("appointmentForm").reset();
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
+  setStatusState("Scheduled",false,false);
   selectedSlot=null;
   selectedEventId=null;
   editingJobGroupId=null;
@@ -2465,9 +2520,7 @@ function loadJobEventIntoForm(ev){
   document.getElementById("inputPickupTime").value=ev.pickupTime||"";
   document.getElementById("inputDeliveryTime").value=ev.deliveryTime||"";
   document.getElementById("inputNotes").value=ev.notes||"";
-  if(statusField) statusField.value=ev.status||"Scheduled";
-  if(checkboxInvoiced) checkboxInvoiced.checked=!!ev.invoiced||!!ev.paid;
-  if(checkboxPaid) checkboxPaid.checked=!!ev.paid;
+  setStatusState(ev.status||"Scheduled",!!ev.invoiced||!!ev.paid,!!ev.paid);
 
   clearServiceAssignments();
   const groupEvents=events.filter(e=>e.type==="job" && (e.jobGroupId||e.id)===groupKey);
@@ -2491,7 +2544,6 @@ function loadJobEventIntoForm(ev){
     renderCalendar();
   }
   if(statusEl)statusEl.textContent="Editing existing appointment.";
-  syncPopupFromForm();
   setAppointmentFormLocked(true);
   setPopupEditable(false);
 }
@@ -2663,11 +2715,6 @@ if(allDayCheckbox){
 btnCreateAppointment.addEventListener("click",createOrUpdateAppointment);
 document.getElementById("btnClear").addEventListener("click",clearAppointmentForm);
 btnDeleteAppointment.addEventListener("click",deleteAppointment);
-if(checkboxPaid){
-  checkboxPaid.addEventListener("change",()=>{
-    if(checkboxPaid.checked && checkboxInvoiced) checkboxInvoiced.checked=true;
-  });
-}
 
 // Appointment popup controls
 if(btnUnlockEditing){
@@ -2687,26 +2734,25 @@ if(appointmentPopup){
 if(popupStatusSelect){
   popupStatusSelect.addEventListener("change",()=>{
     if(appointmentLocked) return;
-    if(statusField) statusField.value=popupStatusSelect.value;
+    setStatusState(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
     applyMetaToGroup(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
-    syncPopupFromForm();
   });
 }
 if(popupInvoiced){
   popupInvoiced.addEventListener("change",()=>{
     if(appointmentLocked) return;
-    checkboxInvoiced.checked=popupInvoiced.checked||popupPaid.checked;
+    const invoiced=popupInvoiced.checked||popupPaid.checked;
+    setStatusState(statusField.value||"Scheduled",invoiced,checkboxPaid.checked);
     applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
-    syncPopupFromForm();
   });
 }
 if(popupPaid){
   popupPaid.addEventListener("change",()=>{
     if(appointmentLocked) return;
-    checkboxPaid.checked=popupPaid.checked;
-    checkboxInvoiced.checked=popupInvoiced.checked||popupPaid.checked;
+    const paid=popupPaid.checked;
+    const invoiced=popupInvoiced.checked||paid;
+    setStatusState(statusField.value||"Scheduled",invoiced,paid);
     applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
-    syncPopupFromForm();
   });
 }
 
@@ -2815,6 +2861,7 @@ renderHolidayList();
 seedDummyEvents();
 ensureAtLeastOneServiceRow();
 refreshAllServiceAssignmentRows();
+setStatusState("Scheduled",false,false);
 setAppointmentFormLocked(false);
 renderCalendar();
 
