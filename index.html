@@ -41,7 +41,7 @@
     .cal-wrapper{flex:1;border-radius:12px;background:var(--grid-bg);border:3px solid var(--grid-border-strong);display:flex;flex-direction:column;overflow:hidden;min-height:260px;box-shadow:0 12px 24px rgba(15,23,42,.25);}
     .cal-header-row{display:grid;grid-template-columns:60px repeat(6,1fr);font-size:11px;padding:4px 4px 6px;border-bottom:3px solid var(--grid-border-strong);background:var(--grid-header-bg);}
     .cal-header-cell{text-align:center;font-weight:600;color:#111827;}
-    .cal-body{flex:1;overflow:auto;}
+    .cal-body{flex:1;overflow:auto;position:relative;}
     .cal-row{display:grid;grid-template-columns:60px repeat(6,1fr);border-bottom:2px solid var(--grid-border-light);font-size:11px;background:linear-gradient(to right,rgba(255,255,255,.9),rgba(255,255,255,.9));height:32px;}
     .cal-row:nth-child(2n){background:linear-gradient(to right,rgba(249,250,251,.95),rgba(249,250,251,.95));}
     .cal-time-cell{padding:2px 4px;text-align:right;color:#4b5563;font-weight:500;background:#e5e7eb;border-right:2px solid var(--grid-border-strong);}
@@ -73,6 +73,12 @@
     .event-ceramic{background:var(--dept-ceramic);}
     .event-electronics{background:var(--dept-electronics);color:#fff;}
     .event-timeoff{background:var(--timeoff);color:#fff;}
+    .event-bubble{position:absolute;border-radius:12px;padding:8px 10px;font-size:11px;font-weight:600;box-shadow:0 6px 16px rgba(15,23,42,.25);display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:transform .05s,box-shadow .08s;line-height:1.2;border:1px solid rgba(0,0,0,.15);z-index:10;}
+    .event-bubble:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,23,42,.32);}
+    .event-bubble .bubble-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+    .event-bubble .bubble-title{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .event-bubble .bubble-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;}
+    .event-bubble .bubble-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;font-weight:500;}
     .event-status-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:700;color:#111827;background:#fef3c7;}
     .event-status-icon.scheduled{background:#fef3c7;color:#92400e;}
     .event-status-icon.checkin{background:#dbeafe;color:#1e3a8a;}
@@ -2019,6 +2025,7 @@ function renderEventDetails(ev){
           }
         }
 
+        if(ev.type!=="job"){
           const pill=document.createElement("div");
           let cls="event-pill ";
           if(ev.type==="timeoff") cls+="event-timeoff";
@@ -2032,57 +2039,12 @@ function renderEventDetails(ev){
 
           let label=ev.label||ev.serviceName||"Job";
           if(ev.type==="job" && ev.customerName) label=`${ev.customerName} – ${label}`;
-        if(ev.type==="job"){
-          const meta=statusMeta(ev.status||"Scheduled");
-          const statusSpan=document.createElement("span");
-          statusSpan.className=`event-status-icon ${meta.className}`;
-          statusSpan.textContent=meta.icon;
-          pill.appendChild(statusSpan);
+          const span=document.createElement("span");
+          span.textContent=label;
+          pill.appendChild(span);
 
-          const progMeta=serviceProgressMeta(ev.serviceProgress||"In Queue");
-          const progSpan=document.createElement("span");
-          progSpan.className=`service-progress-icon ${progMeta.className}`;
-          progSpan.textContent=progMeta.icon;
-          pill.appendChild(progSpan);
+          inner.appendChild(pill);
         }
-        const span=document.createElement("span");
-        span.textContent=label;
-        pill.appendChild(span);
-
-          if(ev.type==="job"){
-            if(ev.invoiced || ev.paid){
-              const dollar=document.createElement("span");
-              dollar.className=`invoice-icon ${ev.paid?"paid":"pending"}`;
-              dollar.textContent="$";
-              pill.appendChild(dollar);
-            }
-            if(ev.dealer){
-              const b=document.createElement("span");
-              b.className="small-badge";
-            b.textContent="D";
-            pill.appendChild(b);
-          }
-          if(ev.customerWaiting){
-            const b=document.createElement("span");
-            b.className="small-badge";
-            b.textContent="W";
-            pill.appendChild(b);
-          }
-          if(ev.rideNeeded){
-            const b=document.createElement("span");
-            b.className="small-badge";
-            b.textContent="R";
-            pill.appendChild(b);
-          }
-          if(ev.pickupDelivery){
-            const b=document.createElement("span");
-            b.className="small-badge";
-            b.textContent="P/D";
-            pill.appendChild(b);
-          }
-        }
-
-        inner.appendChild(pill);
       });
 
       cell.appendChild(inner);
@@ -2090,6 +2052,94 @@ function renderEventDetails(ev){
     });
 
     bodyEl.appendChild(row);
+  });
+
+  // render full-span bubbles for job events
+  const visibleJobs=todays.filter(ev=>ev.type==="job" && (selectedDeptFilter==="All" || ev.dept===selectedDeptFilter));
+  visibleJobs.forEach(ev=>{
+    const startCell=bodyEl.querySelector(`.cal-slot-cell[data-tech="${ev.tech}"][data-time="${ev.time}"]`);
+    if(!startCell) return;
+    const duration=ev.minutes||90;
+    const slotsNeeded=Math.max(1,Math.ceil(duration/30));
+    const cellHeight=startCell.offsetHeight||32;
+    const bubbleHeight=Math.max(cellHeight,(cellHeight*slotsNeeded)-6);
+    const bubble=document.createElement("div");
+    let cls="event-bubble ";
+    if(ev.dept==="Detailing") cls+="event-detailing";
+    else if(ev.dept==="Tint") cls+="event-tint";
+    else if(ev.dept==="PPF") cls+="event-ppf";
+    else if(ev.dept==="Ceramic") cls+="event-ceramic";
+    else if(ev.dept==="Electronics") cls+="event-electronics";
+    bubble.className=cls;
+    bubble.dataset.eventId=ev.id;
+    bubble.style.top=`${startCell.offsetTop+3}px`;
+    bubble.style.left=`${startCell.offsetLeft+3}px`;
+    bubble.style.width=`${(startCell.offsetWidth||100)-6}px`;
+    bubble.style.height=`${bubbleHeight}px`;
+
+    const topRow=document.createElement("div");
+    topRow.className="bubble-top";
+    const meta=statusMeta(ev.status||"Scheduled");
+    const statusSpan=document.createElement("span");
+    statusSpan.className=`event-status-icon ${meta.className}`;
+    statusSpan.textContent=meta.icon;
+    topRow.appendChild(statusSpan);
+
+    const progMeta=serviceProgressMeta(ev.serviceProgress||"In Queue");
+    const progSpan=document.createElement("span");
+    progSpan.className=`service-progress-icon ${progMeta.className}`;
+    progSpan.textContent=progMeta.icon;
+    topRow.appendChild(progSpan);
+
+    const title=document.createElement("span");
+    title.className="bubble-title";
+    const label=ev.customerName?`${ev.customerName} – ${ev.serviceName||ev.label||"Job"}`:(ev.serviceName||ev.label||"Job");
+    title.textContent=label;
+    topRow.appendChild(title);
+    bubble.appendChild(topRow);
+
+    const bubbleMeta=document.createElement("div");
+    bubbleMeta.className="bubble-meta";
+    if(ev.invoiced||ev.paid){
+      const dollar=document.createElement("span");
+      dollar.className=`invoice-icon ${ev.paid?"paid":"pending"}`;
+      dollar.textContent="$";
+      bubbleMeta.appendChild(dollar);
+    }
+    if(ev.dealer){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="D";
+      bubbleMeta.appendChild(b);
+    }
+    if(ev.customerWaiting){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="W";
+      bubbleMeta.appendChild(b);
+    }
+    if(ev.rideNeeded){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="R";
+      bubbleMeta.appendChild(b);
+    }
+    if(ev.pickupDelivery){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="P/D";
+      bubbleMeta.appendChild(b);
+    }
+    if(bubbleMeta.childNodes.length){
+      bubble.appendChild(bubbleMeta);
+    }
+
+    const preview=document.createElement("div");
+    preview.className="bubble-row";
+    preview.textContent=`${ev.serviceName||"Service"} · ${ev.time||""}`;
+    bubble.appendChild(preview);
+
+    bodyEl.appendChild(bubble);
   });
 
   if(selectedSlot){
@@ -2664,7 +2714,7 @@ function loadJobEventIntoForm(ev){
 
 // Calendar clicks
 bodyEl.addEventListener("click",e=>{
-  const pill=e.target.closest(".event-pill");
+  const pill=e.target.closest(".event-bubble, .event-pill");
   if(pill){
     const id=pill.dataset.eventId;
     selectedEventId=id;
