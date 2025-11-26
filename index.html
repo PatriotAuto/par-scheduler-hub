@@ -253,14 +253,8 @@
   <div class="main">
     <div class="left">
       <div class="left-top-row">
-        <div class="chips">
-          <div class="chip active" data-dept="All"><span class="dot dot-detail"></span>All</div>
-          <div class="chip" data-dept="Detailing"><span class="dot dot-detail"></span>Detailing</div>
-          <div class="chip" data-dept="Tint"><span class="dot dot-tint"></span>Tint</div>
-          <div class="chip" data-dept="PPF"><span class="dot dot-ppf"></span>PPF</div>
-          <div class="chip" data-dept="Ceramic"><span class="dot dot-ceramic"></span>Ceramic</div>
-          <div class="chip" data-dept="Electronics"><span class="dot dot-electronics"></span>Electronics</div>
-        </div>
+        <div class="chips" id="chipsContainer"></div>
+        
         <div class="date-controls">
           <div class="date-row">
             <button class="nav-btn" id="btnPrevDay">◀</button>
@@ -897,13 +891,15 @@ function renderServiceLibrary(){
     delBtn.className="btn btn-clear";
     delBtn.style.padding="4px 8px";
     delBtn.style.fontSize="10px";
-    delBtn.addEventListener("click",()=>{
-      if(!confirm(`Delete category "${cat}" and all its services?`)) return;
-      delete servicePackages[cat];
-      saveServicePackagesToStorage();
-      renderServiceLibrary();
-      refreshAllServiceAssignmentRows();
-    });
+  delBtn.addEventListener("click",()=>{
+  if(!confirm(`Delete category "${cat}" and all its services?`)) return;
+  delete servicePackages[cat];
+  saveServicePackagesToStorage();
+  renderServiceLibrary();
+  refreshAllServiceAssignmentRows();
+  renderDeptChips();        // <-- NEW
+});
+
 
     header.appendChild(title);
     header.appendChild(delBtn);
@@ -1002,10 +998,62 @@ btnAddCategory.addEventListener("click",()=>{
   inputNewCategoryName.value="";
   renderServiceLibrary();
   refreshAllServiceAssignmentRows();
+  renderDeptChips();         // <-- NEW
 });
+
 
 // Events utilities
 function getEventsForDay(dateIso){return events.filter(ev=>ev.date===dateIso);}
+function generateDeptColor(dept) {
+  let hash = 0;
+  for (let i = 0; i < dept.length; i++) {
+    hash = dept.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 55%)`;
+}
+
+function renderDeptChips() {
+  const container = document.getElementById("chipsContainer");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  // "All" chip
+  const allChip = document.createElement("div");
+  allChip.className = "chip active";
+  allChip.dataset.dept = "All";
+  allChip.innerHTML = `<span class="dot" style="background:#000;"></span>All`;
+  container.appendChild(allChip);
+
+  // One chip per service category from servicePackages
+  const categories = Object.keys(servicePackages).sort();
+
+  categories.forEach(cat => {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.dataset.dept = cat;
+
+    const color = generateDeptColor(cat);
+
+    chip.innerHTML = `
+      <span class="dot" style="background:${color};"></span>${cat}
+    `;
+
+    container.appendChild(chip);
+  });
+
+  // Chip click handling
+  container.querySelectorAll(".chip").forEach(ch => {
+    ch.addEventListener("click", () => {
+      container.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+      ch.classList.add("active");
+
+      selectedDeptFilter = ch.dataset.dept;
+      renderCalendar();
+    });
+  });
+}
 
 function renderDealerQueue(){
   const dateIso=toISODate(currentDate);
@@ -1617,15 +1665,7 @@ function clearTimeOffForm(){
   document.getElementById("timeOffForm").reset();
 }
 
-// Dept chips
-document.querySelectorAll(".chip").forEach(ch=>{
-  ch.addEventListener("click",()=>{
-    document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
-    ch.classList.add("active");
-    selectedDeptFilter=ch.dataset.dept;
-    renderCalendar();
-  });
-});
+
 
 function loadJobEventIntoForm(ev){
   setPanel("appointments");
@@ -1926,14 +1966,19 @@ document.addEventListener("click",e=>{
 });
 
 // Init
+// Init
 initTimeDropdowns();
 attachOffCheckboxHandlers();
 loadSchedulesFromStorage();
 loadServicePackagesFromStorage();
+renderDeptChips();              // <-- NEW
 seedDummyEvents();
 ensureAtLeastOneServiceRow();
 refreshAllServiceAssignmentRows();
 renderCalendar();
+
 </script>
 </body>
 </html>
+
+                                                                              
