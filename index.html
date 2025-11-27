@@ -1165,24 +1165,36 @@ function syncServiceProgressToForm(groupEvents){
   });
 }
 
-function autoAdvanceServiceProgress(groupId){
-  const groupEvents=events
+function rebalanceServiceProgress(groupId,{triggerAutoStart=false,keepInQueue=false}={}){
+  const sorted=events
     .filter(ev=>ev.type==="job" && (ev.jobGroupId||ev.id)===groupId)
     .map(ev=>({
       ...ev,
       serviceProgress:ev.serviceProgress||"In Queue"
     }))
     .sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time));
-  if(!groupEvents.length) return;
+  if(!sorted.length) return;
 
-  groupEvents.forEach((ev,idx)=>{
-    if(ev.serviceProgress==="Completed"){
-      const next=groupEvents[idx+1];
-      if(next && next.serviceProgress==="In Queue"){
-        events=events.map(e=>e.id===next.id?{...e,serviceProgress:"Started"}:e);
+  const updates=new Map();
+  let encounteredPending=false;
+  sorted.forEach((ev,idx)=>{
+    let current=ev.serviceProgress||"In Queue";
+    if(encounteredPending){
+      if(current==="Started") updates.set(ev.id,"In Queue");
+      return;
+    }
+    if(current!=="Completed"){
+      encounteredPending=true;
+      const allPrevCompleted=idx>0 && sorted.slice(0,idx).every(x=>(x.serviceProgress||"In Queue")==="Completed");
+      if(triggerAutoStart && allPrevCompleted && current==="In Queue" && !keepInQueue){
+        updates.set(ev.id,"Started");
       }
     }
   });
+
+  if(updates.size){
+    events=events.map(ev=>updates.has(ev.id)?{...ev,serviceProgress:updates.get(ev.id)}:ev);
+  }
 
   const refreshed=events.filter(ev=>ev.type==="job" && (ev.jobGroupId||ev.id)===groupId);
   const allDone=refreshed.length>0 && refreshed.every(ev=>(ev.serviceProgress||"In Queue")==="Completed");
@@ -1199,7 +1211,7 @@ function updateServiceProgress(groupId,eventId,newStatus){
     }
     return ev;
   });
-  autoAdvanceServiceProgress(groupId);
+  rebalanceServiceProgress(groupId,{triggerAutoStart:newStatus==="Completed",keepInQueue:newStatus==="In Queue"});
   const groupEvents=events.filter(ev=>ev.type==="job" && (ev.jobGroupId||ev.id)===groupId);
   syncServiceProgressToForm(groupEvents);
   buildPopupServices(groupEvents, groupId);
@@ -1281,7 +1293,7 @@ function openAppointmentPopup(ev){
   const paid=!!ev.paid;
   setStatusState(status,invoiced,paid);
   if(popupStatusChip) popupStatusChip.className=`status-chip`;
-  autoAdvanceServiceProgress(groupId);
+  rebalanceServiceProgress(groupId,{triggerAutoStart:true});
   buildPopupServices(groupEvents, groupId);
   setPopupFlags(ev);
   appointmentPopup.style.display="flex";
@@ -1899,6 +1911,7 @@ function renderEventDetails(ev){
     const dayName=getDayName(currentDate);
   const todays=getEventsForDay(dateIso);
   const coverageMap=new Map();
+  const blockedPreviewRendered=new Set();
   todays.forEach(ev=>{
     if(ev.type!=="job") return;
     if(!ev.serviceProgress) ev.serviceProgress="In Queue";
@@ -1988,8 +2001,9 @@ function renderEventDetails(ev){
 
         if(coveringJobs.length && !hasStartHere){
           const previewJob=[...coveringJobs].sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time))[0];
-          const diff=timeToMinutes(time)-timeToMinutes(previewJob.time);
-          if(previewJob && diff===30){
+          const previewKey=previewJob?`${previewJob.id}-${tech}`:null;
+          if(previewJob && previewKey && !blockedPreviewRendered.has(previewKey)){
+            blockedPreviewRendered.add(previewKey);
             const preview=document.createElement("div");
             preview.className="blocked-preview";
             const meta=statusMeta(previewJob.status||"Scheduled");
@@ -2527,7 +2541,7 @@ async function createOrUpdateAppointment(){
     });
   });
 
-  autoAdvanceServiceProgress(groupId);
+  rebalanceServiceProgress(groupId,{triggerAutoStart:true});
 
   editingJobGroupId=groupId;
   currentDate=new Date(date+"T00:00");
