@@ -1097,10 +1097,12 @@ function setAppointmentFormLocked(locked){
 }
 
 function setPopupEditable(enabled){
-  if(popupStatusSelect) popupStatusSelect.disabled=!enabled;
-  if(popupInvoiced) popupInvoiced.disabled=!enabled;
-  if(popupPaid) popupPaid.disabled=!enabled;
-  if(btnUnlockEditing) btnUnlockEditing.textContent=enabled?"Editing" : "✏️ Edit";
+  // Popup status, invoiced, paid, and per-service progress remain editable at all times
+  // to allow quick corrections without unlocking the main form.
+  if(popupStatusSelect) popupStatusSelect.disabled=false;
+  if(popupInvoiced) popupInvoiced.disabled=false;
+  if(popupPaid) popupPaid.disabled=false;
+  if(btnUnlockEditing) btnUnlockEditing.textContent=enabled?"Editing in form" : "✏️ Edit in form";
 }
 
 function getCurrentStatusState(){
@@ -1268,7 +1270,9 @@ function buildPopupServices(groupEvents, groupId){
       const o=document.createElement("option");o.value=val;o.textContent=val;select.appendChild(o);
     });
     select.value=gev.serviceProgress||"In Queue";
-    select.disabled=appointmentLocked;
+    // Progress stays editable in the popup even when the main form is locked
+    // so users can correct mistakes without unlocking the appointment form.
+    select.disabled=false;
     select.addEventListener("change",()=>{
       updateServiceProgress(groupId||gev.jobGroupId||gev.id, gev.id, select.value);
     });
@@ -2903,6 +2907,7 @@ if(btnUnlockEditing){
   btnUnlockEditing.addEventListener("click",()=>{
     setAppointmentFormLocked(false);
     setPopupEditable(true);
+    closeAppointmentPopup();
   });
 }
 if(btnClosePopup){
@@ -2915,14 +2920,12 @@ if(appointmentPopup){
 }
 if(popupStatusSelect){
   popupStatusSelect.addEventListener("change",()=>{
-    if(appointmentLocked) return;
     setStatusState(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
     applyMetaToGroup(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
   });
 }
 if(popupInvoiced){
   popupInvoiced.addEventListener("change",()=>{
-    if(appointmentLocked) return;
     const invoiced=popupInvoiced.checked||popupPaid.checked;
     setStatusState(statusField.value||"Scheduled",invoiced,checkboxPaid.checked);
     applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
@@ -2930,7 +2933,6 @@ if(popupInvoiced){
 }
 if(popupPaid){
   popupPaid.addEventListener("change",()=>{
-    if(appointmentLocked) return;
     const paid=popupPaid.checked;
     const invoiced=popupInvoiced.checked||paid;
     setStatusState(statusField.value||"Scheduled",invoiced,paid);
