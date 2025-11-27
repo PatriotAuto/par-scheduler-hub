@@ -795,6 +795,46 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
+function normalizeServiceList(list){
+  if(!Array.isArray(list)) return [];
+  return list.map(item=>{
+    if(typeof item==="string"){
+      return {name:item,minutes:90,price:0};
+    }
+    const minutes=Math.max(15,parseInt(item.minutes,10)||90);
+    const price=parseFloat(item.price)||0;
+    return {name:item.name||"Unnamed Service",minutes,price};
+  });
+}
+
+function normalizeServicePackages(raw){
+  const cleaned={};
+  Object.keys(raw||{}).forEach(cat=>{
+    cleaned[cat]=normalizeServiceList(raw[cat]);
+  });
+  return cleaned;
+}
+
+function normalizeServiceList(list){
+  if(!Array.isArray(list)) return [];
+  return list.map(item=>{
+    if(typeof item==="string"){
+      return {name:item,minutes:90,price:0};
+    }
+    const minutes=Math.max(15,parseInt(item.minutes,10)||90);
+    const price=parseFloat(item.price)||0;
+    return {name:item.name||"Unnamed Service",minutes,price};
+  });
+}
+
+function normalizeServicePackages(raw){
+  const cleaned={};
+  Object.keys(raw||{}).forEach(cat=>{
+    cleaned[cat]=normalizeServiceList(raw[cat]);
+  });
+  return cleaned;
+}
+
 const ZAPIER_WEBHOOK_URL="https://hooks.zapier.com/hooks/catch/23565840/uzuiw0k/";
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
@@ -933,6 +973,59 @@ function serviceProgressMeta(status){
     "Completed":{className:"done",icon:"✔"}
   };
   return map[status]||map["In Queue"];
+}
+
+function minutesToTime(total){
+  const h=String(Math.floor(total/60)).padStart(2,"0");
+  const m=String(total%60).padStart(2,"0");
+  return `${h}:${m}`;
+}
+
+function addMinutesToTime(time,minutes){
+  const base=timeToMinutes(time)||0;
+  return minutesToTime(base+minutes);
+}
+
+function statusMeta(status){
+  const map={
+    "Scheduled":{className:"scheduled",icon:"●"},
+    "Check In":{className:"checkin",icon:"⧗"},
+    "Cancelled":{className:"cancelled",icon:"✖"},
+    "No Show":{className:"noshow",icon:"⚠"},
+    "Completed":{className:"completed",icon:"✔"}
+  };
+  return map[status]||map["Scheduled"];
+}
+
+function serviceProgressMeta(status){
+  const map={
+    "In Queue":{className:"queue",icon:"⏳"},
+    "Started":{className:"started",icon:"▶"},
+    "Completed":{className:"done",icon:"✔"}
+  };
+  return map[status]||map["In Queue"];
+}
+
+function minutesToTime(total){
+  const h=String(Math.floor(total/60)).padStart(2,"0");
+  const m=String(total%60).padStart(2,"0");
+  return `${h}:${m}`;
+}
+
+function addMinutesToTime(time,minutes){
+  const base=timeToMinutes(time)||0;
+  return minutesToTime(base+minutes);
+}
+
+function statusMeta(status){
+  const map={
+    "Scheduled":{className:"scheduled",icon:"●"},
+    "Check In":{className:"checkin",icon:"⧗"},
+    "Cancelled":{className:"cancelled",icon:"✖"},
+    "No Show":{className:"noshow",icon:"⚠"},
+    "Completed":{className:"completed",icon:"✔"}
+  };
+  return map[status]||map["Scheduled"];
 }
 
 // Time dropdowns
@@ -1353,6 +1446,16 @@ function populateServiceOptionsForSelect(deptSelect,serviceSelect,selectedValue)
     });
   }
   if(selectedValue) serviceSelect.value=selectedValue;
+}
+
+function findServiceDefaults(dept,name){
+  const list=servicePackages[dept]||[];
+  return list.find(s=>s.name===name)||null;
+}
+
+function findServiceDefaults(dept,name){
+  const list=servicePackages[dept]||[];
+  return list.find(s=>s.name===name)||null;
 }
 
 function findServiceDefaults(dept,name){
@@ -2538,6 +2641,34 @@ async function createOrUpdateAppointment(){
     }
   }
 
+  if(!overrideClosed){
+    const scheduleConflict=services.some(svc=>{
+      const techCfg=techSchedules[svc.tech]?.[dayName];
+      if(!techCfg || techCfg.off) return true;
+      const startMin=timeToMinutes(svc.time);
+      const endMin=startMin+(svc.minutes||90);
+      return startMin<timeToMinutes(techCfg.start)||endMin>timeToMinutes(techCfg.end);
+    });
+    if(scheduleConflict){
+      alert("One or more services exceed the assigned tech schedule. Adjust times or enable override.");
+      return;
+    }
+  }
+
+  if(!overrideClosed){
+    const scheduleConflict=services.some(svc=>{
+      const techCfg=techSchedules[svc.tech]?.[dayName];
+      if(!techCfg || techCfg.off) return true;
+      const startMin=timeToMinutes(svc.time);
+      const endMin=startMin+(svc.minutes||90);
+      return startMin<timeToMinutes(techCfg.start)||endMin>timeToMinutes(techCfg.end);
+    });
+    if(scheduleConflict){
+      alert("One or more services exceed the assigned tech schedule. Adjust times or enable override.");
+      return;
+    }
+  }
+
   if(missingDept || missingTech || missingTime){
     let msg="Each service row must have:";
     if(missingDept) msg+="\n- Service category";
@@ -2945,6 +3076,86 @@ if(popupInvoiced){
 }
 if(popupPaid){
   popupPaid.addEventListener("change",()=>{
+    const paid=popupPaid.checked;
+    const invoiced=popupInvoiced.checked||paid;
+    setStatusState(statusField.value||"Scheduled",invoiced,paid);
+    applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+
+// Appointment popup controls
+if(btnUnlockEditing){
+  btnUnlockEditing.addEventListener("click",()=>{
+    setAppointmentFormLocked(false);
+    setPopupEditable(true);
+  });
+}
+if(btnClosePopup){
+  btnClosePopup.addEventListener("click",closeAppointmentPopup);
+}
+if(appointmentPopup){
+  appointmentPopup.addEventListener("click",e=>{
+    if(e.target===appointmentPopup) closeAppointmentPopup();
+  });
+}
+if(popupStatusSelect){
+  popupStatusSelect.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    setStatusState(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
+    applyMetaToGroup(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+if(popupInvoiced){
+  popupInvoiced.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    const invoiced=popupInvoiced.checked||popupPaid.checked;
+    setStatusState(statusField.value||"Scheduled",invoiced,checkboxPaid.checked);
+    applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+if(popupPaid){
+  popupPaid.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    const paid=popupPaid.checked;
+    const invoiced=popupInvoiced.checked||paid;
+    setStatusState(statusField.value||"Scheduled",invoiced,paid);
+    applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+
+// Appointment popup controls
+if(btnUnlockEditing){
+  btnUnlockEditing.addEventListener("click",()=>{
+    setAppointmentFormLocked(false);
+    setPopupEditable(true);
+  });
+}
+if(btnClosePopup){
+  btnClosePopup.addEventListener("click",closeAppointmentPopup);
+}
+if(appointmentPopup){
+  appointmentPopup.addEventListener("click",e=>{
+    if(e.target===appointmentPopup) closeAppointmentPopup();
+  });
+}
+if(popupStatusSelect){
+  popupStatusSelect.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    setStatusState(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
+    applyMetaToGroup(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+if(popupInvoiced){
+  popupInvoiced.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    const invoiced=popupInvoiced.checked||popupPaid.checked;
+    setStatusState(statusField.value||"Scheduled",invoiced,checkboxPaid.checked);
+    applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+if(popupPaid){
+  popupPaid.addEventListener("change",()=>{
+    if(appointmentLocked) return;
     const paid=popupPaid.checked;
     const invoiced=popupInvoiced.checked||paid;
     setStatusState(statusField.value||"Scheduled",invoiced,paid);
