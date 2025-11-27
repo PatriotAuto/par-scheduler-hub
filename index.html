@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Patriot Auto Restyling – Scheduler Hub v1.3</title>
+  <title>Patriot Auto Restyling – Scheduler Hub v1.7</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     :root {
@@ -41,7 +41,7 @@
     .cal-wrapper{flex:1;border-radius:12px;background:var(--grid-bg);border:3px solid var(--grid-border-strong);display:flex;flex-direction:column;overflow:hidden;min-height:260px;box-shadow:0 12px 24px rgba(15,23,42,.25);}
     .cal-header-row{display:grid;grid-template-columns:60px repeat(6,1fr);font-size:11px;padding:4px 4px 6px;border-bottom:3px solid var(--grid-border-strong);background:var(--grid-header-bg);}
     .cal-header-cell{text-align:center;font-weight:600;color:#111827;}
-    .cal-body{flex:1;overflow:auto;}
+    .cal-body{flex:1;overflow:auto;position:relative;}
     .cal-row{display:grid;grid-template-columns:60px repeat(6,1fr);border-bottom:2px solid var(--grid-border-light);font-size:11px;background:linear-gradient(to right,rgba(255,255,255,.9),rgba(255,255,255,.9));height:32px;}
     .cal-row:nth-child(2n){background:linear-gradient(to right,rgba(249,250,251,.95),rgba(249,250,251,.95));}
     .cal-time-cell{padding:2px 4px;text-align:right;color:#4b5563;font-weight:500;background:#e5e7eb;border-right:2px solid var(--grid-border-strong);}
@@ -51,6 +51,9 @@
     .cal-slot-cell.off-shift{background:repeating-linear-gradient(45deg,rgba(15,23,42,.02),rgba(15,23,42,.02) 4px,rgba(15,23,42,.07) 4px,rgba(15,23,42,.07) 8px);}
     .cal-slot-cell.blocked-slot{background:linear-gradient(to right, rgba(227,6,19,0.08), rgba(227,6,19,0.14));}
     .cal-slot-inner{padding:1px 4px;height:100%;display:flex;align-items:center;gap:2px;overflow:hidden;}
+    .blocked-overlay{position:absolute;inset:0;pointer-events:none;display:grid;grid-auto-rows:32px;z-index:5;}
+    .blocked-span{margin:3px 4px;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,.25);background:linear-gradient(to right,rgba(227,6,19,0.16),rgba(227,6,19,0.22));color:#111827;font-size:10px;font-weight:700;display:flex;align-items:center;gap:6px;padding:4px 8px;overflow:hidden;}
+    .blocked-span .blocked-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .blocked-preview{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.9);color:#111827;font-size:10px;box-shadow:0 1px 2px rgba(15,23,42,.18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .blocked-preview .blocked-text{max-width:140px;overflow:hidden;text-overflow:ellipsis;}
     .cal-slot-cell.timeoff-block{
@@ -386,6 +389,7 @@
             <label>Service & Technician Assignments</label>
             <div id="serviceAssignments"></div>
             <button type="button" class="btn btn-clear" id="btnAddServiceRow" style="margin-top:6px;">+ Add Service</button>
+            <div class="timeoff-note">Each service row now includes labeled Est. Duration (mins), Price ($), and Progress fields you can adjust.</div>
           </div>
 
           <div class="field-row">
@@ -722,6 +726,7 @@
 const techs=["William","Limage","Kaiden","Luke","Fafa","Matt"];
 const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const workTimes=["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00"];
+const SLOT_HEIGHT=32;
 
 const defaultServicePackages={
   "Detailing":[
@@ -1444,10 +1449,23 @@ function addServiceRow(initial){
   priceGroup.appendChild(priceLabel);
   priceGroup.appendChild(priceInput);
 
-  const progressInput=document.createElement("input");
-  progressInput.type="hidden";
+  const progressGroup=document.createElement("div");
+  progressGroup.className="field-group";
+  const progressLabel=document.createElement("label");
+  progressLabel.style.fontSize="10px";
+  progressLabel.style.textTransform="none";
+  progressLabel.style.letterSpacing="0";
+  progressLabel.textContent="Service Progress";
+  const progressInput=document.createElement("select");
   progressInput.className="sa-progress";
-  progressInput.value="In Queue";
+  ["In Queue","Started","Completed"].forEach(val=>{
+    const opt=document.createElement("option");
+    opt.value=val;
+    opt.textContent=val;
+    progressInput.appendChild(opt);
+  });
+  progressGroup.appendChild(progressLabel);
+  progressGroup.appendChild(progressInput);
 
   const removeBtn=document.createElement("button");
   removeBtn.type="button";
@@ -1467,7 +1485,7 @@ function addServiceRow(initial){
   row.appendChild(timeGroup);
   row.appendChild(durationGroup);
   row.appendChild(priceGroup);
-  row.appendChild(progressInput);
+  row.appendChild(progressGroup);
   row.appendChild(removeBtn);
   serviceAssignmentsContainer.appendChild(row);
 
@@ -1494,8 +1512,10 @@ function addServiceRow(initial){
     if(initial.time) timeSelect.value=initial.time;
     if(initial.minutes) durationInput.value=initial.minutes;
     if(typeof initial.price!=="undefined") priceInput.value=initial.price;
-    if(initial.serviceProgress) progressInput.value=initial.serviceProgress;
+    progressInput.value=initial.serviceProgress||"In Queue";
     if(initial.id) row.dataset.eventId=initial.id;
+  }else{
+    progressInput.value="In Queue";
   }
 }
 
@@ -1969,7 +1989,14 @@ function renderEventDetails(ev){
       }
     });
 
-    headerRowEl.innerHTML="";
+  bodyEl.innerHTML="";
+  const overlay=document.createElement("div");
+  overlay.className="blocked-overlay";
+  overlay.style.gridTemplateColumns=`60px repeat(${techs.length},1fr)`;
+  overlay.style.gridAutoRows=`${SLOT_HEIGHT}px`;
+  bodyEl.appendChild(overlay);
+
+  headerRowEl.innerHTML="";
   const timeHead=document.createElement("div");
   timeHead.className="cal-header-cell";
   timeHead.textContent="";
@@ -1984,7 +2011,6 @@ function renderEventDetails(ev){
   dayLabelEl.textContent=formatDateLabel(currentDate);
   if(dayPickerEl) dayPickerEl.value=dateIso;
 
-  bodyEl.innerHTML="";
   workTimes.forEach(time=>{
     const row=document.createElement("div");
     row.className="cal-row";
@@ -2039,41 +2065,6 @@ function renderEventDetails(ev){
         const inner=document.createElement("div");
         inner.className="cal-slot-inner";
 
-        if(coveringJobs.length && !hasStartHere){
-          const previewJob=[...coveringJobs].sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time))[0];
-          const diff=timeToMinutes(time)-timeToMinutes(previewJob.time);
-          if(previewJob && diff===30){
-            const preview=document.createElement("div");
-            preview.className="blocked-preview";
-            const meta=statusMeta(previewJob.status||"Scheduled");
-            const icon=document.createElement("span");
-            icon.className=`event-status-icon ${meta.className}`;
-            icon.textContent=meta.icon;
-            preview.appendChild(icon);
-
-            const svcMeta=serviceProgressMeta(previewJob.serviceProgress||"In Queue");
-            const svcIcon=document.createElement("span");
-            svcIcon.className=`service-progress-icon ${svcMeta.className}`;
-            svcIcon.textContent=svcMeta.icon;
-            preview.appendChild(svcIcon);
-
-            const text=document.createElement("span");
-            text.className="blocked-text";
-            const parts=[];
-            if(previewJob.customerName) parts.push(previewJob.customerName);
-            if(previewJob.serviceName||previewJob.label) parts.push(previewJob.serviceName||previewJob.label);
-            text.textContent=parts.join(" • ")||"Booked";
-            preview.appendChild(text);
-            if(previewJob.invoiced||previewJob.paid){
-              const dollar=document.createElement("span");
-              dollar.className=`invoice-icon ${previewJob.paid?"paid":"pending"}`;
-              dollar.textContent="$";
-              preview.appendChild(dollar);
-            }
-            inner.appendChild(preview);
-          }
-        }
-
       const cellEvents=todays.filter(ev=>
         ev.tech===tech &&
         ev.time===time &&
@@ -2086,6 +2077,7 @@ function renderEventDetails(ev){
       }
 
       cellEvents.forEach(ev=>{
+        if(ev.type==="job") return;
         if(ev.type==="timeoff"){
           const currentIndex=workTimes.indexOf(ev.time);
           const prevTime=currentIndex>0?workTimes[currentIndex-1]:null;
@@ -2168,6 +2160,82 @@ function renderEventDetails(ev){
     });
 
     bodyEl.appendChild(row);
+  });
+
+  todays.filter(ev=>ev.type==="job").forEach(ev=>{
+    if(selectedDeptFilter!=="All" && ev.dept!==selectedDeptFilter) return;
+    const startIdx=workTimes.indexOf(ev.time);
+    const techIdx=techs.indexOf(ev.tech);
+    if(startIdx===-1 || techIdx===-1) return;
+    const span=Math.max(1,Math.ceil((ev.minutes||90)/30));
+    const block=document.createElement("div");
+    block.className="blocked-span";
+    block.dataset.eventId=ev.id;
+    block.style.gridColumn=techIdx+2;
+    block.style.gridRow=`${startIdx+1} / span ${span}`;
+    block.style.pointerEvents="auto";
+
+    const meta=statusMeta(ev.status||"Scheduled");
+    const statusSpan=document.createElement("span");
+    statusSpan.className=`event-status-icon ${meta.className}`;
+    statusSpan.textContent=meta.icon;
+    block.appendChild(statusSpan);
+
+    const progMeta=serviceProgressMeta(ev.serviceProgress||"In Queue");
+    const progSpan=document.createElement("span");
+    progSpan.className=`service-progress-icon ${progMeta.className}`;
+    progSpan.textContent=progMeta.icon;
+    block.appendChild(progSpan);
+
+    const labelParts=[];
+    if(ev.customerName) labelParts.push(ev.customerName);
+    if(ev.serviceName||ev.label) labelParts.push(ev.serviceName||ev.label);
+    const text=document.createElement("span");
+    text.className="blocked-text";
+    text.textContent=labelParts.join(" – ")||"Job";
+    block.appendChild(text);
+
+    if(ev.invoiced || ev.paid){
+      const dollar=document.createElement("span");
+      dollar.className=`invoice-icon ${ev.paid?"paid":"pending"}`;
+      dollar.textContent="$";
+      block.appendChild(dollar);
+    }
+    if(ev.dealer){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="D";
+      block.appendChild(b);
+    }
+    if(ev.customerWaiting){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="W";
+      block.appendChild(b);
+    }
+    if(ev.rideNeeded){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="R";
+      block.appendChild(b);
+    }
+    if(ev.pickupDelivery){
+      const b=document.createElement("span");
+      b.className="small-badge";
+      b.textContent="P/D";
+      block.appendChild(b);
+    }
+
+    block.addEventListener("click",()=>{
+      selectedEventId=ev.id;
+      setSelectedSlot(ev.tech, ev.time);
+      renderEventDetails(ev);
+      loadJobEventIntoForm(ev);
+      openAppointmentPopup(ev);
+    });
+
+    const overlay=document.querySelector(".blocked-overlay");
+    if(overlay) overlay.appendChild(block);
   });
 
   if(selectedSlot){
@@ -2498,7 +2566,7 @@ async function createOrUpdateAppointment(){
 
   let missingDept=false,missingTech=false,missingTime=false;
   const services=rawServices.map(row=>{
-    let {dept,serviceName,tech,time,minutes,price}=row;
+    let {dept,serviceName,tech,time,minutes,price,serviceProgress}=row;
     if(!dept) missingDept=true;
     if(!time) missingTime=true;
     if(!tech && dealer){
