@@ -707,7 +707,7 @@
       </div>
       <div class="popup-actions">
         <div class="status-chip" id="popupStatusChip">
-          <span class="event-status-icon scheduled" id="popupStatusIcon">●</span>
+          <span class="event-status-icon scheduled" id="popupStatusIcon">S</span>
           <span id="popupStatusLabel">Scheduled</span>
         </div>
         <button class="icon-button" id="btnUnlockEditing">✏️ Edit</button>
@@ -914,11 +914,11 @@ function addMinutesToTime(time,minutes){
 
 function statusMeta(status){
   const map={
-    "Scheduled":{className:"scheduled",icon:"●"},
-    "Check In":{className:"checkin",icon:"⧗"},
-    "Cancelled":{className:"cancelled",icon:"✖"},
-    "No Show":{className:"noshow",icon:"⚠"},
-    "Completed":{className:"completed",icon:"✔"}
+    "Scheduled":{className:"scheduled",icon:"S"},
+    "Check In":{className:"checkin",icon:"I"},
+    "Cancelled":{className:"cancelled",icon:"X"},
+    "No Show":{className:"noshow",icon:"N"},
+    "Completed":{className:"completed",icon:"C"}
   };
   return map[status]||map["Scheduled"];
 }
