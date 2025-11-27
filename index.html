@@ -10,6 +10,7 @@
       --par-border:#2b3950;--par-text:#fdfdfd;--par-muted:#9ca7c0;
       --dept-tint:#e53935;--dept-ppf:#2962ff;--dept-ceramic:#00c853;--dept-detail:#ffb300;--dept-electronics:#ab47bc;--timeoff:#8d8d8d;
       --grid-bg:#f2f4fb;--grid-header-bg:#e3e7f1;--grid-border-strong:rgba(0,0,0,.25);--grid-border-light:rgba(0,0,0,.15);
+      --slot-height:32px;
     }
     *{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystem,"Segoe UI",sans-serif;}
     body{margin:0;background:radial-gradient(circle at top,#101b2e,#02040a);color:var(--par-text);}
@@ -42,10 +43,10 @@
     .cal-header-row{display:grid;grid-template-columns:60px repeat(6,1fr);font-size:11px;padding:4px 4px 6px;border-bottom:3px solid var(--grid-border-strong);background:var(--grid-header-bg);}
     .cal-header-cell{text-align:center;font-weight:600;color:#111827;}
     .cal-body{flex:1;overflow:auto;}
-    .cal-row{display:grid;grid-template-columns:60px repeat(6,1fr);border-bottom:2px solid var(--grid-border-light);font-size:11px;background:linear-gradient(to right,rgba(255,255,255,.9),rgba(255,255,255,.9));height:32px;}
+    .cal-row{display:grid;grid-template-columns:60px repeat(6,1fr);border-bottom:2px solid var(--grid-border-light);font-size:11px;background:linear-gradient(to right,rgba(255,255,255,.9),rgba(255,255,255,.9));height:var(--slot-height,32px);}
     .cal-row:nth-child(2n){background:linear-gradient(to right,rgba(249,250,251,.95),rgba(249,250,251,.95));}
     .cal-time-cell{padding:2px 4px;text-align:right;color:#4b5563;font-weight:500;background:#e5e7eb;border-right:2px solid var(--grid-border-strong);}
-    .cal-slot-cell{border-left:2px solid var(--grid-border-light);position:relative;cursor:pointer;background:transparent;transition:background .12s,box-shadow .12s,transform .05s;overflow:hidden;}
+    .cal-slot-cell{border-left:2px solid var(--grid-border-light);position:relative;cursor:pointer;background:transparent;transition:background .12s,box-shadow .12s,transform .05s;overflow:visible;}
     .cal-slot-cell:hover{background:rgba(227,6,19,.06);box-shadow:inset 0 0 0 1px rgba(227,6,19,.35);}
     .cal-slot-cell.selected{background:rgba(227,6,19,.1);box-shadow:inset 0 0 0 2px rgba(227,6,19,.8);transform:translateY(-1px);}
     .cal-slot-cell.off-shift{background:repeating-linear-gradient(45deg,rgba(15,23,42,.02),rgba(15,23,42,.02) 4px,rgba(15,23,42,.07) 4px,rgba(15,23,42,.07) 8px);}
@@ -67,11 +68,25 @@
     }
 
     .event-pill{border-radius:999px;padding:1px 6px;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(15,23,42,.25);display:inline-flex;align-items:center;gap:3px;}
+    .event-bubble{position:absolute;left:2px;right:2px;top:2px;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:10px;color:#0b1324;background:rgba(255,255,255,.96);box-shadow:0 6px 16px rgba(0,0,0,.28);border:1px solid rgba(0,0,0,.08);overflow:hidden;}
+    .event-bubble .bubble-header{display:flex;flex-direction:column;gap:4px;}
+    .event-bubble .bubble-title{font-weight:700;font-size:12px;color:#0f172a;}
+    .event-bubble .bubble-sub{font-size:11px;color:#1f2937;}
+    .event-bubble .bubble-sub.muted{color:#6b7280;font-weight:600;}
+    .event-bubble .bubble-icons{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10px;}
+    .event-bubble .bubble-foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:6px;}
+    .event-bubble .bubble-foot-left{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+    .event-bubble .bubble-foot .bubble-time{font-size:11px;font-weight:700;color:#0f172a;}
     .event-detailing{background:var(--dept-detail);}
     .event-tint{background:var(--dept-tint);color:#fff;}
     .event-ppf{background:var(--dept-ppf);color:#fff;}
     .event-ceramic{background:var(--dept-ceramic);}
     .event-electronics{background:var(--dept-electronics);color:#fff;}
+    .event-bubble.event-detailing{border-left:5px solid var(--dept-detail);}
+    .event-bubble.event-tint{border-left:5px solid var(--dept-tint);}
+    .event-bubble.event-ppf{border-left:5px solid var(--dept-ppf);}
+    .event-bubble.event-ceramic{border-left:5px solid var(--dept-ceramic);}
+    .event-bubble.event-electronics{border-left:5px solid var(--dept-electronics);}
     .event-timeoff{background:var(--timeoff);color:#fff;}
     .event-status-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:700;color:#111827;background:#fef3c7;}
     .event-status-icon.scheduled{background:#fef3c7;color:#92400e;}
@@ -1911,7 +1926,7 @@ function renderEventDetails(ev){
     const dayName=getDayName(currentDate);
   const todays=getEventsForDay(dateIso);
   const coverageMap=new Map();
-  const blockedPreviewRendered=new Set();
+  const slotHeightVal=parseInt(getComputedStyle(document.documentElement).getPropertyValue("--slot-height"))||32;
   todays.forEach(ev=>{
     if(ev.type!=="job") return;
     if(!ev.serviceProgress) ev.serviceProgress="In Queue";
@@ -1999,42 +2014,6 @@ function renderEventDetails(ev){
         const inner=document.createElement("div");
         inner.className="cal-slot-inner";
 
-        if(coveringJobs.length && !hasStartHere){
-          const previewJob=[...coveringJobs].sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time))[0];
-          const previewKey=previewJob?`${previewJob.id}-${tech}`:null;
-          if(previewJob && previewKey && !blockedPreviewRendered.has(previewKey)){
-            blockedPreviewRendered.add(previewKey);
-            const preview=document.createElement("div");
-            preview.className="blocked-preview";
-            const meta=statusMeta(previewJob.status||"Scheduled");
-            const icon=document.createElement("span");
-            icon.className=`event-status-icon ${meta.className}`;
-            icon.textContent=meta.icon;
-            preview.appendChild(icon);
-
-            const svcMeta=serviceProgressMeta(previewJob.serviceProgress||"In Queue");
-            const svcIcon=document.createElement("span");
-            svcIcon.className=`service-progress-icon ${svcMeta.className}`;
-            svcIcon.textContent=svcMeta.icon;
-            preview.appendChild(svcIcon);
-
-            const text=document.createElement("span");
-            text.className="blocked-text";
-            const parts=[];
-            if(previewJob.customerName) parts.push(previewJob.customerName);
-            if(previewJob.serviceName||previewJob.label) parts.push(previewJob.serviceName||previewJob.label);
-            text.textContent=parts.join(" • ")||"Booked";
-            preview.appendChild(text);
-            if(previewJob.invoiced||previewJob.paid){
-              const dollar=document.createElement("span");
-              dollar.className=`invoice-icon ${previewJob.paid?"paid":"pending"}`;
-              dollar.textContent="$";
-              preview.appendChild(dollar);
-            }
-            inner.appendChild(preview);
-          }
-        }
-
       const cellEvents=todays.filter(ev=>
         ev.tech===tech &&
         ev.time===time &&
@@ -2058,6 +2037,102 @@ function renderEventDetails(ev){
           }
         }
 
+        if(ev.type==="job"){
+          const bubble=document.createElement("div");
+          let cls="event-bubble ";
+          if(ev.dept==="Detailing") cls+="event-detailing";
+          else if(ev.dept==="Tint") cls+="event-tint";
+          else if(ev.dept==="PPF") cls+="event-ppf";
+          else if(ev.dept==="Ceramic") cls+="event-ceramic";
+          else if(ev.dept==="Electronics") cls+="event-electronics";
+          bubble.className=cls.trim();
+          bubble.dataset.eventId=ev.id;
+
+          const slotsNeeded=Math.max(1,Math.ceil((ev.minutes||90)/30));
+          bubble.style.height=`calc(${slotsNeeded} * var(--slot-height, ${slotHeightVal}px) - 6px)`;
+
+          const header=document.createElement("div");
+          header.className="bubble-header";
+          const title=document.createElement("div");
+          title.className="bubble-title";
+          title.textContent=ev.serviceName||ev.label||"Service";
+          header.appendChild(title);
+          if(ev.customerName){
+            const cust=document.createElement("div");
+            cust.className="bubble-sub";
+            cust.textContent=ev.customerName;
+            header.appendChild(cust);
+          }
+          const infoLine=document.createElement("div");
+          infoLine.className="bubble-sub muted";
+          const infoParts=[];
+          if(ev.phone) infoParts.push(ev.phone);
+          if(ev.time) infoParts.push(formatTimeFriendly(ev.time));
+          infoLine.textContent=infoParts.join(" • ");
+          header.appendChild(infoLine);
+
+          bubble.appendChild(header);
+
+          const foot=document.createElement("div");
+          foot.className="bubble-foot";
+          const footLeft=document.createElement("div");
+          footLeft.className="bubble-foot-left";
+
+          const meta=statusMeta(ev.status||"Scheduled");
+          const statusSpan=document.createElement("span");
+          statusSpan.className=`event-status-icon ${meta.className}`;
+          statusSpan.textContent=meta.icon;
+          footLeft.appendChild(statusSpan);
+
+          const progMeta=serviceProgressMeta(ev.serviceProgress||"In Queue");
+          const progSpan=document.createElement("span");
+          progSpan.className=`service-progress-icon ${progMeta.className}`;
+          progSpan.textContent=progMeta.icon;
+          footLeft.appendChild(progSpan);
+
+          if(ev.invoiced || ev.paid){
+            const dollar=document.createElement("span");
+            dollar.className=`invoice-icon ${ev.paid?"paid":"pending"}`;
+            dollar.textContent="$";
+            footLeft.appendChild(dollar);
+          }
+
+          if(ev.dealer){
+            const b=document.createElement("span");
+            b.className="small-badge";
+            b.textContent="D";
+            footLeft.appendChild(b);
+          }
+          if(ev.customerWaiting){
+            const b=document.createElement("span");
+            b.className="small-badge";
+            b.textContent="W";
+            footLeft.appendChild(b);
+          }
+          if(ev.rideNeeded){
+            const b=document.createElement("span");
+            b.className="small-badge";
+            b.textContent="R";
+            footLeft.appendChild(b);
+          }
+          if(ev.pickupDelivery){
+            const b=document.createElement("span");
+            b.className="small-badge";
+            b.textContent="P/D";
+            footLeft.appendChild(b);
+          }
+
+          foot.appendChild(footLeft);
+          const startLabel=document.createElement("div");
+          startLabel.className="bubble-time";
+          startLabel.textContent=ev.time?formatTimeFriendly(ev.time):"";
+          foot.appendChild(startLabel);
+
+          bubble.appendChild(foot);
+          inner.appendChild(bubble);
+          return;
+        }
+
           const pill=document.createElement("div");
           let cls="event-pill ";
           if(ev.type==="timeoff") cls+="event-timeoff";
@@ -2071,55 +2146,9 @@ function renderEventDetails(ev){
 
           let label=ev.label||ev.serviceName||"Job";
           if(ev.type==="job" && ev.customerName) label=`${ev.customerName} – ${label}`;
-        if(ev.type==="job"){
-          const meta=statusMeta(ev.status||"Scheduled");
-          const statusSpan=document.createElement("span");
-          statusSpan.className=`event-status-icon ${meta.className}`;
-          statusSpan.textContent=meta.icon;
-          pill.appendChild(statusSpan);
-
-          const progMeta=serviceProgressMeta(ev.serviceProgress||"In Queue");
-          const progSpan=document.createElement("span");
-          progSpan.className=`service-progress-icon ${progMeta.className}`;
-          progSpan.textContent=progMeta.icon;
-          pill.appendChild(progSpan);
-        }
         const span=document.createElement("span");
         span.textContent=label;
         pill.appendChild(span);
-
-          if(ev.type==="job"){
-            if(ev.invoiced || ev.paid){
-              const dollar=document.createElement("span");
-              dollar.className=`invoice-icon ${ev.paid?"paid":"pending"}`;
-              dollar.textContent="$";
-              pill.appendChild(dollar);
-            }
-            if(ev.dealer){
-              const b=document.createElement("span");
-              b.className="small-badge";
-            b.textContent="D";
-            pill.appendChild(b);
-          }
-          if(ev.customerWaiting){
-            const b=document.createElement("span");
-            b.className="small-badge";
-            b.textContent="W";
-            pill.appendChild(b);
-          }
-          if(ev.rideNeeded){
-            const b=document.createElement("span");
-            b.className="small-badge";
-            b.textContent="R";
-            pill.appendChild(b);
-          }
-          if(ev.pickupDelivery){
-            const b=document.createElement("span");
-            b.className="small-badge";
-            b.textContent="P/D";
-            pill.appendChild(b);
-          }
-        }
 
         inner.appendChild(pill);
       });
@@ -2703,7 +2732,7 @@ function loadJobEventIntoForm(ev){
 
 // Calendar clicks
 bodyEl.addEventListener("click",e=>{
-  const pill=e.target.closest(".event-pill");
+  const pill=e.target.closest(".event-pill, .event-bubble");
   if(pill){
     const id=pill.dataset.eventId;
     selectedEventId=id;
