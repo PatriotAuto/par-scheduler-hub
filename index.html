@@ -49,7 +49,10 @@
     .cal-slot-cell:hover{background:rgba(227,6,19,.06);box-shadow:inset 0 0 0 1px rgba(227,6,19,.35);}
     .cal-slot-cell.selected{background:rgba(227,6,19,.1);box-shadow:inset 0 0 0 2px rgba(227,6,19,.8);transform:translateY(-1px);}
     .cal-slot-cell.off-shift{background:repeating-linear-gradient(45deg,rgba(15,23,42,.02),rgba(15,23,42,.02) 4px,rgba(15,23,42,.07) 4px,rgba(15,23,42,.07) 8px);}
+    .cal-slot-cell.blocked-slot{background:linear-gradient(to right, rgba(227,6,19,0.08), rgba(227,6,19,0.14));}
     .cal-slot-inner{padding:1px 4px;height:100%;display:flex;align-items:center;gap:2px;overflow:hidden;}
+    .blocked-preview{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.9);color:#111827;font-size:10px;box-shadow:0 1px 2px rgba(15,23,42,.18);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .blocked-preview .blocked-text{max-width:140px;overflow:hidden;text-overflow:ellipsis;}
     .cal-slot-cell.timeoff-block{
       background:linear-gradient(to right, rgba(141,141,141,0.25), rgba(141,141,141,0.35));
     }
@@ -70,6 +73,22 @@
     .event-ceramic{background:var(--dept-ceramic);}
     .event-electronics{background:var(--dept-electronics);color:#fff;}
     .event-timeoff{background:var(--timeoff);color:#fff;}
+    .event-status-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:700;color:#111827;background:#fef3c7;}
+    .event-status-icon.scheduled{background:#fef3c7;color:#92400e;}
+    .event-status-icon.checkin{background:#dbeafe;color:#1e3a8a;}
+    .event-status-icon.completed{background:#dcfce7;color:#166534;}
+    .event-status-icon.cancelled{background:#fee2e2;color:#991b1b;}
+    .event-status-icon.noshow{background:#ede9fe;color:#4c1d95;}
+    .service-progress-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:6px;font-size:10px;font-weight:800;border:1px solid rgba(0,0,0,.12);background:#fff;color:#111827;}
+    .service-progress-icon.queue{background:#fff7ed;color:#b45309;}
+    .service-progress-icon.started{background:#e0f2fe;color:#075985;}
+    .service-progress-icon.done{background:#dcfce7;color:#166534;}
+    .invoice-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:11px;font-weight:800;}
+    .invoice-icon.pending{background:#fef3c7;color:#b45309;}
+    .invoice-icon.paid{background:#dcfce7;color:#15803d;}
+    .status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:10px;border:1px solid rgba(0,0,0,.1);background:#fff;color:#111827;}
+    .status-summary{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:24px;}
+    .status-summary-note{font-size:10px;color:#6b7280;}
     .small-badge{font-size:9px;padding:0 4px;border-radius:999px;background:rgba(0,0,0,.2);color:#f9fafb;text-transform:uppercase;}
     .cal-legend{margin:6px 8px 4px;display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:#4b5563;}
     .legend-item{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.8);border-radius:999px;padding:2px 8px;border:1px solid rgba(0,0,0,.06);}
@@ -172,6 +191,24 @@
         padding:7px 9px;
       }
     }
+
+    /* Appointment pop-up */
+    .popup-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);z-index:1500;padding:12px;}
+    .popup-card{background:#0b1324;border:1px solid rgba(255,255,255,.12);border-radius:12px;max-width:520px;width:100%;box-shadow:0 18px 40px rgba(0,0,0,.45);color:#f9fafb;display:flex;flex-direction:column;}
+    .popup-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
+    .popup-title{display:flex;flex-direction:column;gap:4px;}
+    .popup-title h3{margin:0;font-size:16px;letter-spacing:.08em;text-transform:uppercase;}
+    .popup-title span{font-size:12px;color:var(--par-muted);}
+    .popup-actions{display:flex;align-items:center;gap:8px;}
+    .icon-button{border:none;background:rgba(255,255,255,.08);color:#f9fafb;border-radius:8px;padding:6px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-weight:600;letter-spacing:.04em;}
+    .icon-button:hover{background:rgba(227,6,19,.22);}
+    .popup-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+    .popup-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .popup-badge{padding:4px 8px;border-radius:8px;background:rgba(255,255,255,.08);font-size:11px;display:inline-flex;align-items:center;gap:6px;}
+    .popup-list{border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;background:rgba(5,11,24,.6);display:flex;flex-direction:column;gap:6px;}
+    .popup-list-item{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.04);}
+    .popup-list-item select{min-width:130px;}
+    .popup-close{border:none;background:none;color:var(--par-muted);font-size:18px;cursor:pointer;}
 
     /* Custom date picker */
     .date-picker-popup{
@@ -382,6 +419,23 @@
 <div class="field-group">
   <label>Notes</label>
   <textarea id="inputNotes" placeholder="Deposit paid? Keys in drop box?"></textarea>
+</div>
+
+<div class="field-group">
+  <label>Status &amp; Billing</label>
+  <div id="statusSummary" class="status-summary"></div>
+  <div class="timeoff-note">Update status or billing from the appointment pop-up.</div>
+  <select id="inputStatus" style="display:none;" disabled>
+    <option value="Scheduled">Scheduled</option>
+    <option value="Check In">Check In</option>
+    <option value="Cancelled">Cancelled</option>
+    <option value="No Show">No Show</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <div style="display:none;">
+    <input type="checkbox" id="checkboxInvoiced" />
+    <input type="checkbox" id="checkboxPaid" />
+  </div>
 </div>
 
 <div class="inline-checkbox" style="margin-top:4px;">
@@ -619,19 +673,100 @@
   <div class="date-picker-grid" id="dpGrid"></div>
 </div>
 
+<!-- Appointment pop-up -->
+<div id="appointmentPopup" class="popup-backdrop">
+  <div class="popup-card">
+    <div class="popup-header">
+      <div class="popup-title">
+        <h3 id="popupTitle">Appointment</h3>
+        <span id="popupSubtitle"></span>
+      </div>
+      <div class="popup-actions">
+        <div class="status-chip" id="popupStatusChip">
+          <span class="event-status-icon scheduled" id="popupStatusIcon">●</span>
+          <span id="popupStatusLabel">Scheduled</span>
+        </div>
+        <button class="icon-button" id="btnUnlockEditing">✏️ Edit</button>
+        <button class="popup-close" id="btnClosePopup">✕</button>
+      </div>
+    </div>
+    <div class="popup-body">
+      <div class="popup-row">
+        <label style="font-size:11px;letter-spacing:.08em;">Status</label>
+        <select id="popupStatusSelect" style="flex:1;max-width:200px;">
+          <option>Scheduled</option>
+          <option>Check In</option>
+          <option>Cancelled</option>
+          <option>No Show</option>
+          <option>Completed</option>
+        </select>
+      </div>
+      <div class="popup-row">
+        <label style="font-size:11px;letter-spacing:.08em;">Billing</label>
+        <div class="inline-checkbox" style="color:#f9fafb;">
+          <input type="checkbox" id="popupInvoiced" />
+          <span>Invoiced <span class="invoice-icon pending" style="margin-left:4px;">$</span></span>
+        </div>
+        <div class="inline-checkbox" style="color:#f9fafb;">
+          <input type="checkbox" id="popupPaid" />
+          <span>Paid <span class="invoice-icon paid" style="margin-left:4px;">$</span></span>
+        </div>
+      </div>
+      <div class="popup-row" id="popupQuickFlags"></div>
+      <div class="popup-list" id="popupServicesList"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 const techs=["William","Limage","Kaiden","Luke","Fafa","Matt"];
 const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const workTimes=["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00"];
 
 const defaultServicePackages={
-  "Detailing":["Interior Detail","Exterior Detail","Full Detail","Quick Clean"],
-  "Tint":["Front Windows Only","Full Tint","Windshield Tint"],
-  "PPF":["Full Front PPF"],
-  "Ceramic":["1 Year Coating","3 Year Coating","5 Year Coating"],
-  "Electronics":["Remote Start","Remote Start + Security"]
+  "Detailing":[
+    {name:"Interior Detail",minutes:150,price:275},
+    {name:"Exterior Detail",minutes:120,price:225},
+    {name:"Full Detail",minutes:210,price:450},
+    {name:"Quick Clean",minutes:60,price:120}
+  ],
+  "Tint":[
+    {name:"Front Windows Only",minutes:60,price:180},
+    {name:"Full Tint",minutes:120,price:380},
+    {name:"Windshield Tint",minutes:90,price:220}
+  ],
+  "PPF":[{name:"Full Front PPF",minutes:240,price:1600}],
+  "Ceramic":[
+    {name:"1 Year Coating",minutes:150,price:650},
+    {name:"3 Year Coating",minutes:210,price:1100},
+    {name:"5 Year Coating",minutes:240,price:1400}
+  ],
+  "Electronics":[
+    {name:"Remote Start",minutes:120,price:450},
+    {name:"Remote Start + Security",minutes:150,price:650}
+  ]
 };
 let servicePackages={};
+
+function normalizeServiceList(list){
+  if(!Array.isArray(list)) return [];
+  return list.map(item=>{
+    if(typeof item==="string"){
+      return {name:item,minutes:90,price:0};
+    }
+    const minutes=Math.max(15,parseInt(item.minutes,10)||90);
+    const price=parseFloat(item.price)||0;
+    return {name:item.name||"Unnamed Service",minutes,price};
+  });
+}
+
+function normalizeServicePackages(raw){
+  const cleaned={};
+  Object.keys(raw||{}).forEach(cat=>{
+    cleaned[cat]=normalizeServiceList(raw[cat]);
+  });
+  return cleaned;
+}
 
 const ZAPIER_WEBHOOK_URL="https://hooks.zapier.com/hooks/catch/23565840/uzuiw0k/";
 // Global shop hours (open/close per weekday) + holidays
@@ -654,6 +789,7 @@ let selectedDeptFilter="All";
 let selectedSlot=null;
 let selectedEventId=null;
 let editingJobGroupId=null;
+let appointmentLocked=false;
 
 // DOM refs
 const headerBtnAppointments=document.getElementById("btnAppointmentsPanel");
@@ -675,6 +811,24 @@ const scheduleTechSelect=document.getElementById("scheduleTechSelect");
 const scheduleStatus=document.getElementById("scheduleStatus");
 const btnCreateAppointment=document.getElementById("btnCreateAppointment");
 const btnDeleteAppointment=document.getElementById("btnDeleteAppointment");
+const statusField=document.getElementById("inputStatus");
+const checkboxInvoiced=document.getElementById("checkboxInvoiced");
+const checkboxPaid=document.getElementById("checkboxPaid");
+const statusSummary=document.getElementById("statusSummary");
+
+const appointmentPopup=document.getElementById("appointmentPopup");
+const popupStatusSelect=document.getElementById("popupStatusSelect");
+const popupStatusIcon=document.getElementById("popupStatusIcon");
+const popupStatusLabel=document.getElementById("popupStatusLabel");
+const popupStatusChip=document.getElementById("popupStatusChip");
+const popupTitle=document.getElementById("popupTitle");
+const popupSubtitle=document.getElementById("popupSubtitle");
+const popupServicesList=document.getElementById("popupServicesList");
+const popupQuickFlags=document.getElementById("popupQuickFlags");
+const popupInvoiced=document.getElementById("popupInvoiced");
+const popupPaid=document.getElementById("popupPaid");
+const btnUnlockEditing=document.getElementById("btnUnlockEditing");
+const btnClosePopup=document.getElementById("btnClosePopup");
 
 // Service assignments container
 const serviceAssignmentsContainer=document.getElementById("serviceAssignments");
@@ -721,6 +875,37 @@ function parseISODate(str){
   const d=new Date(year,month,day);
   if(isNaN(d.getTime())) return null;
   return d;
+}
+
+function minutesToTime(total){
+  const h=String(Math.floor(total/60)).padStart(2,"0");
+  const m=String(total%60).padStart(2,"0");
+  return `${h}:${m}`;
+}
+
+function addMinutesToTime(time,minutes){
+  const base=timeToMinutes(time)||0;
+  return minutesToTime(base+minutes);
+}
+
+function statusMeta(status){
+  const map={
+    "Scheduled":{className:"scheduled",icon:"●"},
+    "Check In":{className:"checkin",icon:"⧗"},
+    "Cancelled":{className:"cancelled",icon:"✖"},
+    "No Show":{className:"noshow",icon:"⚠"},
+    "Completed":{className:"completed",icon:"✔"}
+  };
+  return map[status]||map["Scheduled"];
+}
+
+function serviceProgressMeta(status){
+  const map={
+    "In Queue":{className:"queue",icon:"⏳"},
+    "Started":{className:"started",icon:"▶"},
+    "Completed":{className:"done",icon:"✔"}
+  };
+  return map[status]||map["In Queue"];
 }
 
 // Time dropdowns
@@ -860,25 +1045,251 @@ function saveShopHolidaysToStorage(){
 // Service packages storage
 function loadServicePackagesFromStorage(){
   if(!storageAvailable){
-    servicePackages=JSON.parse(JSON.stringify(defaultServicePackages));
+    servicePackages=normalizeServicePackages(defaultServicePackages);
     return;
   }
   const raw=localStorage.getItem("patriotServicePackages");
   if(!raw){
-    servicePackages=JSON.parse(JSON.stringify(defaultServicePackages));
+    servicePackages=normalizeServicePackages(defaultServicePackages);
     return;
   }
   try{
     const parsed=JSON.parse(raw);
     if(parsed && typeof parsed==="object"){
-      servicePackages=parsed;
+      servicePackages=normalizeServicePackages(parsed);
     }else{
-      servicePackages=JSON.parse(JSON.stringify(defaultServicePackages));
+      servicePackages=normalizeServicePackages(defaultServicePackages);
     }
   }catch(e){
     console.error("Failed to parse saved service packages",e);
-    servicePackages=JSON.parse(JSON.stringify(defaultServicePackages));
+    servicePackages=normalizeServicePackages(defaultServicePackages);
   }
+}
+
+function setAppointmentFormLocked(locked){
+  appointmentLocked=locked;
+  const form=document.getElementById("appointmentForm");
+  if(!form) return;
+  const controls=form.querySelectorAll("input, select, textarea, button");
+  controls.forEach(el=>{
+    if(el.id==="btnClear") return;
+    el.disabled=locked;
+  });
+  form.querySelectorAll(".service-row button").forEach(btn=>btn.disabled=locked);
+  if(btnCreateAppointment) btnCreateAppointment.disabled=locked;
+  if(btnDeleteAppointment) btnDeleteAppointment.disabled=locked;
+  if(btnAddServiceRow) btnAddServiceRow.disabled=locked;
+}
+
+function setPopupEditable(enabled){
+  if(popupStatusSelect) popupStatusSelect.disabled=!enabled;
+  if(popupInvoiced) popupInvoiced.disabled=!enabled;
+  if(popupPaid) popupPaid.disabled=!enabled;
+  if(btnUnlockEditing) btnUnlockEditing.textContent=enabled?"Editing" : "✏️ Edit";
+}
+
+function getCurrentStatusState(){
+  const status=statusField?statusField.value||"Scheduled":"Scheduled";
+  const paid=!!(checkboxPaid&&checkboxPaid.checked);
+  const invoiced=paid?true:!!(checkboxInvoiced&&checkboxInvoiced.checked);
+  return {status,invoiced,paid};
+}
+
+function updateStatusSummaryDisplay(){
+  if(!statusSummary) return;
+  const {status,invoiced,paid}=getCurrentStatusState();
+  statusSummary.innerHTML="";
+  const meta=statusMeta(status);
+  const chip=document.createElement("div");
+  chip.className=`status-chip`;
+  const icon=document.createElement("span");
+  icon.className=`event-status-icon ${meta.className}`;
+  icon.textContent=meta.icon;
+  const text=document.createElement("span");
+  text.textContent=status;
+  chip.appendChild(icon);
+  chip.appendChild(text);
+  statusSummary.appendChild(chip);
+
+  if(invoiced||paid){
+    const dollar=document.createElement("span");
+    dollar.className=`invoice-icon ${paid?"paid":"pending"}`;
+    dollar.textContent="$";
+    statusSummary.appendChild(dollar);
+  }
+}
+
+function setStatusState(status,invoiced,paid){
+  if(statusField) statusField.value=status||"Scheduled";
+  if(checkboxPaid) checkboxPaid.checked=!!paid;
+  if(checkboxInvoiced) checkboxInvoiced.checked=!!invoiced||!!paid;
+  syncPopupFromStatusFields();
+}
+
+function syncPopupFromStatusFields(){
+  const {status,invoiced,paid}=getCurrentStatusState();
+  if(popupStatusSelect) popupStatusSelect.value=status;
+  if(popupInvoiced) popupInvoiced.checked=invoiced;
+  if(popupPaid) popupPaid.checked=paid;
+  const meta=statusMeta(status);
+  if(popupStatusIcon){
+    popupStatusIcon.className=`event-status-icon ${meta.className}`;
+    popupStatusIcon.textContent=meta.icon;
+  }
+  if(popupStatusLabel) popupStatusLabel.textContent=status;
+  updateStatusSummaryDisplay();
+}
+
+function applyMetaToGroup(status,invoiced,paid){
+  if(paid) invoiced=true;
+  if(!editingJobGroupId) return;
+  events=events.map(ev=>{
+    if(ev.type==="job" && (ev.jobGroupId||ev.id)===editingJobGroupId){
+      return {...ev,status,invoiced,paid};
+    }
+    return ev;
+  });
+  renderCalendar();
+}
+
+function syncServiceProgressToForm(groupEvents){
+  const map=new Map();
+  groupEvents.forEach(ev=>map.set(ev.id, ev.serviceProgress||"In Queue"));
+  document.querySelectorAll(".service-row").forEach(row=>{
+    const prog=row.querySelector(".sa-progress");
+    if(!prog) return;
+    const id=row.dataset.eventId;
+    if(id && map.has(id)){
+      prog.value=map.get(id);
+    }
+  });
+}
+
+function autoAdvanceServiceProgress(groupId){
+  const groupEvents=events
+    .filter(ev=>ev.type==="job" && (ev.jobGroupId||ev.id)===groupId)
+    .map(ev=>({
+      ...ev,
+      serviceProgress:ev.serviceProgress||"In Queue"
+    }))
+    .sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time));
+  if(!groupEvents.length) return;
+
+  groupEvents.forEach((ev,idx)=>{
+    if(ev.serviceProgress==="Completed"){
+      const next=groupEvents[idx+1];
+      if(next && next.serviceProgress==="In Queue"){
+        events=events.map(e=>e.id===next.id?{...e,serviceProgress:"Started"}:e);
+      }
+    }
+  });
+
+  const refreshed=events.filter(ev=>ev.type==="job" && (ev.jobGroupId||ev.id)===groupId);
+  const allDone=refreshed.length>0 && refreshed.every(ev=>(ev.serviceProgress||"In Queue")==="Completed");
+  if(allDone){
+    setStatusState("Completed",checkboxInvoiced.checked,checkboxPaid.checked);
+    applyMetaToGroup("Completed",checkboxInvoiced.checked,checkboxPaid.checked);
+  }
+}
+
+function updateServiceProgress(groupId,eventId,newStatus){
+  events=events.map(ev=>{
+    if(ev.id===eventId){
+      return {...ev,serviceProgress:newStatus};
+    }
+    return ev;
+  });
+  autoAdvanceServiceProgress(groupId);
+  const groupEvents=events.filter(ev=>ev.type==="job" && (ev.jobGroupId||ev.id)===groupId);
+  syncServiceProgressToForm(groupEvents);
+  buildPopupServices(groupEvents, groupId);
+  renderCalendar();
+}
+
+function buildPopupServices(groupEvents, groupId){
+  if(!popupServicesList) return;
+  popupServicesList.innerHTML="";
+  const sorted=[...groupEvents].sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time));
+  sorted.forEach(gev=>{
+    const row=document.createElement("div");
+    row.className="popup-list-item";
+
+    const left=document.createElement("div");
+    left.style.display="flex";
+    left.style.alignItems="center";
+    left.style.gap="8px";
+    const progMeta=serviceProgressMeta(gev.serviceProgress||"In Queue");
+    const progIcon=document.createElement("span");
+    progIcon.className=`service-progress-icon ${progMeta.className}`;
+    progIcon.textContent=progMeta.icon;
+    left.appendChild(progIcon);
+
+    const info=document.createElement("div");
+    info.style.display="flex";
+    info.style.flexDirection="column";
+    info.style.gap="2px";
+    const endTime=addMinutesToTime(gev.time,gev.minutes||90);
+    info.innerHTML=`<strong>${gev.serviceName||gev.label||"Service"}</strong><span style="color:#9ca3af;">${gev.tech} · ${gev.time}–${endTime} · ${gev.minutes||90} mins</span>`;
+    left.appendChild(info);
+
+    const price=document.createElement("div");
+    price.textContent=`$${(gev.price||0).toFixed(2)}`;
+    price.style.fontWeight="700";
+
+    const select=document.createElement("select");
+    ["In Queue","Started","Completed"].forEach(val=>{
+      const o=document.createElement("option");o.value=val;o.textContent=val;select.appendChild(o);
+    });
+    select.value=gev.serviceProgress||"In Queue";
+    select.disabled=appointmentLocked;
+    select.addEventListener("change",()=>{
+      updateServiceProgress(groupId||gev.jobGroupId||gev.id, gev.id, select.value);
+    });
+
+    row.appendChild(left);
+    row.appendChild(price);
+    row.appendChild(select);
+    popupServicesList.appendChild(row);
+  });
+}
+
+function setPopupFlags(ev){
+  if(!popupQuickFlags) return;
+  popupQuickFlags.innerHTML="";
+  const flags=[];
+  if(ev.dealer) flags.push("Dealer Job");
+  if(ev.customerWaiting) flags.push("Waiting");
+  if(ev.rideNeeded) flags.push("Ride Needed");
+  if(ev.pickupDelivery) flags.push("Pickup / Delivery");
+  flags.forEach(f=>{
+    const badge=document.createElement("div");
+    badge.className="popup-badge";
+    badge.textContent=f;
+    popupQuickFlags.appendChild(badge);
+  });
+}
+
+function openAppointmentPopup(ev){
+  if(!appointmentPopup || ev.type!=="job") return;
+  const groupId=ev.jobGroupId||ev.id;
+  const groupEvents=events.filter(e=>e.type==="job" && (e.jobGroupId||e.id)===groupId);
+  popupTitle.textContent=ev.customerName||"Appointment";
+  const endTime=addMinutesToTime(ev.time,ev.minutes||90);
+  popupSubtitle.textContent=`${ev.date} · ${ev.time}–${endTime}`;
+  const status=ev.status||"Scheduled";
+  const invoiced=!!ev.invoiced;
+  const paid=!!ev.paid;
+  setStatusState(status,invoiced,paid);
+  if(popupStatusChip) popupStatusChip.className=`status-chip`;
+  autoAdvanceServiceProgress(groupId);
+  buildPopupServices(groupEvents, groupId);
+  setPopupFlags(ev);
+  appointmentPopup.style.display="flex";
+  setPopupEditable(false);
+}
+
+function closeAppointmentPopup(){
+  if(appointmentPopup) appointmentPopup.style.display="none";
 }
 function saveServicePackagesToStorage(){
   if(!storageAvailable) return;
@@ -891,13 +1302,19 @@ function populateServiceOptionsForSelect(deptSelect,serviceSelect,selectedValue)
   const ph=document.createElement("option");ph.value="";ph.textContent="Select service";serviceSelect.appendChild(ph);
   const dept=deptSelect.value;
   if(dept && servicePackages[dept]){
-    servicePackages[dept].forEach(n=>{
+    servicePackages[dept].forEach(svc=>{
+      const name=svc.name||svc;
       const o=document.createElement("option");
-      o.value=n;o.textContent=n;
+      o.value=name;o.textContent=name;
       serviceSelect.appendChild(o);
     });
   }
   if(selectedValue) serviceSelect.value=selectedValue;
+}
+
+function findServiceDefaults(dept,name){
+  const list=servicePackages[dept]||[];
+  return list.find(s=>s.name===name)||null;
 }
 
 // Service assignment rows
@@ -940,6 +1357,45 @@ function addServiceRow(initial){
   populateTimeSelect(timeSelect,true);
   timeGroup.appendChild(timeSelect);
 
+  const durationGroup=document.createElement("div");
+  durationGroup.className="field-group";
+  const durationLabel=document.createElement("label");
+  durationLabel.style.fontSize="10px";
+  durationLabel.style.textTransform="none";
+  durationLabel.style.letterSpacing="0";
+  durationLabel.textContent="Est. Duration (mins)";
+  const durationInput=document.createElement("input");
+  durationInput.type="number";
+  durationInput.min="15";
+  durationInput.step="15";
+  durationInput.placeholder="Est. mins";
+  durationInput.className="sa-minutes";
+  durationInput.value="90";
+  durationGroup.appendChild(durationLabel);
+  durationGroup.appendChild(durationInput);
+
+  const priceGroup=document.createElement("div");
+  priceGroup.className="field-group";
+  const priceLabel=document.createElement("label");
+  priceLabel.style.fontSize="10px";
+  priceLabel.style.textTransform="none";
+  priceLabel.style.letterSpacing="0";
+  priceLabel.textContent="Price ($)";
+  const priceInput=document.createElement("input");
+  priceInput.type="number";
+  priceInput.min="0";
+  priceInput.step="1";
+  priceInput.placeholder="Price";
+  priceInput.className="sa-price";
+  priceInput.value="0";
+  priceGroup.appendChild(priceLabel);
+  priceGroup.appendChild(priceInput);
+
+  const progressInput=document.createElement("input");
+  progressInput.type="hidden";
+  progressInput.className="sa-progress";
+  progressInput.value="In Queue";
+
   const removeBtn=document.createElement("button");
   removeBtn.type="button";
   removeBtn.textContent="✕";
@@ -956,11 +1412,24 @@ function addServiceRow(initial){
   row.appendChild(svcGroup);
   row.appendChild(techGroup);
   row.appendChild(timeGroup);
+  row.appendChild(durationGroup);
+  row.appendChild(priceGroup);
+  row.appendChild(progressInput);
   row.appendChild(removeBtn);
   serviceAssignmentsContainer.appendChild(row);
 
   deptSelect.addEventListener("change",()=>{
     populateServiceOptionsForSelect(deptSelect,svcSelect,null);
+    durationInput.value="";
+    priceInput.value="";
+  });
+
+  svcSelect.addEventListener("change",()=>{
+    const defaults=findServiceDefaults(deptSelect.value,svcSelect.value);
+    if(defaults){
+      durationInput.value=defaults.minutes||90;
+      priceInput.value=defaults.price||0;
+    }
   });
 
   if(initial){
@@ -970,6 +1439,10 @@ function addServiceRow(initial){
     }
     if(initial.tech) techSelect.value=initial.tech;
     if(initial.time) timeSelect.value=initial.time;
+    if(initial.minutes) durationInput.value=initial.minutes;
+    if(typeof initial.price!=="undefined") priceInput.value=initial.price;
+    if(initial.serviceProgress) progressInput.value=initial.serviceProgress;
+    if(initial.id) row.dataset.eventId=initial.id;
   }
 }
 
@@ -988,6 +1461,12 @@ function refreshAllServiceAssignmentRows(){
     const svcSelect=row.querySelector(".sa-service");
     const prevDept=deptSelect.value;
     const prevSvc=svcSelect.value;
+    const minutesInput=row.querySelector(".sa-minutes");
+    const priceInput=row.querySelector(".sa-price");
+    const prevMinutes=minutesInput.value;
+    const prevPrice=priceInput.value;
+    const progressInput=row.querySelector(".sa-progress");
+    const prevProgress=progressInput?.value||"In Queue";
 
     deptSelect.innerHTML="";
     const deptPh=document.createElement("option");deptPh.value="";deptPh.textContent="Service Category";deptSelect.appendChild(deptPh);
@@ -997,6 +1476,9 @@ function refreshAllServiceAssignmentRows(){
     if(prevDept && servicePackages[prevDept]) deptSelect.value=prevDept;
 
     populateServiceOptionsForSelect(deptSelect,svcSelect,prevSvc);
+    minutesInput.value=prevMinutes;
+    priceInput.value=prevPrice;
+    if(progressInput) progressInput.value=prevProgress;
   });
 }
 function getServiceAssignmentsFromForm(){
@@ -1007,8 +1489,11 @@ function getServiceAssignmentsFromForm(){
     const serviceName=row.querySelector(".sa-service")?.value||"";
     const tech=row.querySelector(".sa-tech")?.value||"";
     const time=row.querySelector(".sa-time")?.value||"";
+    const minutes=parseInt(row.querySelector(".sa-minutes")?.value||"0",10)||90;
+    const price=parseFloat(row.querySelector(".sa-price")?.value||"0")||0;
+    const serviceProgress=row.querySelector(".sa-progress")?.value||"In Queue";
     if(!dept && !serviceName && !tech && !time) return;
-    result.push({dept,serviceName,tech,time});
+    result.push({dept,serviceName,tech,time,minutes,price,serviceProgress});
   });
   return result;
 }
@@ -1048,72 +1533,111 @@ function renderServiceLibrary(){
     delBtn.className="btn btn-clear";
     delBtn.style.padding="4px 8px";
     delBtn.style.fontSize="10px";
-  delBtn.addEventListener("click",()=>{
-  if(!confirm(`Delete category "${cat}" and all its services?`)) return;
-  delete servicePackages[cat];
-  saveServicePackagesToStorage();
-  renderServiceLibrary();
-  refreshAllServiceAssignmentRows();
-  renderDeptChips();        // <-- NEW
-});
-
+    delBtn.addEventListener("click",()=>{
+      if(!confirm(`Delete category "${cat}" and all its services?`)) return;
+      delete servicePackages[cat];
+      saveServicePackagesToStorage();
+      renderServiceLibrary();
+      refreshAllServiceAssignmentRows();
+      renderDeptChips();
+    });
 
     header.appendChild(title);
     header.appendChild(delBtn);
     card.appendChild(header);
 
     const svcList=document.createElement("div");
-    svcList.style.display="flex";
-    svcList.style.flexWrap="wrap";
-    svcList.style.gap="4px";
-    (servicePackages[cat]||[]).forEach(name=>{
-      const chip=document.createElement("div");
-      chip.style.borderRadius="999px";
-      chip.style.padding="2px 8px";
-      chip.style.fontSize="11px";
-      chip.style.background="rgba(15,23,42,0.9)";
-      chip.style.border="1px solid rgba(255,255,255,0.15)";
-      chip.style.display="flex";
-      chip.style.alignItems="center";
-      chip.style.gap="4px";
+    svcList.className="popup-list";
+    (servicePackages[cat]||[]).forEach((svc,idx)=>{
+      const row=document.createElement("div");
+      row.className="popup-list-item";
 
-      const span=document.createElement("span");
-      span.textContent=name;
+      const info=document.createElement("div");
+      info.style.display="flex";
+      info.style.flexDirection="column";
+      info.style.gap="2px";
+      info.innerHTML=`<strong>${svc.name}</strong><span style="color:#9ca3af;">${svc.minutes} mins · $${svc.price}</span>`;
 
-      const xBtn=document.createElement("button");
-      xBtn.type="button";
-      xBtn.textContent="✕";
-      xBtn.style.border="none";
-      xBtn.style.background="transparent";
-      xBtn.style.color="#fca5a5";
-      xBtn.style.cursor="pointer";
-      xBtn.style.fontSize="11px";
-      xBtn.addEventListener("click",()=>{
-        const arr=servicePackages[cat]||[];
-        const idx=arr.indexOf(name);
-        if(idx!==-1){
-          arr.splice(idx,1);
-          saveServicePackagesToStorage();
-          renderServiceLibrary();
-          refreshAllServiceAssignmentRows();
-        }
+      const controls=document.createElement("div");
+      controls.style.display="flex";
+      controls.style.gap="6px";
+      controls.style.alignItems="center";
+
+      const minutesInput=document.createElement("input");
+      minutesInput.type="number";
+      minutesInput.min="15";
+      minutesInput.step="15";
+      minutesInput.value=svc.minutes||90;
+      minutesInput.style.width="70px";
+      minutesInput.title="Estimated minutes";
+
+      const priceInput=document.createElement("input");
+      priceInput.type="number";
+      priceInput.min="0";
+      priceInput.step="1";
+      priceInput.value=svc.price||0;
+      priceInput.style.width="70px";
+      priceInput.title="Price";
+
+      const removeBtn=document.createElement("button");
+      removeBtn.type="button";
+      removeBtn.textContent="✕";
+      removeBtn.className="btn btn-clear";
+      removeBtn.style.padding="4px 8px";
+
+      function persist(){
+        const newMinutes=Math.max(15,parseInt(minutesInput.value,10)||90);
+        const newPrice=parseFloat(priceInput.value)||0;
+        servicePackages[cat][idx]={...svc,minutes:newMinutes,price:newPrice};
+        saveServicePackagesToStorage();
+        refreshAllServiceAssignmentRows();
+        renderCalendar();
+        renderServiceLibrary();
+      }
+
+      minutesInput.addEventListener("change",persist);
+      priceInput.addEventListener("change",persist);
+
+      removeBtn.addEventListener("click",()=>{
+        if(!servicePackages[cat]) return;
+        servicePackages[cat].splice(idx,1);
+        saveServicePackagesToStorage();
+        refreshAllServiceAssignmentRows();
+        renderServiceLibrary();
+        renderDeptChips();
       });
 
-      chip.appendChild(span);
-      chip.appendChild(xBtn);
-      svcList.appendChild(chip);
+      controls.appendChild(minutesInput);
+      controls.appendChild(priceInput);
+      controls.appendChild(removeBtn);
+
+      row.appendChild(info);
+      row.appendChild(controls);
+      svcList.appendChild(row);
     });
     card.appendChild(svcList);
 
     const addRow=document.createElement("div");
-    addRow.style.display="flex";
+    addRow.style.display="grid";
+    addRow.style.gridTemplateColumns="1fr 80px 80px auto";
     addRow.style.gap="6px";
     addRow.style.marginTop="6px";
 
     const input=document.createElement("input");
     input.type="text";
     input.placeholder="Add service";
-    input.style.flex="1";
+
+    const minsInput=document.createElement("input");
+    minsInput.type="number";
+    minsInput.min="15";
+    minsInput.step="15";
+    minsInput.placeholder="Mins";
+
+    const priceInput=document.createElement("input");
+    priceInput.type="number";
+    priceInput.min="0";
+    priceInput.step="1";
+    priceInput.placeholder="Price";
 
     const addBtn=document.createElement("button");
     addBtn.type="button";
@@ -1123,19 +1647,24 @@ function renderServiceLibrary(){
     addBtn.style.fontSize="11px";
     addBtn.addEventListener("click",()=>{
       const val=input.value.trim();
+      const minsVal=Math.max(15,parseInt(minsInput.value,10)||90);
+      const priceVal=parseFloat(priceInput.value)||0;
       if(!val) return;
       if(!servicePackages[cat]) servicePackages[cat]=[];
-      if(servicePackages[cat].includes(val)){
+      if(servicePackages[cat].some(s=>s.name===val)){
         alert("Service already exists in this category.");
         return;
       }
-      servicePackages[cat].push(val);
+      servicePackages[cat].push({name:val,minutes:minsVal,price:priceVal});
       saveServicePackagesToStorage();
       renderServiceLibrary();
       refreshAllServiceAssignmentRows();
+      renderDeptChips();
     });
 
     addRow.appendChild(input);
+    addRow.appendChild(minsInput);
+    addRow.appendChild(priceInput);
     addRow.appendChild(addBtn);
     card.appendChild(addRow);
 
@@ -1322,9 +1851,13 @@ function renderEventDetails(ev){
   }
   if(ev.type==="job"){
     row("Type","Appointment");
-    row("Customer",ev.customerName||"");
     const groupKey=ev.jobGroupId||ev.id;
     const groupEvents=events.filter(x=>x.type==="job" && (x.jobGroupId||x.id)===groupKey);
+    const totalPrice=groupEvents.reduce((sum,x)=>sum+(x.price||0),0);
+    const totalMinutes=groupEvents.reduce((sum,x)=>sum+(x.minutes||0),0);
+    const statusText=`${ev.status||"Scheduled"}`+(ev.paid?" · Paid":ev.invoiced?" · Invoiced":"");
+    row("Status",statusText);
+    row("Customer",ev.customerName||"");
     if(groupEvents.length>1){
       const summary=groupEvents.map(x=>{
         const base=`${x.dept||""}${x.serviceName?" – "+x.serviceName:""}`;
@@ -1335,6 +1868,7 @@ function renderEventDetails(ev){
     }else{
       row("Dept / Service",`${ev.dept||""}${ev.serviceName?" · "+ev.serviceName:""}`);
     }
+    row("Estimated",`${totalMinutes||0} mins · $${totalPrice.toFixed(2)}`);
   }else{
     row("Type","Time Off");
     row("Tech",ev.tech||"");
@@ -1360,12 +1894,29 @@ function renderEventDetails(ev){
 }
 
 // Calendar rendering
-function renderCalendar(){
-  const dateIso=toISODate(currentDate);
-  const dayName=getDayName(currentDate);
+  function renderCalendar(){
+    const dateIso=toISODate(currentDate);
+    const dayName=getDayName(currentDate);
   const todays=getEventsForDay(dateIso);
+  const coverageMap=new Map();
+  todays.forEach(ev=>{
+    if(ev.type!=="job") return;
+    if(!ev.serviceProgress) ev.serviceProgress="In Queue";
+    if(selectedDeptFilter!=="All" && ev.dept!==selectedDeptFilter) return;
+      const duration=ev.minutes||90;
+      const startIdx=workTimes.indexOf(ev.time);
+      if(startIdx===-1) return;
+      const slotsNeeded=Math.max(1,Math.ceil(duration/30));
+      for(let i=0;i<slotsNeeded;i++){
+        const slot=workTimes[startIdx+i];
+        if(!slot) break;
+        const key=`${ev.tech}-${slot}`;
+        if(!coverageMap.has(key)) coverageMap.set(key,[]);
+        coverageMap.get(key).push(ev);
+      }
+    });
 
-  headerRowEl.innerHTML="";
+    headerRowEl.innerHTML="";
   const timeHead=document.createElement("div");
   timeHead.className="cal-header-cell";
   timeHead.textContent="";
@@ -1421,12 +1972,54 @@ function renderCalendar(){
         }
       }
 
-      if(shopClosed){
-        cell.classList.add("shop-closed");
-      }
+        if(shopClosed){
+          cell.classList.add("shop-closed");
+        }
 
-      const inner=document.createElement("div");
-      inner.className="cal-slot-inner";
+        const coverKey=`${tech}-${time}`;
+        const coveringJobs=coverageMap.get(coverKey)||[];
+        const hasStartHere=coveringJobs.some(ev=>ev.time===time);
+        if(coveringJobs.length && !hasStartHere){
+          cell.classList.add("blocked-slot");
+        }
+
+        const inner=document.createElement("div");
+        inner.className="cal-slot-inner";
+
+        if(coveringJobs.length && !hasStartHere){
+          const previewJob=[...coveringJobs].sort((a,b)=>timeToMinutes(a.time)-timeToMinutes(b.time))[0];
+          const diff=timeToMinutes(time)-timeToMinutes(previewJob.time);
+          if(previewJob && diff===30){
+            const preview=document.createElement("div");
+            preview.className="blocked-preview";
+            const meta=statusMeta(previewJob.status||"Scheduled");
+            const icon=document.createElement("span");
+            icon.className=`event-status-icon ${meta.className}`;
+            icon.textContent=meta.icon;
+            preview.appendChild(icon);
+
+            const svcMeta=serviceProgressMeta(previewJob.serviceProgress||"In Queue");
+            const svcIcon=document.createElement("span");
+            svcIcon.className=`service-progress-icon ${svcMeta.className}`;
+            svcIcon.textContent=svcMeta.icon;
+            preview.appendChild(svcIcon);
+
+            const text=document.createElement("span");
+            text.className="blocked-text";
+            const parts=[];
+            if(previewJob.customerName) parts.push(previewJob.customerName);
+            if(previewJob.serviceName||previewJob.label) parts.push(previewJob.serviceName||previewJob.label);
+            text.textContent=parts.join(" • ")||"Booked";
+            preview.appendChild(text);
+            if(previewJob.invoiced||previewJob.paid){
+              const dollar=document.createElement("span");
+              dollar.className=`invoice-icon ${previewJob.paid?"paid":"pending"}`;
+              dollar.textContent="$";
+              preview.appendChild(dollar);
+            }
+            inner.appendChild(preview);
+          }
+        }
 
       const cellEvents=todays.filter(ev=>
         ev.tech===tech &&
@@ -1451,27 +2044,46 @@ function renderCalendar(){
           }
         }
 
-        const pill=document.createElement("div");
-        let cls="event-pill ";
-        if(ev.type==="timeoff") cls+="event-timeoff";
-        else if(ev.dept==="Detailing") cls+="event-detailing";
-        else if(ev.dept==="Tint") cls+="event-tint";
-        else if(ev.dept==="PPF") cls+="event-ppf";
-        else if(ev.dept==="Ceramic") cls+="event-ceramic";
-        else if(ev.dept==="Electronics") cls+="event-electronics";
-        pill.className=cls;
-        pill.dataset.eventId=ev.id;
+          const pill=document.createElement("div");
+          let cls="event-pill ";
+          if(ev.type==="timeoff") cls+="event-timeoff";
+          else if(ev.dept==="Detailing") cls+="event-detailing";
+          else if(ev.dept==="Tint") cls+="event-tint";
+          else if(ev.dept==="PPF") cls+="event-ppf";
+          else if(ev.dept==="Ceramic") cls+="event-ceramic";
+          else if(ev.dept==="Electronics") cls+="event-electronics";
+          pill.className=cls;
+          pill.dataset.eventId=ev.id;
 
-        let label=ev.label||ev.serviceName||"Job";
-        if(ev.type==="job" && ev.customerName) label=`${ev.customerName} – ${label}`;
+          let label=ev.label||ev.serviceName||"Job";
+          if(ev.type==="job" && ev.customerName) label=`${ev.customerName} – ${label}`;
+        if(ev.type==="job"){
+          const meta=statusMeta(ev.status||"Scheduled");
+          const statusSpan=document.createElement("span");
+          statusSpan.className=`event-status-icon ${meta.className}`;
+          statusSpan.textContent=meta.icon;
+          pill.appendChild(statusSpan);
+
+          const progMeta=serviceProgressMeta(ev.serviceProgress||"In Queue");
+          const progSpan=document.createElement("span");
+          progSpan.className=`service-progress-icon ${progMeta.className}`;
+          progSpan.textContent=progMeta.icon;
+          pill.appendChild(progSpan);
+        }
         const span=document.createElement("span");
         span.textContent=label;
         pill.appendChild(span);
 
-        if(ev.type==="job"){
-          if(ev.dealer){
-            const b=document.createElement("span");
-            b.className="small-badge";
+          if(ev.type==="job"){
+            if(ev.invoiced || ev.paid){
+              const dollar=document.createElement("span");
+              dollar.className=`invoice-icon ${ev.paid?"paid":"pending"}`;
+              dollar.textContent="$";
+              pill.appendChild(dollar);
+            }
+            if(ev.dealer){
+              const b=document.createElement("span");
+              b.className="small-badge";
             b.textContent="D";
             pill.appendChild(b);
           }
@@ -1516,9 +2128,10 @@ function renderCalendar(){
 }
 
 // Slot selection
-function setSelectedSlot(tech,time){
-  selectedSlot={tech,time};
-  bodyEl.querySelectorAll(".cal-slot-cell").forEach(c=>c.classList.remove("selected"));
+  function setSelectedSlot(tech,time){
+    selectedSlot={tech,time};
+    if(!editingJobGroupId) setAppointmentFormLocked(false);
+    bodyEl.querySelectorAll(".cal-slot-cell").forEach(c=>c.classList.remove("selected"));
   const sel=`.cal-slot-cell[data-tech="${tech}"][data-time="${time}"]`;
   const c=bodyEl.querySelector(sel);if(c)c.classList.add("selected");
   const iso=toISODate(currentDate);
@@ -1546,21 +2159,21 @@ function setSelectedSlot(tech,time){
 function seedDummyEvents(){
   const todayIso=toISODate(currentDate);
   let idCounter=1;
-  const base=[
-    {tech:"William",dept:"Detailing",type:"job",label:"Full Detail – F-150",time:"09:00",dealer:false,customerName:"Smith"},
-    {tech:"Limage",dept:"Detailing",type:"job",label:"Interior – Civic",time:"10:00",dealer:true,pickupDelivery:true,pickupTime:"08:30",deliveryTime:"17:00",customerName:"Zeigler"},
-    {tech:"Matt",dept:"Tint",type:"job",label:"Full Tint – Model 3",time:"09:30",dealer:true,rideNeeded:true,rideTime:"09:00",customerWaiting:true,customerName:"Jones"},
-    {tech:"Matt",dept:"PPF",type:"job",label:"Full Front – Supra",time:"12:00",dealer:false,customerName:"Taylor"},
-    {tech:"William",dept:"Ceramic",type:"job",label:"5yr – Silverado",time:"14:00",dealer:false,customerName:"Clark"},
-    {tech:"Fafa",dept:"Detailing",type:"job",label:"Quick Clean – CR-V",time:"15:00",dealer:false,customerName:"Lopez"},
-    {tech:"Matt",dept:"Electronics",type:"job",label:"Remote Start – RAM",time:"11:00",dealer:true,pickupDelivery:true,pickupTime:"10:30",deliveryTime:"16:30",customerName:"Davis"},
-    {tech:"William",dept:"Detailing",type:"timeoff",label:"Time Off",time:"13:00",notes:"Doctor appt"}
-  ];
-  events=base.map(e=>{
-    const id="seed-"+(idCounter++);
-    return {...e,id,date:todayIso,jobGroupId: e.type==="job" ? id : undefined};
-  });
-}
+    const base=[
+      {tech:"William",dept:"Detailing",type:"job",serviceName:"Full Detail",label:"Full Detail – F-150",time:"09:00",minutes:210,price:450,status:"Scheduled",dealer:false,customerName:"Smith",serviceProgress:"In Queue"},
+      {tech:"Limage",dept:"Detailing",type:"job",serviceName:"Interior Detail",label:"Interior – Civic",time:"10:00",minutes:150,price:275,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"08:30",deliveryTime:"17:00",customerName:"Zeigler",serviceProgress:"In Queue"},
+      {tech:"Matt",dept:"Tint",type:"job",serviceName:"Full Tint",label:"Full Tint – Model 3",time:"09:30",minutes:120,price:380,status:"Scheduled",dealer:true,rideNeeded:true,rideTime:"09:00",customerWaiting:true,customerName:"Jones",serviceProgress:"In Queue"},
+      {tech:"Matt",dept:"PPF",type:"job",serviceName:"Full Front PPF",label:"Full Front – Supra",time:"12:00",minutes:240,price:1600,status:"Scheduled",dealer:false,customerName:"Taylor",serviceProgress:"In Queue"},
+      {tech:"William",dept:"Ceramic",type:"job",serviceName:"5 Year Coating",label:"5yr – Silverado",time:"14:00",minutes:240,price:1400,status:"Scheduled",dealer:false,customerName:"Clark",serviceProgress:"In Queue"},
+      {tech:"Fafa",dept:"Detailing",type:"job",serviceName:"Quick Clean",label:"Quick Clean – CR-V",time:"15:00",minutes:60,price:120,status:"Scheduled",dealer:false,customerName:"Lopez",serviceProgress:"In Queue"},
+      {tech:"Matt",dept:"Electronics",type:"job",serviceName:"Remote Start",label:"Remote Start – RAM",time:"11:00",minutes:120,price:450,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"10:30",deliveryTime:"16:30",customerName:"Davis",serviceProgress:"In Queue"},
+      {tech:"William",dept:"Detailing",type:"timeoff",label:"Time Off",time:"13:00",notes:"Doctor appt"}
+    ];
+    events=base.map(e=>{
+      const id="seed-"+(idCounter++);
+      return {...e,id,date:todayIso,jobGroupId: e.type==="job" ? id : undefined};
+    });
+  }
 
 // Panels
 function setPanel(mode){
@@ -1807,6 +2420,7 @@ async function createOrUpdateAppointment(){
   const phone=document.getElementById("inputCustomerPhone").value.trim();
   const email=document.getElementById("inputCustomerEmail").value.trim();
   const date=document.getElementById("datePicker").value;
+  const dayName=getDayName(new Date(date+"T00:00"));
   const dealer=document.getElementById("checkboxDealer").checked;
   const waiting=document.getElementById("checkboxCustomerWaiting").checked;
   const rideNeeded=document.getElementById("checkboxRideNeeded").checked;
@@ -1815,6 +2429,9 @@ async function createOrUpdateAppointment(){
   const pickupTime=document.getElementById("inputPickupTime").value;
   const deliveryTime=document.getElementById("inputDeliveryTime").value;
   const notes=document.getElementById("inputNotes").value;
+  const statusValue=statusField?statusField.value:"Scheduled";
+  const invoiced=checkboxInvoiced.checked||checkboxPaid.checked;
+  const paid=checkboxPaid.checked;
 
   const rawServices=getServiceAssignmentsFromForm();
   if(!rawServices.length){
@@ -1828,19 +2445,36 @@ async function createOrUpdateAppointment(){
 
   let missingDept=false,missingTech=false,missingTime=false;
   const services=rawServices.map(row=>{
-    let {dept,serviceName,tech,time}=row;
+    let {dept,serviceName,tech,time,minutes,price,serviceProgress}=row;
     if(!dept) missingDept=true;
     if(!time) missingTime=true;
     if(!tech && dealer){
       tech="Dealer";
     }
     if(!tech) missingTech=true;
-    return {dept,serviceName,tech,time};
+    return {dept,serviceName,tech,time,minutes,price,serviceProgress};
   });
   if(!overrideClosed){
-    const blocked = services.some(svc => isShopClosedAt(date, svc.time));
+    const blocked = services.some(svc => {
+      const endTime=addMinutesToTime(svc.time,svc.minutes||90);
+      return isShopClosedAt(date, svc.time) || isShopClosedAt(date,endTime);
+    });
     if(blocked){
       alert("One or more service times are outside shop hours or on a holiday. Check 'Override shop hours & holidays for this booking' if you want to schedule anyway.");
+      return;
+    }
+  }
+
+  if(!overrideClosed){
+    const scheduleConflict=services.some(svc=>{
+      const techCfg=techSchedules[svc.tech]?.[dayName];
+      if(!techCfg || techCfg.off) return true;
+      const startMin=timeToMinutes(svc.time);
+      const endMin=startMin+(svc.minutes||90);
+      return startMin<timeToMinutes(techCfg.start)||endMin>timeToMinutes(techCfg.end);
+    });
+    if(scheduleConflict){
+      alert("One or more services exceed the assigned tech schedule. Adjust times or enable override.");
       return;
     }
   }
@@ -1861,17 +2495,39 @@ async function createOrUpdateAppointment(){
 
   services.forEach((svc,index)=>{
     const id=groupId+"-"+index+"-"+Date.now();
-     events.push({
+    events.push({
       id,
       jobGroupId:groupId,
       type:"job",
       tech:svc.tech,
-      ...
+      dept:svc.dept,
+      serviceName:svc.serviceName,
+      label:svc.serviceName||svc.dept||"Service",
+      date,
+      time:svc.time,
+      minutes:svc.minutes||90,
+      endTime:addMinutesToTime(svc.time,svc.minutes||90),
+      price:svc.price||0,
+      serviceProgress:svc.serviceProgress||"In Queue",
+      status:statusValue,
+      invoiced,
+      paid,
+      dealer,
+      customerName,
+      phone,
+      email,
+      customerWaiting:waiting,
+      rideNeeded,
+      rideTime,
+      pickupDelivery,
+      pickupTime,
+      deliveryTime,
       notes,
       overrideClosed
     });
-
   });
+
+  autoAdvanceServiceProgress(groupId);
 
   editingJobGroupId=groupId;
   currentDate=new Date(date+"T00:00");
@@ -1900,6 +2556,9 @@ async function createOrUpdateAppointment(){
         pickupTime,
         deliveryTime,
         notes,
+        status:statusValue,
+        invoiced,
+        paid,
         services:services
       })
     });
@@ -1911,10 +2570,14 @@ async function createOrUpdateAppointment(){
   document.getElementById("appointmentForm").reset();
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
+  setStatusState("Scheduled",false,false);
   selectedSlot=null;
   selectedEventId=null;
   editingJobGroupId=null;
   btnCreateAppointment.textContent="Save to Zapier";
+  setAppointmentFormLocked(false);
+  setPopupEditable(false);
+  closeAppointmentPopup();
 }
 
 // Delete appointment (entire group)
@@ -1930,9 +2593,13 @@ function deleteAppointment(){
   document.getElementById("appointmentForm").reset();
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
+  setStatusState("Scheduled",false,false);
   btnCreateAppointment.textContent="Save to Zapier";
   if(statusEl)statusEl.textContent="Appointment deleted.";
   renderCalendar();
+  setAppointmentFormLocked(false);
+  setPopupEditable(false);
+  closeAppointmentPopup();
   try{
     fetch(ZAPIER_WEBHOOK_URL,{
       method:"POST",
@@ -1952,12 +2619,16 @@ function clearAppointmentForm(){
   document.getElementById("appointmentForm").reset();
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
+  setStatusState("Scheduled",false,false);
   selectedSlot=null;
   selectedEventId=null;
   editingJobGroupId=null;
   btnCreateAppointment.textContent="Save to Zapier";
   if(statusEl)statusEl.textContent="Cleared form.";
   renderCalendar();
+  setAppointmentFormLocked(false);
+  setPopupEditable(false);
+  closeAppointmentPopup();
 }
 
 // Clear time off form
@@ -1986,6 +2657,7 @@ function loadJobEventIntoForm(ev){
   document.getElementById("inputPickupTime").value=ev.pickupTime||"";
   document.getElementById("inputDeliveryTime").value=ev.deliveryTime||"";
   document.getElementById("inputNotes").value=ev.notes||"";
+  setStatusState(ev.status||"Scheduled",!!ev.invoiced||!!ev.paid,!!ev.paid);
 
   clearServiceAssignments();
   const groupEvents=events.filter(e=>e.type==="job" && (e.jobGroupId||e.id)===groupKey);
@@ -1995,7 +2667,11 @@ function loadJobEventIntoForm(ev){
         dept:gev.dept||"",
         serviceName:gev.serviceName||"",
         tech:gev.tech||"",
-        time:gev.time||""
+        time:gev.time||"",
+        minutes:gev.minutes||90,
+        price:typeof gev.price!=="undefined"?gev.price:0,
+        serviceProgress:gev.serviceProgress||"In Queue",
+        id:gev.id
       });
     });
   }else{
@@ -2007,6 +2683,8 @@ function loadJobEventIntoForm(ev){
     renderCalendar();
   }
   if(statusEl)statusEl.textContent="Editing existing appointment.";
+  setAppointmentFormLocked(true);
+  setPopupEditable(false);
 }
 
 // Calendar clicks
@@ -2019,6 +2697,7 @@ bodyEl.addEventListener("click",e=>{
     renderEventDetails(ev);
     if(ev.type==="job"){
       loadJobEventIntoForm(ev);
+      openAppointmentPopup(ev);
     }else if(ev.type==="timeoff"){
       setPanel("timeoff");
       const tech=ev.tech||"";
@@ -2123,6 +2802,7 @@ dealerQueueListEl.addEventListener("click",e=>{
   renderEventDetails(ev);
   if(ev.type==="job"){
     loadJobEventIntoForm(ev);
+    openAppointmentPopup(ev);
   }
 });
 
@@ -2174,6 +2854,46 @@ if(allDayCheckbox){
 btnCreateAppointment.addEventListener("click",createOrUpdateAppointment);
 document.getElementById("btnClear").addEventListener("click",clearAppointmentForm);
 btnDeleteAppointment.addEventListener("click",deleteAppointment);
+
+// Appointment popup controls
+if(btnUnlockEditing){
+  btnUnlockEditing.addEventListener("click",()=>{
+    setAppointmentFormLocked(false);
+    setPopupEditable(true);
+  });
+}
+if(btnClosePopup){
+  btnClosePopup.addEventListener("click",closeAppointmentPopup);
+}
+if(appointmentPopup){
+  appointmentPopup.addEventListener("click",e=>{
+    if(e.target===appointmentPopup) closeAppointmentPopup();
+  });
+}
+if(popupStatusSelect){
+  popupStatusSelect.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    setStatusState(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
+    applyMetaToGroup(popupStatusSelect.value,checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+if(popupInvoiced){
+  popupInvoiced.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    const invoiced=popupInvoiced.checked||popupPaid.checked;
+    setStatusState(statusField.value||"Scheduled",invoiced,checkboxPaid.checked);
+    applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
+if(popupPaid){
+  popupPaid.addEventListener("change",()=>{
+    if(appointmentLocked) return;
+    const paid=popupPaid.checked;
+    const invoiced=popupInvoiced.checked||paid;
+    setStatusState(statusField.value||"Scheduled",invoiced,paid);
+    applyMetaToGroup(statusField.value||"Scheduled",checkboxInvoiced.checked,checkboxPaid.checked);
+  });
+}
 
 // Add service row button
 btnAddServiceRow.addEventListener("click",()=>addServiceRow());
@@ -2280,6 +3000,8 @@ renderHolidayList();
 seedDummyEvents();
 ensureAtLeastOneServiceRow();
 refreshAllServiceAssignmentRows();
+setStatusState("Scheduled",false,false);
+setAppointmentFormLocked(false);
 renderCalendar();
 
 
