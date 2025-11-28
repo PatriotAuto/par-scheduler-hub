@@ -528,7 +528,7 @@
           <div class="actions">
             <button type="button" class="btn btn-clear" id="btnClear">Clear</button>
             <button type="button" class="btn btn-danger" id="btnDeleteAppointment">Delete</button>
-            <button type="button" class="btn btn-primary" id="btnCreateAppointment">Save to Zapier</button>
+            <button type="button" class="btn btn-primary" id="btnCreateAppointment">Save Appointment</button>
           </div>
         </form>
       </div>
@@ -889,7 +889,7 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
-const ZAPIER_WEBHOOK_URL="https://hooks.zapier.com/hooks/catch/23565840/uzuiw0k/";
+const GOOGLE_BACKEND_URL="https://script.google.com/a/macros/patriotautorestyling.com/s/AKfycbzfTUv9h_3U4RYFZgH7HH_mybySDGrva75urTpyYE5bXDyfuFTrwBIL2kqgthFbzjmb/exec";
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
 let shopHolidays = []; // array of { date: "YYYY-MM-DD", label: "New Year's Day" }
@@ -2378,7 +2378,7 @@ function renderDealerQueue(){
 
   if(statusEl)statusEl.textContent=`Selected ${tech} at ${time} on ${iso}.`;
   if(!editingJobGroupId){
-    btnCreateAppointment.textContent="Save to Zapier";
+    btnCreateAppointment.textContent="Save Appointment";
   }else{
     btnCreateAppointment.textContent="Update Appointment";
   }
@@ -2642,6 +2642,39 @@ function deleteTimeOff(){
   renderCalendar();
 }
 
+function sendAppointmentToBackend(groupId, eventsForGroup){
+  if(!GOOGLE_BACKEND_URL) return;
+  if(!eventsForGroup || !eventsForGroup.length) return;
+
+  const primary=eventsForGroup[0];
+
+  const payload={
+    id:groupId,
+    date:primary.date,
+    time:primary.startTime||primary.time||"",
+    tech:primary.tech||"",
+    customerName:primary.customerName||primary.name||"",
+    vehicle:primary.vehicle||"",
+    services:primary.services?primary.services.join(", "):(primary.serviceName||""),
+    status:primary.status||"",
+    notes:primary.notes||"",
+    overrideClosed:!!primary.overrideClosed
+  };
+
+  try{
+    fetch(GOOGLE_BACKEND_URL,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    }).catch(err=>{
+      console.error("Failed to send appointment to backend",err);
+    });
+  }catch(e){
+    console.error("Error sending appointment to backend",e);
+  }
+}
+
 // Appointment create/update
 async function createOrUpdateAppointment(){
   const overrideClosed = document.getElementById("checkboxOverrideClosed").checked;
@@ -2804,45 +2837,12 @@ async function createOrUpdateAppointment(){
   currentDate=new Date(date+"T00:00");
   renderCalendar();
   if(statusEl)statusEl.textContent=payloadType==="update_appointment"
-    ?"Appointment updated and sent to Zapier."
-    :"Appointment created and sent to Zapier.";
+    ?"Appointment updated."
+    :"Appointment created.";
   btnCreateAppointment.textContent="Update Appointment";
 
-  try{
-    await fetch(ZAPIER_WEBHOOK_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        type:payloadType,
-        appointmentId:groupId,
-        customerFirstName,
-        customerLastName,
-        customerName,
-        phone,
-        email,
-        vin,
-        stockNumber,
-        vehicleYear,
-        vehicleMake,
-        vehicleModel,
-        date,
-        dealer,
-        customerWaiting:waiting,
-        rideNeeded,
-        rideTime,
-        pickupDelivery,
-        pickupTime,
-        deliveryTime,
-        notes,
-        status:statusValue,
-        invoiced,
-        paid,
-        services:services
-      })
-    });
-  }catch(e){
-    console.error("Zapier error",e);
-  }
+  const eventsForGroup=events.filter(ev=>ev.jobGroupId===groupId);
+  sendAppointmentToBackend(groupId,eventsForGroup);
 
   // clear form after save
   document.getElementById("appointmentForm").reset();
@@ -2852,7 +2852,7 @@ async function createOrUpdateAppointment(){
   setStatusState("Scheduled",false,false);
   selectedSlot=null;
   editingJobGroupId=null;
-  btnCreateAppointment.textContent="Save to Zapier";
+  btnCreateAppointment.textContent="Save Appointment";
   setAppointmentFormLocked(false);
   setPopupEditable(false);
   closeAppointmentPopup();
@@ -2872,24 +2872,12 @@ function deleteAppointment(){
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
   setStatusState("Scheduled",false,false);
-  btnCreateAppointment.textContent="Save to Zapier";
+  btnCreateAppointment.textContent="Save Appointment";
   if(statusEl)statusEl.textContent="Appointment deleted.";
   renderCalendar();
   setAppointmentFormLocked(false);
   setPopupEditable(false);
   closeAppointmentPopup();
-  try{
-    fetch(ZAPIER_WEBHOOK_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        type:"delete_appointment",
-        appointmentId:groupKey
-      })
-    });
-  }catch(e){
-    console.error("Zapier error",e);
-  }
 }
 
 // Clear appointment form manually
@@ -2901,7 +2889,7 @@ function clearAppointmentForm(){
   setStatusState("Scheduled",false,false);
   selectedSlot=null;
   editingJobGroupId=null;
-  btnCreateAppointment.textContent="Save to Zapier";
+  btnCreateAppointment.textContent="Save Appointment";
   if(statusEl)statusEl.textContent="Cleared form.";
   renderCalendar();
   setAppointmentFormLocked(false);
