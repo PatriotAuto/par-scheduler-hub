@@ -200,6 +200,14 @@
         min-width:calc(60px + var(--tech-count)*var(--cal-col-min));
         height:32px;
       }
+      .service-row{
+        grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+        align-items:start;
+      }
+      .service-row .btn{
+        margin-top:4px;
+        width:100%;
+      }
       .bottom-info-row{
         flex-direction:column;
       }
@@ -214,6 +222,12 @@
         font-size:12px;
         padding:7px 9px;
       }
+    }
+    @media(max-width:540px){
+      .service-row{
+        grid-template-columns:1fr;
+      }
+      .service-row .field-group{min-width:0;}
     }
 
     /* Appointment pop-up */
