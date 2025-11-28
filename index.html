@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Patriot Auto Restyling – Scheduler Hub v1.3</title>
+  <title>Patriot Auto Restyling – Scheduler Hub v1.8</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     :root {
@@ -11,6 +11,8 @@
       --dept-tint:#e53935;--dept-ppf:#2962ff;--dept-ceramic:#00c853;--dept-detail:#ffb300;--dept-electronics:#ab47bc;--timeoff:#8d8d8d;
       --grid-bg:#f2f4fb;--grid-header-bg:#e3e7f1;--grid-border-strong:rgba(0,0,0,.25);--grid-border-light:rgba(0,0,0,.15);
       --slot-height:32px;
+      --tech-count:6;
+      --cal-col-min:140px;
     }
     *{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystem,"Segoe UI",sans-serif;}
     body{margin:0;background:radial-gradient(circle at top,#101b2e,#02040a);color:var(--par-text);}
@@ -40,10 +42,11 @@
     .date-label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#111827;}
     #dayPicker{border-radius:999px;border:1px solid rgba(0,0,0,.2);background:#fff;color:#111827;font-size:11px;padding:4px 8px;cursor:pointer;}
     .cal-wrapper{flex:1;border-radius:12px;background:var(--grid-bg);border:3px solid var(--grid-border-strong);display:flex;flex-direction:column;overflow:hidden;min-height:260px;box-shadow:0 12px 24px rgba(15,23,42,.25);}
-    .cal-header-row{display:grid;grid-template-columns:60px repeat(6,1fr);font-size:11px;padding:4px 4px 6px;border-bottom:3px solid var(--grid-border-strong);background:var(--grid-header-bg);}
+    .cal-scroll{flex:1;display:flex;flex-direction:column;overflow:auto;}
+    .cal-header-row{display:grid;grid-template-columns:60px repeat(var(--tech-count),minmax(var(--cal-col-min),1fr));font-size:11px;padding:4px 4px 6px;border-bottom:3px solid var(--grid-border-strong);background:var(--grid-header-bg);position:sticky;top:0;z-index:5;min-width:calc(60px + var(--tech-count)*var(--cal-col-min));}
     .cal-header-cell{text-align:center;font-weight:600;color:#111827;}
-    .cal-body{flex:1;overflow:auto;}
-    .cal-row{display:grid;grid-template-columns:60px repeat(6,1fr);border-bottom:2px solid var(--grid-border-light);font-size:11px;background:linear-gradient(to right,rgba(255,255,255,.9),rgba(255,255,255,.9));height:var(--slot-height,32px);}
+    .cal-body{flex:1;display:flex;flex-direction:column;min-height:0;}
+    .cal-row{display:grid;grid-template-columns:60px repeat(var(--tech-count),minmax(var(--cal-col-min),1fr));border-bottom:2px solid var(--grid-border-light);font-size:11px;background:linear-gradient(to right,rgba(255,255,255,.9),rgba(255,255,255,.9));height:var(--slot-height,32px);min-width:calc(60px + var(--tech-count)*var(--cal-col-min));}
     .cal-row:nth-child(2n){background:linear-gradient(to right,rgba(249,250,251,.95),rgba(249,250,251,.95));}
     .cal-time-cell{padding:2px 4px;text-align:right;color:#4b5563;font-weight:500;background:#e5e7eb;border-right:2px solid var(--grid-border-strong);}
     .cal-slot-cell{border-left:2px solid var(--grid-border-light);position:relative;cursor:pointer;background:transparent;transition:background .12s,box-shadow .12s,transform .05s;overflow:visible;}
@@ -108,7 +111,7 @@
     .cal-legend{margin:6px 8px 4px;display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:#4b5563;}
     .legend-item{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.8);border-radius:999px;padding:2px 8px;border:1px solid rgba(0,0,0,.06);}
     .bottom-info-row{display:flex;gap:10px;padding:6px 8px 8px;border-top:1px solid rgba(0,0,0,.12);background:#e5e7f3;}
-    .dealer-queue,.event-details{
+    .dealer-queue{
       flex:1;
       background:#f9fafb;
       border-radius:10px;
@@ -120,8 +123,8 @@
       gap:4px;
     }
     .dealer-queue{color:#000;}
-    .dealer-queue-title,.event-details-title{font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:10px;color:#111827;}
-    .dealer-queue-empty,.event-details-empty{font-size:10px;color:#6b7280;font-style:italic;}
+    .dealer-queue-title{font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:10px;color:#111827;}
+    .dealer-queue-empty{font-size:10px;color:#6b7280;font-style:italic;}
     .dealer-queue-item{padding:4px 6px;border-radius:6px;background:#eef2ff;border:1px solid rgba(79,70,229,.3);display:flex;justify-content:space-between;align-items:center;gap:6px;}
     .dq-badge{
       padding:1px 5px;
@@ -131,9 +134,6 @@
       font-size:9px;
       text-transform:uppercase;
     }
-    .event-details-row{display:flex;justify-content:space-between;gap:6px;}
-    .event-details-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;}
-    .event-details-value{font-size:11px;color:#111827;font-weight:500;}
     .panel-title{font-size:13px;text-transform:uppercase;letter-spacing:.14em;color:var(--par-muted);}
     .panel-divider{height:1px;background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(227,6,19,.6),rgba(255,255,255,.06));margin:4px 0 8px;}
     form{display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto;padding-right:4px;}
@@ -145,6 +145,13 @@
     .field-group{display:flex;flex-direction:column;gap:6px;}
     .field-row{display:flex;gap:8px;}
     .field-row .field-group{flex:1;}
+    .service-row{display:grid;grid-template-columns:1.1fr 1.1fr 1fr 1fr .9fr .9fr 70px;gap:8px;align-items:end;}
+    .service-row .btn{align-self:end;width:100%;}
+    .input-actions{display:flex;gap:6px;align-items:center;}
+    .input-actions input{flex:1;}
+    .icon-button.subtle{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);padding:7px 10px;font-size:11px;}
+    .icon-button.subtle:hover{background:rgba(227,6,19,.18);}
+    .field-note{font-size:11px;color:var(--par-muted);}
     .inline-checkbox{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--par-muted);}
     .inline-checkbox input[type=checkbox]{width:auto;}
     .status{font-size:11px;min-height:16px;color:var(--par-muted);}
@@ -184,17 +191,27 @@
       }
       .cal-wrapper{
         min-height:220px;
-        overflow-x:auto;
+      }
+      .cal-scroll{
+        overflow:auto;
       }
       .cal-header-row,
       .cal-row{
-        min-width:650px;
+        min-width:calc(60px + var(--tech-count)*var(--cal-col-min));
         height:32px;
+      }
+      .service-row{
+        grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+        align-items:start;
+      }
+      .service-row .btn{
+        margin-top:4px;
+        width:100%;
       }
       .bottom-info-row{
         flex-direction:column;
       }
-      .dealer-queue,.event-details{
+      .dealer-queue{
         width:100%;
       }
       .btn{
@@ -205,6 +222,12 @@
         font-size:12px;
         padding:7px 9px;
       }
+    }
+    @media(max-width:540px){
+      .service-row{
+        grid-template-columns:1fr;
+      }
+      .service-row .field-group{min-width:0;}
     }
 
     /* Appointment pop-up */
@@ -343,8 +366,10 @@
           <span class="legend-item"><span class="invoice-icon pending">$</span>Invoiced</span>
           <span class="legend-item"><span class="invoice-icon paid">$</span>Paid</span>
         </div>
-        <div class="cal-header-row" id="calHeaderRow"></div>
-        <div class="cal-body" id="calBody"></div>
+        <div class="cal-scroll">
+          <div class="cal-header-row" id="calHeaderRow"></div>
+          <div class="cal-body" id="calBody"></div>
+        </div>
         <div class="cal-legend">
           <span class="legend-item"><span class="dot dot-detail"></span>Detailing</span>
           <span class="legend-item"><span class="dot dot-tint"></span>Tint</span>
@@ -358,10 +383,6 @@
             <div class="dealer-queue-title">Dealer Queue (Today)</div>
             <div id="dealerQueueList" class="dealer-queue-empty">No dealer jobs queued for this day.</div>
           </div>
-          <div class="event-details">
-            <div class="event-details-title">Appointment Details</div>
-            <div id="eventDetails" class="event-details-empty">Click an appointment pill to view details. Click again to edit.</div>
-          </div>
         </div>
       </div>
     </div>
@@ -374,8 +395,12 @@
         <form id="appointmentForm" onsubmit="return false;">
           <div class="field-row">
             <div class="field-group">
-              <label>Customer / Dealer Name</label>
-              <input id="inputCustomerName" placeholder="Search or enter name" />
+              <label>Customer First Name</label>
+              <input id="inputCustomerFirstName" placeholder="First name" />
+            </div>
+            <div class="field-group">
+              <label>Customer Last Name</label>
+              <input id="inputCustomerLastName" placeholder="Last name" />
             </div>
             <div class="field-group">
               <label>&nbsp;</label>
@@ -393,6 +418,34 @@
             <div class="field-group">
               <label>Email</label>
               <input type="email" id="inputCustomerEmail" placeholder="email@example.com" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group" style="flex:1.4;">
+              <label>VIN</label>
+              <div class="input-actions">
+                <input id="inputVin" placeholder="Scan or enter VIN" maxlength="17" />
+                <button type="button" class="icon-button subtle" id="btnVinScan">VIN Scan</button>
+              </div>
+              <div class="field-note" id="vinHelperText">Scan VIN to auto-fill year, make, and model.</div>
+            </div>
+            <div class="field-group">
+              <label>Stock #</label>
+              <input id="inputStockNumber" placeholder="Inventory ID" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label>Year</label>
+              <input id="inputVehicleYear" placeholder="YYYY" maxlength="4" />
+            </div>
+            <div class="field-group">
+              <label>Make</label>
+              <input id="inputVehicleMake" placeholder="Manufacturer" />
+            </div>
+            <div class="field-group">
+              <label>Model</label>
+              <input id="inputVehicleModel" placeholder="Model" />
             </div>
           </div>
           <div class="field-row">
@@ -475,7 +528,7 @@
           <div class="actions">
             <button type="button" class="btn btn-clear" id="btnClear">Clear</button>
             <button type="button" class="btn btn-danger" id="btnDeleteAppointment">Delete</button>
-            <button type="button" class="btn btn-primary" id="btnCreateAppointment">Save to Zapier</button>
+            <button type="button" class="btn btn-primary" id="btnCreateAppointment">Save Appointment</button>
           </div>
         </form>
       </div>
@@ -747,6 +800,7 @@
 
 <script>
 const techs=["William","Limage","Kaiden","Luke","Fafa","Matt"];
+document.documentElement.style.setProperty("--tech-count",techs.length);
 const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const workTimes=["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00"];
 
@@ -835,7 +889,7 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
-const ZAPIER_WEBHOOK_URL="https://hooks.zapier.com/hooks/catch/23565840/uzuiw0k/";
+const GOOGLE_BACKEND_URL="https://SCRIPT_URL_GOES_HERE";
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
 let shopHolidays = []; // array of { date: "YYYY-MM-DD", label: "New Year's Day" }
@@ -854,7 +908,6 @@ let events=[];
 let currentDate=new Date();currentDate.setHours(0,0,0,0);
 let selectedDeptFilter="All";
 let selectedSlot=null;
-let selectedEventId=null;
 let editingJobGroupId=null;
 let appointmentLocked=false;
 
@@ -873,7 +926,6 @@ const dayLabelEl=document.getElementById("dayLabel");
 const dayPickerEl=document.getElementById("dayPicker");
 const statusEl=document.getElementById("statusText");
 const dealerQueueListEl=document.getElementById("dealerQueueList");
-const eventDetailsEl=document.getElementById("eventDetails");
 const scheduleTechSelect=document.getElementById("scheduleTechSelect");
 const scheduleStatus=document.getElementById("scheduleStatus");
 const btnCreateAppointment=document.getElementById("btnCreateAppointment");
@@ -882,6 +934,14 @@ const statusField=document.getElementById("inputStatus");
 const checkboxInvoiced=document.getElementById("checkboxInvoiced");
 const checkboxPaid=document.getElementById("checkboxPaid");
 const statusSummary=document.getElementById("statusSummary");
+const vinInput=document.getElementById("inputVin");
+const stockNumberInput=document.getElementById("inputStockNumber");
+const vehicleYearInput=document.getElementById("inputVehicleYear");
+const vehicleMakeInput=document.getElementById("inputVehicleMake");
+const vehicleModelInput=document.getElementById("inputVehicleModel");
+const vinHelperText=document.getElementById("vinHelperText");
+const btnVinScan=document.getElementById("btnVinScan");
+const defaultVinHelperText="Scan VIN to auto-fill year, make, and model.";
 
 const appointmentPopup=document.getElementById("appointmentPopup");
 const popupStatusSelect=document.getElementById("popupStatusSelect");
@@ -934,6 +994,50 @@ function formatTimeFriendly(t){
   if(h===0) h=12; else if(h>12) h-=12;
   return h+":"+(m<10?"0"+m:m)+" "+ampm;
 }
+function formatCustomerName(evOrFirst,last){
+  if(typeof evOrFirst==="object"){
+    const ev=evOrFirst||{};
+    const formatted=[ev.customerFirstName,ev.customerLastName].filter(Boolean).join(" ").trim();
+    return formatted||ev.customerName||"";
+  }
+  return [evOrFirst,last].filter(Boolean).join(" ").trim();
+}
+function sanitizeVin(value){
+  return (value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,17);
+}
+function decodeVinYear(vin){
+  if(!vin || vin.length<10) return "";
+  const yearCode=vin[9];
+  const map=[
+    "A","B","C","D","E","F","G","H","J","K","L","M","N","P","R","S","T","V","W","X","Y",
+    "1","2","3","4","5","6","7","8","9"
+  ];
+  const idx=map.indexOf(yearCode);
+  if(idx===-1) return "";
+  const baseYear=1980+idx;
+  const cycle=Math.floor((new Date().getFullYear()-baseYear)/30);
+  return baseYear+Math.max(0,cycle*30);
+}
+function decodeVinToVehicle(vin){
+  const cleaned=sanitizeVin(vin);
+  if(cleaned.length<10) return null;
+  const wmi=cleaned.slice(0,3);
+  const makeMap={
+    "1FT":"Ford","1FA":"Ford","1C6":"RAM","1C4":"Chrysler","5YJ":"Tesla","3GC":"Chevrolet","1GC":"Chevrolet",
+    "JT2":"Toyota","JTD":"Toyota","2HK":"Honda","19X":"Honda","1HG":"Honda","JHM":"Honda","KM8":"Hyundai",
+    "1N4":"Nissan","JM1":"Mazda","WVW":"Volkswagen"
+  };
+  const modelMap={
+    "1FT":"F-150","3GC":"Silverado","1GC":"Silverado","JT2":"Supra","JTD":"Camry","2HK":"CR-V","19X":"Civic",
+    "1HG":"Accord","JHM":"Accord","5YJ":"Model 3","1C6":"1500","KM8":"Tucson","1N4":"Altima","JM1":"Mazda3",
+    "WVW":"Jetta","1FA":"Mustang"
+  };
+  const year=decodeVinYear(cleaned);
+  const make=makeMap[wmi]||"";
+  const model=modelMap[wmi]||"";
+  if(!year && !make && !model) return null;
+  return {year:String(year||""),make,model};
+}
 function parseISODate(str){
   if(!str) return null;
   const m=str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -973,6 +1077,34 @@ function serviceProgressMeta(status){
     "Completed":{className:"done",icon:"✔"}
   };
   return map[status]||map["In Queue"];
+}
+function updateVinHelper(message){
+  if(vinHelperText) vinHelperText.textContent=message||defaultVinHelperText;
+}
+function applyVinDecodeAndHelper(vin){
+  const cleaned=sanitizeVin(vin|| (vinInput?vinInput.value:""));
+  if(vinInput) vinInput.value=cleaned;
+  const decoded=decodeVinToVehicle(cleaned);
+  if(decoded){
+    if(vehicleYearInput) vehicleYearInput.value=decoded.year||"";
+    if(vehicleMakeInput) vehicleMakeInput.value=decoded.make||"";
+    if(vehicleModelInput) vehicleModelInput.value=decoded.model||"";
+  }else if(!cleaned){
+    if(vehicleYearInput) vehicleYearInput.value="";
+    if(vehicleMakeInput) vehicleMakeInput.value="";
+    if(vehicleModelInput) vehicleModelInput.value="";
+  }
+  const len=cleaned.length;
+  const vehicleSummary=decoded? [decoded.year,decoded.make,decoded.model].filter(Boolean).join(" "):"";
+  const suffix=vehicleSummary?` • ${vehicleSummary}`:"";
+  updateVinHelper(len?`VIN captured (${len}/17)${suffix}.`:defaultVinHelperText);
+  return cleaned;
+}
+function sanitizeVinInput(){
+  if(!vinInput) return "";
+  const cleaned=sanitizeVin(vinInput.value);
+  vinInput.value=cleaned;
+  return cleaned;
 }
 
 function minutesToTime(total){
@@ -1409,7 +1541,7 @@ function openAppointmentPopup(ev){
   if(!appointmentPopup || ev.type!=="job") return;
   const groupId=ev.jobGroupId||ev.id;
   const groupEvents=events.filter(e=>e.type==="job" && (e.jobGroupId||e.id)===groupId);
-  popupTitle.textContent=ev.customerName||"Appointment";
+  popupTitle.textContent=formatCustomerName(ev)||"Appointment";
   const endTime=addMinutesToTime(ev.time,ev.minutes||90);
   popupSubtitle.textContent=`${ev.date} · ${ev.time}–${endTime}`;
   const status=ev.status||"Scheduled";
@@ -1930,7 +2062,7 @@ function renderDealerQueue(){
     main.appendChild(t);
 
     const n=document.createElement("span");
-    n.textContent=(ev.customerName||"Dealer Job");
+    n.textContent=formatCustomerName(ev)||"Dealer Job";
     main.appendChild(n);
 
     const s=document.createElement("span");
@@ -1972,71 +2104,6 @@ function renderDealerQueue(){
     item.appendChild(badges);
     dealerQueueListEl.appendChild(item);
   });
-}
-
-function renderEventDetails(ev){
-  if(!ev){
-    eventDetailsEl.className="event-details-empty";
-    eventDetailsEl.textContent="Click an appointment pill to view details. Click again to edit.";
-    return;
-  }
-  eventDetailsEl.className="";
-  eventDetailsEl.innerHTML="";
-  function row(label,val){
-    const r=document.createElement("div");
-    r.className="event-details-row";
-    const l=document.createElement("div");
-    l.className="event-details-label";
-    l.textContent=label;
-    const v=document.createElement("div");
-    v.className="event-details-value";
-    v.textContent=val||"—";
-    r.appendChild(l);
-    r.appendChild(v);
-    eventDetailsEl.appendChild(r);
-  }
-  if(ev.type==="job"){
-    row("Type","Appointment");
-    const groupKey=ev.jobGroupId||ev.id;
-    const groupEvents=events.filter(x=>x.type==="job" && (x.jobGroupId||x.id)===groupKey);
-    const totalPrice=groupEvents.reduce((sum,x)=>sum+(x.price||0),0);
-    const totalMinutes=groupEvents.reduce((sum,x)=>sum+(x.minutes||0),0);
-    const statusText=`${ev.status||"Scheduled"}`+(ev.paid?" · Paid":ev.invoiced?" · Invoiced":"");
-    row("Status",statusText);
-    row("Customer",ev.customerName||"");
-    if(groupEvents.length>1){
-      const summary=groupEvents.map(x=>{
-        const base=`${x.dept||""}${x.serviceName?" – "+x.serviceName:""}`;
-        const techPart=x.tech?` (${x.tech} @ ${x.time||""})`:"";
-        return base+techPart;
-      }).join(" | ");
-      row("Services",summary);
-    }else{
-      row("Dept / Service",`${ev.dept||""}${ev.serviceName?" · "+ev.serviceName:""}`);
-    }
-    row("Estimated",`${totalMinutes||0} mins · $${totalPrice.toFixed(2)}`);
-  }else{
-    row("Type","Time Off");
-    row("Tech",ev.tech||"");
-    row("Note",ev.notes||"");
-  }
-  row("Tech",ev.tech||"");
-  row("Date",ev.date||"");
-  row("Time",ev.time||"");
-  if(ev.type==="job"){
-    row("Dealer",ev.dealer?"Yes":"No");
-    row("Customer Waiting",ev.customerWaiting?"Yes":"No");
-    row("Ride Needed",ev.rideNeeded?"Yes":"No");
-    row("Ride Time",ev.rideTime||"");
-    let pdVal=ev.pickupDelivery?"Yes":"No";
-    if(ev.pickupDelivery){
-      const p=ev.pickupTime?`Pickup: ${ev.pickupTime}`:"";
-      const d=ev.deliveryTime?`Delivery: ${ev.deliveryTime}`:"";
-      pdVal=[p,d].filter(Boolean).join(" · ")||"Yes";
-    }
-    row("Pickup/Delivery",pdVal);
-    row("Notes",ev.notes||"");
-  }
 }
 
 // Calendar rendering
@@ -2176,10 +2243,11 @@ function renderEventDetails(ev){
           title.className="bubble-title";
           title.textContent=ev.serviceName||ev.label||"Service";
           header.appendChild(title);
-          if(ev.customerName){
+          const customerLabel=formatCustomerName(ev);
+          if(customerLabel){
             const cust=document.createElement("div");
             cust.className="bubble-sub";
-            cust.textContent=ev.customerName;
+            cust.textContent=customerLabel;
             header.appendChild(cust);
           }
           const infoLine=document.createElement("div");
@@ -2264,7 +2332,8 @@ function renderEventDetails(ev){
           pill.dataset.eventId=ev.id;
 
           let label=ev.label||ev.serviceName||"Job";
-          if(ev.type==="job" && ev.customerName) label=`${ev.customerName} – ${label}`;
+          const pillName=formatCustomerName(ev);
+          if(ev.type==="job" && pillName) label=`${pillName} – ${label}`;
         const span=document.createElement("span");
         span.textContent=label;
         pill.appendChild(span);
@@ -2284,8 +2353,6 @@ function renderEventDetails(ev){
     const c=bodyEl.querySelector(sel);
     if(c) c.classList.add("selected");
   }
-  const selectedEvent=events.find(ev=>ev.id===selectedEventId);
-  renderEventDetails(selectedEvent);
   renderDealerQueue();
 }
 
@@ -2311,7 +2378,7 @@ function renderEventDetails(ev){
 
   if(statusEl)statusEl.textContent=`Selected ${tech} at ${time} on ${iso}.`;
   if(!editingJobGroupId){
-    btnCreateAppointment.textContent="Save to Zapier";
+    btnCreateAppointment.textContent="Save Appointment";
   }else{
     btnCreateAppointment.textContent="Update Appointment";
   }
@@ -2322,13 +2389,13 @@ function seedDummyEvents(){
   const todayIso=toISODate(currentDate);
   let idCounter=1;
     const base=[
-      {tech:"William",dept:"Detailing",type:"job",serviceName:"Full Detail",label:"Full Detail – F-150",time:"09:00",minutes:210,price:450,status:"Scheduled",dealer:false,customerName:"Smith",serviceProgress:"In Queue"},
-      {tech:"Limage",dept:"Detailing",type:"job",serviceName:"Interior Detail",label:"Interior – Civic",time:"10:00",minutes:150,price:275,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"08:30",deliveryTime:"17:00",customerName:"Zeigler",serviceProgress:"In Queue"},
-      {tech:"Matt",dept:"Tint",type:"job",serviceName:"Full Tint",label:"Full Tint – Model 3",time:"09:30",minutes:120,price:380,status:"Scheduled",dealer:true,rideNeeded:true,rideTime:"09:00",customerWaiting:true,customerName:"Jones",serviceProgress:"In Queue"},
-      {tech:"Matt",dept:"PPF",type:"job",serviceName:"Full Front PPF",label:"Full Front – Supra",time:"12:00",minutes:240,price:1600,status:"Scheduled",dealer:false,customerName:"Taylor",serviceProgress:"In Queue"},
-      {tech:"William",dept:"Ceramic",type:"job",serviceName:"5 Year Coating",label:"5yr – Silverado",time:"14:00",minutes:240,price:1400,status:"Scheduled",dealer:false,customerName:"Clark",serviceProgress:"In Queue"},
-      {tech:"Fafa",dept:"Detailing",type:"job",serviceName:"Quick Clean",label:"Quick Clean – CR-V",time:"15:00",minutes:60,price:120,status:"Scheduled",dealer:false,customerName:"Lopez",serviceProgress:"In Queue"},
-      {tech:"Matt",dept:"Electronics",type:"job",serviceName:"Remote Start",label:"Remote Start – RAM",time:"11:00",minutes:120,price:450,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"10:30",deliveryTime:"16:30",customerName:"Davis",serviceProgress:"In Queue"},
+      {tech:"William",dept:"Detailing",type:"job",serviceName:"Full Detail",label:"Full Detail – F-150",time:"09:00",minutes:210,price:450,status:"Scheduled",dealer:false,customerFirstName:"Alex",customerLastName:"Smith",customerName:"Alex Smith",vin:"1FTFW1E50PFA12345",stockNumber:"STK-101",vehicleYear:"2023",vehicleMake:"Ford",vehicleModel:"F-150",serviceProgress:"In Queue"},
+      {tech:"Limage",dept:"Detailing",type:"job",serviceName:"Interior Detail",label:"Interior – Civic",time:"10:00",minutes:150,price:275,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"08:30",deliveryTime:"17:00",customerFirstName:"Dana",customerLastName:"Zeigler",customerName:"Dana Zeigler",vin:"19XFC2F59GE000111",stockNumber:"STK-102",vehicleYear:"2016",vehicleMake:"Honda",vehicleModel:"Civic",serviceProgress:"In Queue"},
+      {tech:"Matt",dept:"Tint",type:"job",serviceName:"Full Tint",label:"Full Tint – Model 3",time:"09:30",minutes:120,price:380,status:"Scheduled",dealer:true,rideNeeded:true,rideTime:"09:00",customerWaiting:true,customerFirstName:"Chris",customerLastName:"Jones",customerName:"Chris Jones",vin:"5YJ3E1EA7KF317222",stockNumber:"STK-103",vehicleYear:"2019",vehicleMake:"Tesla",vehicleModel:"Model 3",serviceProgress:"In Queue"},
+      {tech:"Matt",dept:"PPF",type:"job",serviceName:"Full Front PPF",label:"Full Front – Supra",time:"12:00",minutes:240,price:1600,status:"Scheduled",dealer:false,customerFirstName:"Taylor",customerLastName:"Kim",customerName:"Taylor Kim",vin:"JT2JA82J0R0000456",stockNumber:"STK-104",vehicleYear:"2024",vehicleMake:"Toyota",vehicleModel:"Supra",serviceProgress:"In Queue"},
+      {tech:"William",dept:"Ceramic",type:"job",serviceName:"5 Year Coating",label:"5yr – Silverado",time:"14:00",minutes:240,price:1400,status:"Scheduled",dealer:false,customerFirstName:"Morgan",customerLastName:"Clark",customerName:"Morgan Clark",vin:"3GCUYDED2PG111888",stockNumber:"STK-105",vehicleYear:"2023",vehicleMake:"Chevrolet",vehicleModel:"Silverado",serviceProgress:"In Queue"},
+      {tech:"Fafa",dept:"Detailing",type:"job",serviceName:"Quick Clean",label:"Quick Clean – CR-V",time:"15:00",minutes:60,price:120,status:"Scheduled",dealer:false,customerFirstName:"Jamie",customerLastName:"Lopez",customerName:"Jamie Lopez",vin:"2HKRW2H5XHH123321",stockNumber:"STK-106",vehicleYear:"2017",vehicleMake:"Honda",vehicleModel:"CR-V",serviceProgress:"In Queue"},
+      {tech:"Matt",dept:"Electronics",type:"job",serviceName:"Remote Start",label:"Remote Start – RAM",time:"11:00",minutes:120,price:450,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"10:30",deliveryTime:"16:30",customerFirstName:"Robin",customerLastName:"Davis",customerName:"Robin Davis",vin:"1C6SRFMT3NN401234",stockNumber:"STK-107",vehicleYear:"2022",vehicleMake:"RAM",vehicleModel:"1500",serviceProgress:"In Queue"},
       {tech:"William",dept:"Detailing",type:"timeoff",label:"Time Off",time:"13:00",notes:"Doctor appt"}
     ];
     events=base.map(e=>{
@@ -2575,12 +2642,52 @@ function deleteTimeOff(){
   renderCalendar();
 }
 
+function sendAppointmentToBackend(groupId, eventsForGroup){
+  if(!GOOGLE_BACKEND_URL) return;
+  if(!eventsForGroup || !eventsForGroup.length) return;
+
+  const primary=eventsForGroup[0];
+
+  const payload={
+    id:groupId,
+    date:primary.date,
+    time:primary.startTime||primary.time||"",
+    tech:primary.tech||"",
+    customerName:primary.customerName||primary.name||"",
+    vehicle:primary.vehicle||"",
+    services:primary.services?primary.services.join(", "):(primary.serviceName||""),
+    status:primary.status||"",
+    notes:primary.notes||"",
+    overrideClosed:!!primary.overrideClosed
+  };
+
+  try{
+    fetch(GOOGLE_BACKEND_URL,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    }).catch(err=>{
+      console.error("Failed to send appointment to backend",err);
+    });
+  }catch(e){
+    console.error("Error sending appointment to backend",e);
+  }
+}
+
 // Appointment create/update
 async function createOrUpdateAppointment(){
   const overrideClosed = document.getElementById("checkboxOverrideClosed").checked;
-  const customerName=document.getElementById("inputCustomerName").value.trim();
+  const customerFirstName=document.getElementById("inputCustomerFirstName").value.trim();
+  const customerLastName=document.getElementById("inputCustomerLastName").value.trim();
+  const customerName=formatCustomerName(customerFirstName,customerLastName)||(document.getElementById("checkboxDealer").checked?"Dealer Job":"");
   const phone=document.getElementById("inputCustomerPhone").value.trim();
   const email=document.getElementById("inputCustomerEmail").value.trim();
+  const vin=sanitizeVinInput();
+  const stockNumber=(stockNumberInput?.value||"").trim();
+  const vehicleYear=(vehicleYearInput?.value||"").trim();
+  const vehicleMake=(vehicleMakeInput?.value||"").trim();
+  const vehicleModel=(vehicleModelInput?.value||"").trim();
   const date=document.getElementById("datePicker").value;
   const dayName=getDayName(new Date(date+"T00:00"));
   const dealer=document.getElementById("checkboxDealer").checked;
@@ -2703,9 +2810,16 @@ async function createOrUpdateAppointment(){
       invoiced,
       paid,
       dealer,
+      customerFirstName,
+      customerLastName,
       customerName,
       phone,
       email,
+      vin,
+      stockNumber,
+      vehicleYear,
+      vehicleMake,
+      vehicleModel,
       customerWaiting:waiting,
       rideNeeded,
       rideTime,
@@ -2723,48 +2837,22 @@ async function createOrUpdateAppointment(){
   currentDate=new Date(date+"T00:00");
   renderCalendar();
   if(statusEl)statusEl.textContent=payloadType==="update_appointment"
-    ?"Appointment updated and sent to Zapier."
-    :"Appointment created and sent to Zapier.";
+    ?"Appointment updated."
+    :"Appointment created.";
   btnCreateAppointment.textContent="Update Appointment";
 
-  try{
-    await fetch(ZAPIER_WEBHOOK_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        type:payloadType,
-        appointmentId:groupId,
-        customerName,
-        phone,
-        email,
-        date,
-        dealer,
-        customerWaiting:waiting,
-        rideNeeded,
-        rideTime,
-        pickupDelivery,
-        pickupTime,
-        deliveryTime,
-        notes,
-        status:statusValue,
-        invoiced,
-        paid,
-        services:services
-      })
-    });
-  }catch(e){
-    console.error("Zapier error",e);
-  }
+  const eventsForGroup=events.filter(ev=>ev.jobGroupId===groupId);
+  sendAppointmentToBackend(groupId,eventsForGroup);
 
   // clear form after save
   document.getElementById("appointmentForm").reset();
+  updateVinHelper(defaultVinHelperText);
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
   setStatusState("Scheduled",false,false);
   selectedSlot=null;
-  selectedEventId=null;
   editingJobGroupId=null;
-  btnCreateAppointment.textContent="Save to Zapier";
+  btnCreateAppointment.textContent="Save Appointment";
   setAppointmentFormLocked(false);
   setPopupEditable(false);
   closeAppointmentPopup();
@@ -2778,42 +2866,30 @@ function deleteAppointment(){
   }
   const groupKey=editingJobGroupId;
   events=events.filter(ev=>!(ev.type==="job" && (ev.jobGroupId||ev.id)===groupKey));
-  selectedEventId=null;
   editingJobGroupId=null;
   document.getElementById("appointmentForm").reset();
+  updateVinHelper(defaultVinHelperText);
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
   setStatusState("Scheduled",false,false);
-  btnCreateAppointment.textContent="Save to Zapier";
+  btnCreateAppointment.textContent="Save Appointment";
   if(statusEl)statusEl.textContent="Appointment deleted.";
   renderCalendar();
   setAppointmentFormLocked(false);
   setPopupEditable(false);
   closeAppointmentPopup();
-  try{
-    fetch(ZAPIER_WEBHOOK_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        type:"delete_appointment",
-        appointmentId:groupKey
-      })
-    });
-  }catch(e){
-    console.error("Zapier error",e);
-  }
 }
 
 // Clear appointment form manually
 function clearAppointmentForm(){
   document.getElementById("appointmentForm").reset();
+  updateVinHelper(defaultVinHelperText);
   clearServiceAssignments();
   ensureAtLeastOneServiceRow();
   setStatusState("Scheduled",false,false);
   selectedSlot=null;
-  selectedEventId=null;
   editingJobGroupId=null;
-  btnCreateAppointment.textContent="Save to Zapier";
+  btnCreateAppointment.textContent="Save Appointment";
   if(statusEl)statusEl.textContent="Cleared form.";
   renderCalendar();
   setAppointmentFormLocked(false);
@@ -2835,9 +2911,22 @@ function loadJobEventIntoForm(ev){
   editingJobGroupId=groupKey;
   btnCreateAppointment.textContent="Update Appointment";
 
-  document.getElementById("inputCustomerName").value=ev.customerName||"";
+  const firstInput=document.getElementById("inputCustomerFirstName");
+  const lastInput=document.getElementById("inputCustomerLastName");
+  const fallbackName=(ev.customerName||"").trim();
+  const nameParts=fallbackName.split(" ");
+  if(firstInput) firstInput.value=ev.customerFirstName||nameParts[0]||"";
+  if(lastInput) lastInput.value=ev.customerLastName||nameParts.slice(1).join(" ")||"";
   document.getElementById("inputCustomerPhone").value=ev.phone||"";
   document.getElementById("inputCustomerEmail").value=ev.email||"";
+  if(vinInput){
+    vinInput.value=ev.vin||"";
+    applyVinDecodeAndHelper(ev.vin||"");
+  }
+  if(stockNumberInput) stockNumberInput.value=ev.stockNumber||"";
+  if(vehicleYearInput) vehicleYearInput.value=ev.vehicleYear||"";
+  if(vehicleMakeInput) vehicleMakeInput.value=ev.vehicleMake||"";
+  if(vehicleModelInput) vehicleModelInput.value=ev.vehicleModel||"";
   document.getElementById("datePicker").value=ev.date||"";
   document.getElementById("checkboxDealer").checked=!!ev.dealer;
   document.getElementById("checkboxCustomerWaiting").checked=!!ev.customerWaiting;
@@ -2882,9 +2971,7 @@ bodyEl.addEventListener("click",e=>{
   const pill=e.target.closest(".event-pill, .event-bubble");
   if(pill){
     const id=pill.dataset.eventId;
-    selectedEventId=id;
     const ev=events.find(ev=>ev.id===id);
-    renderEventDetails(ev);
     if(ev.type==="job"){
       loadJobEventIntoForm(ev);
       openAppointmentPopup(ev);
@@ -2988,8 +3075,6 @@ dealerQueueListEl.addEventListener("click",e=>{
   const id=item.dataset.eventId;
   const ev=events.find(ev=>ev.id===id);
   if(!ev) return;
-  selectedEventId=id;
-  renderEventDetails(ev);
   if(ev.type==="job"){
     loadJobEventIntoForm(ev);
     openAppointmentPopup(ev);
@@ -3037,6 +3122,19 @@ if(allDayCheckbox){
     const disabled=allDayCheckbox.checked;
     if(startTimeEl) startTimeEl.disabled=disabled;
     if(endTimeEl) endTimeEl.disabled=disabled;
+  });
+}
+
+// VIN helpers
+if(vinInput){
+  vinInput.addEventListener("blur",()=>{
+    applyVinDecodeAndHelper(sanitizeVinInput());
+  });
+}
+if(btnVinScan){
+  btnVinScan.addEventListener("click",()=>{
+    const scanned=prompt("Scan or enter VIN value:","")||"";
+    applyVinDecodeAndHelper(scanned);
   });
 }
 
@@ -3270,6 +3368,7 @@ ensureAtLeastOneServiceRow();
 refreshAllServiceAssignmentRows();
 setStatusState("Scheduled",false,false);
 setAppointmentFormLocked(false);
+updateVinHelper(defaultVinHelperText);
 renderCalendar();
 
 
