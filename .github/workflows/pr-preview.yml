@@ -2,7 +2,8 @@ name: PR Preview
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -26,6 +27,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          # This repo is a simple static site (index.html etc.),
+          # so just upload the repo root.
           path: .
 
   deploy:
