@@ -2648,6 +2648,8 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
   if (!GOOGLE_BACKEND_URL) return;
 
   try {
+    console.log("loadAppointmentsFromBackend: fetching from backend...");
+
     const resp = await fetch(GOOGLE_BACKEND_URL + "?ts=" + Date.now(), {
       method: "GET"
     });
@@ -2658,19 +2660,23 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
     }
 
     const data = await resp.json();
+    console.log("Backend raw payload:", data);
+
     if (!data || !data.ok || !Array.isArray(data.rows)) {
-      console.error("Unexpected backend payload", data);
+      console.error("Unexpected backend payload shape", data);
       return;
     }
 
-    // Build a new events array from the sheet rows
     const newEvents = [];
 
     data.rows.forEach(row => {
-      // row keys: id, date, time, tech, customerName, vehicle, services, status, notes, overrideClosed
-      if (!row.date || !row.time || !row.tech) return; // skip incomplete rows
+      // row.id, row.date, row.time, row.tech, row.customerName, row.vehicle, row.services, row.status, row.notes, row.overrideClosed
+      if (!row.date || !row.time || !row.tech) {
+        console.warn("Skipping row with missing date/time/tech:", row);
+        return;
+      }
 
-      const minutes = 90; // default duration for now
+      const minutes = 90;
       const endTime = addMinutesToTime(row.time, minutes);
 
       newEvents.push({
@@ -2682,7 +2688,7 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
         minutes,
         endTime,
         tech: row.tech,
-        dept: "", // we don't store dept in the sheet yet
+        dept: "",
         serviceName: row.services || "",
         label: row.services || "Service",
         price: 0,
@@ -2713,14 +2719,14 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
     });
 
     console.log("Loaded from backend:", newEvents.length, "events");
-
     if (newEvents.length > 0) {
+      // Only replace local events if we actually have some from backend
       events = newEvents;
       if (typeof renderCalendar === "function") {
         renderCalendar();
       }
     } else {
-      console.warn("Backend returned no valid events. Keeping local events as-is.");
+      console.warn("Backend returned no valid events. Keeping local events unchanged.");
     }
 
   } catch (err) {
