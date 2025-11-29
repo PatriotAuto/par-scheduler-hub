@@ -2720,7 +2720,6 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
       events = newEvents;
     }
 
-    saveEventsToStorage && saveEventsToStorage();
     renderCalendar && renderCalendar();
 
   } catch (err) {
@@ -3062,6 +3061,7 @@ bodyEl.addEventListener("click",e=>{
   if(pill){
     const id=pill.dataset.eventId;
     const ev=events.find(ev=>ev.id===id);
+    if(!ev) return;
     if(ev.type==="job"){
       loadJobEventIntoForm(ev);
       openAppointmentPopup(ev);
