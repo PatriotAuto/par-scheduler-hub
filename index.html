@@ -889,7 +889,7 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
-const GOOGLE_BACKEND_URL="https://script.google.com/macros/s/AKfycbzfTUv9h_3U4RYFZgH7HH_mybySDGrva75urTpyYE5bXDyfuFTrwBIL2kqgthFbzjmb/exec";
+const GOOGLE_BACKEND_URL = "https://script.google.com/macros/s/AKfycbzfTUv9h_3U4RYFZgH7HH_mybySDGrva75urTpyYE5bXDyfuFTrwBIL2kqgthFbzjmb/exec";
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
 let shopHolidays = []; // array of { date: "YYYY-MM-DD", label: "New Year's Day" }
@@ -2643,39 +2643,39 @@ function deleteTimeOff(){
 }
 
 function sendAppointmentToBackend(groupId, eventsForGroup){
-  if(!GOOGLE_BACKEND_URL) return;
-  if(!eventsForGroup || !eventsForGroup.length) return;
+  if (!GOOGLE_BACKEND_URL) return;
+  if (!eventsForGroup || !eventsForGroup.length) return;
 
-  const primary=eventsForGroup[0];
+  const primary = eventsForGroup[0];
 
-  const payload={
-    id:groupId,
-    date:primary.date,
-    time:primary.startTime||primary.time||"",
-    tech:primary.tech||"",
-    customerName:primary.customerName||primary.name||"",
-    vehicle:primary.vehicle||"",
-    services:primary.services?primary.services.join(", "):(primary.serviceName||""),
-    status:primary.status||"",
-    notes:primary.notes||"",
-    overrideClosed:!!primary.overrideClosed
+  const payload = {
+    id: groupId,
+    date: primary.date,
+    time: primary.startTime || primary.time || "",
+    tech: primary.tech || "",
+    customerName: primary.customerName || primary.name || "",
+    vehicle: primary.vehicle || "",
+    services: primary.services ? primary.services.join(", ") : (primary.serviceName || ""),
+    status: primary.status || "",
+    notes: primary.notes || "",
+    overrideClosed: !!primary.overrideClosed
   };
 
-  console.log("Sending to backend:",payload);
+  console.log("Sending to backend:", payload);
 
-  try{
-    fetch(GOOGLE_BACKEND_URL,{
-      method:"POST",
-      mode:"no-cors", // fire-and-forget
-      headers:{
-        "Content-Type":"application/json"
+  try {
+    fetch(GOOGLE_BACKEND_URL, {
+      method: "POST",
+      mode: "no-cors", // fire-and-forget
+      headers: {
+        "Content-Type": "application/json"
       },
-      body:JSON.stringify(payload)
-    }).catch(err=>{
-      console.error("Failed to send appointment to backend",err);
+      body: JSON.stringify(payload)
+    }).catch(err => {
+      console.error("Failed to send appointment to backend", err);
     });
-  }catch(e){
-    console.error("Error sending appointment to backend",e);
+  } catch (e) {
+    console.error("Error sending appointment to backend", e);
   }
 }
 
