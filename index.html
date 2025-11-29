@@ -889,7 +889,7 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
-const GOOGLE_BACKEND_URL="https://SCRIPT_URL_GOES_HERE";
+const GOOGLE_BACKEND_URL="https://script.google.com/macros/s/AKfycbzfTUv9h_3U4RYFZgH7HH_mybySDGrva75urTpyYE5bXDyfuFTrwBIL2kqgthFbzjmb/exec";
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
 let shopHolidays = []; // array of { date: "YYYY-MM-DD", label: "New Year's Day" }
@@ -2661,11 +2661,15 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     overrideClosed:!!primary.overrideClosed
   };
 
+  console.log("Sending to backend:",payload);
+
   try{
     fetch(GOOGLE_BACKEND_URL,{
       method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"application/json"},
+      mode:"no-cors", // fire-and-forget
+      headers:{
+        "Content-Type":"application/json"
+      },
       body:JSON.stringify(payload)
     }).catch(err=>{
       console.error("Failed to send appointment to backend",err);
@@ -2841,9 +2845,6 @@ async function createOrUpdateAppointment(){
     :"Appointment created.";
   btnCreateAppointment.textContent="Update Appointment";
 
-  const eventsForGroup=events.filter(ev=>ev.jobGroupId===groupId);
-  sendAppointmentToBackend(groupId,eventsForGroup);
-
   // clear form after save
   document.getElementById("appointmentForm").reset();
   updateVinHelper(defaultVinHelperText);
@@ -2856,6 +2857,9 @@ async function createOrUpdateAppointment(){
   setAppointmentFormLocked(false);
   setPopupEditable(false);
   closeAppointmentPopup();
+
+  const eventsForGroup=events.filter(ev=>ev.jobGroupId===groupId);
+  sendAppointmentToBackend(groupId,eventsForGroup);
 }
 
 // Delete appointment (entire group)
