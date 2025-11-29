@@ -2712,15 +2712,16 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
       });
     });
 
-    if (options.replaceLocal) {
-      // Replace local events with the backend version
-      events = newEvents;
-    } else {
-      // Optionally merge, but for now we replace
-      events = newEvents;
-    }
+    console.log("Loaded from backend:", newEvents.length, "events");
 
-    renderCalendar && renderCalendar();
+    if (newEvents.length > 0) {
+      events = newEvents;
+      if (typeof renderCalendar === "function") {
+        renderCalendar();
+      }
+    } else {
+      console.warn("Backend returned no valid events. Keeping local events as-is.");
+    }
 
   } catch (err) {
     console.error("Error loading appointments from backend", err);
