@@ -2701,6 +2701,14 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
 
       const minutes = 90;
       const endTime = addMinutesToTime(timeStr, minutes);
+      const servicesText = row.services || "";
+      const invoiced = row.invoiced === "YES";
+      const paid = row.paid === "YES";
+      const dealer = row.dealer === "YES";
+      const customerWaiting = row.customerWaiting === "YES";
+      const rideNeeded = row.rideNeeded === "YES";
+      const pickupDelivery = row.pickupDelivery === "YES";
+      const overrideClosed = row.overrideClosed === "YES";
 
       newEvents.push({
         id: row.id || ("remote-" + dateStr + "-" + timeStr + "-" + row.tech),
@@ -2710,34 +2718,34 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
         time: timeStr,
         minutes,
         endTime,
-        tech: row.tech,
-        dept: "",
-        serviceName: row.services || "",
-        label: row.services || "Service",
+        tech: row.tech || "",
+        dept: row.dept || "",
+        serviceName: servicesText,
+        label: servicesText || "Service",
         price: 0,
-        serviceProgress: "In Queue",
+        serviceProgress: row.serviceProgress || "In Queue",
         status: row.status || "Scheduled",
-        invoiced: false,
-        paid: false,
-        dealer: row.customerName === "Dealer Job",
-        customerFirstName: "",
-        customerLastName: "",
+        invoiced,
+        paid,
+        dealer,
+        customerFirstName: row.customerFirstName || "",
+        customerLastName: row.customerLastName || "",
         customerName: row.customerName || "",
-        phone: "",
-        email: "",
-        vin: "",
-        stockNumber: "",
-        vehicleYear: "",
-        vehicleMake: "",
-        vehicleModel: row.vehicle || "",
-        customerWaiting: false,
-        rideNeeded: false,
-        rideTime: "",
-        pickupDelivery: false,
-        pickupTime: "",
-        deliveryTime: "",
+        phone: row.phone || "",
+        email: row.email || "",
+        vin: row.vin || "",
+        stockNumber: row.stockNumber || "",
+        vehicleYear: row.vehicleYear || "",
+        vehicleMake: row.vehicleMake || "",
+        vehicleModel: row.vehicleModel || "",
+        customerWaiting,
+        rideNeeded,
+        rideTime: row.rideTime || "",
+        pickupDelivery,
+        pickupTime: row.pickupTime || "",
+        deliveryTime: row.deliveryTime || "",
         notes: row.notes || "",
-        overrideClosed: row.overrideClosed === "YES"
+        overrideClosed
       });
     });
 
@@ -2768,10 +2776,29 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     date: primary.date,
     time: primary.startTime || primary.time || "",
     tech: primary.tech || "",
+    dept: primary.dept || "",
+    customerFirstName: primary.customerFirstName || "",
+    customerLastName: primary.customerLastName || "",
     customerName: primary.customerName || primary.name || "",
-    vehicle: primary.vehicle || "",
+    phone: primary.phone || "",
+    email: primary.email || "",
+    vin: primary.vin || "",
+    stockNumber: primary.stockNumber || "",
+    vehicleYear: primary.vehicleYear || "",
+    vehicleMake: primary.vehicleMake || "",
+    vehicleModel: primary.vehicleModel || "",
     services: primary.services ? primary.services.join(", ") : (primary.serviceName || ""),
     status: primary.status || "",
+    serviceProgress: primary.serviceProgress || "",
+    invoiced: !!primary.invoiced,
+    paid: !!primary.paid,
+    dealer: !!primary.dealer,
+    customerWaiting: !!primary.customerWaiting,
+    rideNeeded: !!primary.rideNeeded,
+    rideTime: primary.rideTime || "",
+    pickupDelivery: !!primary.pickupDelivery,
+    pickupTime: primary.pickupTime || "",
+    deliveryTime: primary.deliveryTime || "",
     notes: primary.notes || "",
     overrideClosed: !!primary.overrideClosed
   };
