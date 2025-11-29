@@ -2671,20 +2671,43 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
 
     data.rows.forEach(row => {
       // row.id, row.date, row.time, row.tech, row.customerName, row.vehicle, row.services, row.status, row.notes, row.overrideClosed
-      if (!row.date || !row.time || !row.tech) {
+      let dateStr = row.date;
+      if (typeof dateStr === "string") {
+        // If it's like "2025-01-13T00:00:00.000Z", keep only the first 10 chars
+        if (dateStr.length >= 10) {
+          dateStr = dateStr.slice(0, 10);
+        }
+      }
+
+      let timeStr = row.time;
+      if (typeof timeStr === "string") {
+        if (/^\d{2}:\d{2}$/.test(timeStr)) {
+          // already HH:MM, leave as is
+        } else {
+          // Try to parse as a Date and extract HH:MM
+          const dt = new Date(timeStr);
+          if (!isNaN(dt.getTime())) {
+            const hh = String(dt.getHours()).padStart(2, "0");
+            const mm = String(dt.getMinutes()).padStart(2, "0");
+            timeStr = `${hh}:${mm}`;
+          }
+        }
+      }
+
+      if (!dateStr || !timeStr || !row.tech) {
         console.warn("Skipping row with missing date/time/tech:", row);
         return;
       }
 
       const minutes = 90;
-      const endTime = addMinutesToTime(row.time, minutes);
+      const endTime = addMinutesToTime(timeStr, minutes);
 
       newEvents.push({
-        id: row.id || ("remote-" + row.date + "-" + row.time + "-" + row.tech),
+        id: row.id || ("remote-" + dateStr + "-" + timeStr + "-" + row.tech),
         jobGroupId: row.id || null,
         type: "job",
-        date: row.date,
-        time: row.time,
+        date: dateStr,
+        time: timeStr,
         minutes,
         endTime,
         tech: row.tech,
