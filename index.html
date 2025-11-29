@@ -14,7 +14,6 @@
       --tech-count:6;
       --cal-col-min:140px;
     }
-    
     *{box-sizing:border-box;font-family:system-ui,-apple-system,BlinkMacSystem,"Segoe UI",sans-serif;}
     body{margin:0;background:radial-gradient(circle at top,#101b2e,#02040a);color:var(--par-text);}
     .page{min-height:100vh;display:flex;flex-direction:column;}
@@ -333,6 +332,7 @@
       <button id="btnTimeOffPanel" class="header-btn">Tech Time Off</button>
       <button id="btnSchedulesPanel" class="header-btn">Tech Schedules</button>
       <button id="btnServicesPanel" class="header-btn">Services</button>
+      <button id="btnRefreshFromCloud" class="header-btn">Refresh From Cloud</button>
     </div>
   </header>
 
@@ -917,6 +917,7 @@ const headerBtnAppointments=document.getElementById("btnAppointmentsPanel");
 const headerBtnTimeOff=document.getElementById("btnTimeOffPanel");
 const headerBtnSchedules=document.getElementById("btnSchedulesPanel");
 const headerBtnServices=document.getElementById("btnServicesPanel");
+const btnRefreshFromCloud=document.getElementById("btnRefreshFromCloud");
 const appointmentPanel=document.getElementById("appointmentPanel");
 const timeOffPanel=document.getElementById("timeOffPanel");
 const schedulesPanel=document.getElementById("schedulesPanel");
@@ -2643,6 +2644,90 @@ function deleteTimeOff(){
   renderCalendar();
 }
 
+async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
+  if (!GOOGLE_BACKEND_URL) return;
+
+  try {
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?ts=" + Date.now(), {
+      method: "GET"
+    });
+
+    if (!resp.ok) {
+      console.error("Backend GET failed:", resp.status, resp.statusText);
+      return;
+    }
+
+    const data = await resp.json();
+    if (!data || !data.ok || !Array.isArray(data.rows)) {
+      console.error("Unexpected backend payload", data);
+      return;
+    }
+
+    // Build a new events array from the sheet rows
+    const newEvents = [];
+
+    data.rows.forEach(row => {
+      // row keys: id, date, time, tech, customerName, vehicle, services, status, notes, overrideClosed
+      if (!row.date || !row.time || !row.tech) return; // skip incomplete rows
+
+      const minutes = 90; // default duration for now
+      const endTime = addMinutesToTime(row.time, minutes);
+
+      newEvents.push({
+        id: row.id || ("remote-" + row.date + "-" + row.time + "-" + row.tech),
+        jobGroupId: row.id || null,
+        type: "job",
+        date: row.date,
+        time: row.time,
+        minutes,
+        endTime,
+        tech: row.tech,
+        dept: "", // we don't store dept in the sheet yet
+        serviceName: row.services || "",
+        label: row.services || "Service",
+        price: 0,
+        serviceProgress: "In Queue",
+        status: row.status || "Scheduled",
+        invoiced: false,
+        paid: false,
+        dealer: row.customerName === "Dealer Job",
+        customerFirstName: "",
+        customerLastName: "",
+        customerName: row.customerName || "",
+        phone: "",
+        email: "",
+        vin: "",
+        stockNumber: "",
+        vehicleYear: "",
+        vehicleMake: "",
+        vehicleModel: row.vehicle || "",
+        customerWaiting: false,
+        rideNeeded: false,
+        rideTime: "",
+        pickupDelivery: false,
+        pickupTime: "",
+        deliveryTime: "",
+        notes: row.notes || "",
+        overrideClosed: row.overrideClosed === "YES"
+      });
+    });
+
+    if (options.replaceLocal) {
+      // Replace local events with the backend version
+      events = newEvents;
+    } else {
+      // Optionally merge, but for now we replace
+      events = newEvents;
+    }
+
+    saveEventsToStorage && saveEventsToStorage();
+    renderCalendar && renderCalendar();
+
+  } catch (err) {
+    console.error("Error loading appointments from backend", err);
+  }
+}
+
 function sendAppointmentToBackend(groupId, eventsForGroup){
   if (!GOOGLE_BACKEND_URL) return;
   if (!eventsForGroup || !eventsForGroup.length) return;
@@ -3104,6 +3189,11 @@ headerBtnServices.addEventListener("click",()=>{
   setPanel("services");
   renderServiceLibrary();
 });
+if(btnRefreshFromCloud){
+  btnRefreshFromCloud.addEventListener("click",()=>{
+    loadAppointmentsFromBackend({ replaceLocal:true });
+  });
+}
 
 // Schedules panel
 scheduleTechSelect.addEventListener("change",()=>{
@@ -3375,6 +3465,7 @@ setStatusState("Scheduled",false,false);
 setAppointmentFormLocked(false);
 updateVinHelper(defaultVinHelperText);
 renderCalendar();
+loadAppointmentsFromBackend({ replaceLocal: true });
 
 
 </script>
