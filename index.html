@@ -2771,14 +2771,35 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
 
   const primary = eventsForGroup[0];
 
-  // Build a combined services string from all events in the group
-  const servicesList = eventsForGroup
-    .map(ev => ev.serviceName || ev.label || "")
-    .filter(s => s && s.trim().length > 0);
-  const servicesText = servicesList.join(", ");
+  // Build per-service payloads for the group
+  const serviceEventsPayload = eventsForGroup.map(ev => {
+    return {
+      date: ev.date,
+      time: ev.startTime || ev.time || "",
+      tech: ev.tech || "",
+      dept: ev.dept || "",
+      services: ev.serviceName || ev.label || "",
+      status: ev.status || primary.status || "",
+      serviceProgress: ev.serviceProgress || primary.serviceProgress || "",
+      invoiced: !!ev.invoiced,
+      paid: !!ev.paid,
+      dealer: !!ev.dealer,
+      customerWaiting: !!ev.customerWaiting,
+      rideNeeded: !!ev.rideNeeded,
+      rideTime: ev.rideTime || primary.rideTime || "",
+      pickupDelivery: !!ev.pickupDelivery,
+      pickupTime: ev.pickupTime || primary.pickupTime || "",
+      deliveryTime: ev.deliveryTime || primary.deliveryTime || "",
+      notes: ev.notes || primary.notes || "",
+      overrideClosed: !!ev.overrideClosed
+    };
+  });
 
   const payload = {
+    // group-level id (jobGroupId)
     id: groupId,
+
+    // shared appointment fields
     date: primary.date,
     time: primary.startTime || primary.time || "",
     tech: primary.tech || "",
@@ -2792,7 +2813,8 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     vehicleYear: primary.vehicleYear || "",
     vehicleMake: primary.vehicleMake || "",
     vehicleModel: primary.vehicleModel || "",
-    services: servicesText,
+
+    // status + progress at job level (also duplicated into serviceEventsPayload)
     status: primary.status || "",
     serviceProgress: primary.serviceProgress || "",
     invoiced: !!primary.invoiced,
@@ -2805,7 +2827,10 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     pickupTime: primary.pickupTime || "",
     deliveryTime: primary.deliveryTime || "",
     notes: primary.notes || "",
-    overrideClosed: !!primary.overrideClosed
+    overrideClosed: !!primary.overrideClosed,
+
+    // all service lines for this job
+    events: serviceEventsPayload
   };
 
   console.log("Sending to backend:", payload);
