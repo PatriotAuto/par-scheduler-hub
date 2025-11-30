@@ -2786,6 +2786,164 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
   }
 }
 
+async function loadTechSchedulesFromBackend() {
+  if (!GOOGLE_BACKEND_URL) return;
+  try {
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadTechSchedules&ts=" + Date.now(), {
+      method: "GET"
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.ok || !Array.isArray(data.rows)) return;
+
+    techSchedules = {};
+    data.rows.forEach(function(row) {
+      var tech = row.tech;
+      var weekday = row.weekday;
+      if (!tech || !weekday) return;
+
+      if (!techSchedules[tech]) techSchedules[tech] = {};
+
+      var off = (row.off === "YES");
+      techSchedules[tech][weekday] = {
+        start: row.startTime || "",
+        end: row.endTime || "",
+        off: off
+      };
+    });
+
+    const selectedTech = scheduleTechSelect?.value;
+    if (selectedTech && techSchedules[selectedTech]) {
+      loadScheduleIntoForm(selectedTech);
+    }
+    renderCalendar();
+  } catch (err) {
+    console.error("Error loading TechSchedules from backend", err);
+  }
+}
+
+async function loadTechTimeOffFromBackend() {
+  if (!GOOGLE_BACKEND_URL) return;
+  try {
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadTechTimeOff&ts=" + Date.now(), {
+      method: "GET"
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.ok || !Array.isArray(data.rows)) return;
+
+    events = events.filter(ev => ev.type !== "timeoff");
+    let idBase = Date.now();
+
+    data.rows.forEach(function(row) {
+      const tech = row.tech || "";
+      const date = row.date || "";
+      if (!tech || !date) return;
+
+      const dow = getDayName(new Date(date + "T00:00"));
+      const allDay = row.allDay === "YES";
+      const cfg = techSchedules[tech]?.[dow];
+
+      let start = row.startTime || "";
+      let end = row.endTime || "";
+
+      if (allDay && cfg && !cfg.off) {
+        start = cfg.start || start;
+        end = cfg.end || end;
+      }
+
+      if (!start) start = (cfg && cfg.start) ? cfg.start : "09:00";
+      if (!end) end = (cfg && cfg.end) ? cfg.end : "17:00";
+      if (cfg && cfg.off) return;
+      if (!start || !end) return;
+
+      const times = workTimes.filter(t => {
+        const m = timeToMinutes(t);
+        return m >= timeToMinutes(start) && m < timeToMinutes(end);
+      });
+
+      times.forEach(t => {
+        events.push({
+          id: "to-" + (idBase++),
+          type: "timeoff",
+          tech,
+          dept: null,
+          label: "Time Off",
+          date,
+          time: t,
+          dealer: false,
+          notes: row.reason || ""
+        });
+      });
+    });
+
+    renderCalendar();
+  } catch (err) {
+    console.error("Error loading TechTimeOff from backend", err);
+  }
+}
+
+async function loadHolidaysFromBackend() {
+  if (!GOOGLE_BACKEND_URL) return;
+  try {
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadHolidays&ts=" + Date.now(), {
+      method: "GET"
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.ok || !Array.isArray(data.rows)) return;
+
+    shopHolidays = data.rows.map(function(row) {
+      return {
+        date: row.date,
+        label: row.name || "",
+        closedAllDay: (row.closedAllDay === "YES"),
+        openTime: row.openTime || "",
+        closeTime: row.closeTime || ""
+      };
+    });
+
+    renderHolidayList();
+    renderCalendar();
+  } catch (err) {
+    console.error("Error loading Holidays from backend", err);
+  }
+}
+
+async function loadServicesFromBackend() {
+  if (!GOOGLE_BACKEND_URL) return;
+  try {
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadServices&ts=" + Date.now(), {
+      method: "GET"
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.ok || !Array.isArray(data.rows)) return;
+
+    const rebuilt = {};
+
+    data.rows.forEach(function(row) {
+      if (row.active !== "YES") return;
+      var cat = row.category || "General";
+      if (!rebuilt[cat]) rebuilt[cat] = [];
+      rebuilt[cat].push({
+        name: row.serviceName || "",
+        minutes: row.defaultMinutes ? Math.max(15, parseInt(row.defaultMinutes, 10) || 0) : 0,
+        price: row.defaultPrice ? parseFloat(row.defaultPrice) || 0 : 0
+      });
+    });
+
+    if (Object.keys(rebuilt).length) {
+      servicePackages = normalizeServicePackages(rebuilt);
+      renderServiceLibrary();
+      refreshAllServiceAssignmentRows();
+      renderDeptChips();
+    }
+  } catch (err) {
+    console.error("Error loading Services from backend", err);
+  }
+}
+
 function sendAppointmentToBackend(groupId, eventsForGroup){
   if (!GOOGLE_BACKEND_URL) return;
   if (!eventsForGroup || !eventsForGroup.length) return;
@@ -3597,6 +3755,11 @@ refreshAllServiceAssignmentRows();
 setStatusState("Scheduled",false,false);
 setAppointmentFormLocked(false);
 updateVinHelper(defaultVinHelperText);
+// Load configuration from backend, overriding local defaults where available
+loadTechSchedulesFromBackend();
+loadTechTimeOffFromBackend();
+loadHolidaysFromBackend();
+loadServicesFromBackend();
 renderCalendar();
 loadAppointmentsFromBackend({ replaceLocal: true });
 
