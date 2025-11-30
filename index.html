@@ -2871,6 +2871,31 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
   }
 }
 
+function sendAppointmentDeleteToBackend(groupId) {
+  if (!GOOGLE_BACKEND_URL) return;
+  if (!groupId) return;
+
+  var payload = {
+    action: "delete",
+    id: groupId
+  };
+
+  console.log("Sending delete to backend:", payload);
+
+  try {
+    fetch(GOOGLE_BACKEND_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(function(err) {
+      console.error("Failed to send delete to backend", err);
+    });
+  } catch (e) {
+    console.error("Error sending delete to backend", e);
+  }
+}
+
 // Appointment create/update
 async function createOrUpdateAppointment(){
   const overrideClosed = document.getElementById("checkboxOverrideClosed").checked;
@@ -3062,6 +3087,7 @@ function deleteAppointment(){
   }
   const groupKey=editingJobGroupId;
   events=events.filter(ev=>!(ev.type==="job" && (ev.jobGroupId||ev.id)===groupKey));
+  sendAppointmentDeleteToBackend(groupKey);
   editingJobGroupId=null;
   document.getElementById("appointmentForm").reset();
   updateVinHelper(defaultVinHelperText);
