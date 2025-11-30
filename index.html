@@ -911,6 +911,7 @@ let selectedDeptFilter="All";
 let selectedSlot=null;
 let editingJobGroupId=null;
 let appointmentLocked=false;
+let isEditingAppointmentForm=false;
 
 // Auto-refresh + idle tracking
 let lastAutoRefreshTime=0;
@@ -2411,6 +2412,8 @@ function renderDealerQueue(){
   }else{
     btnCreateAppointment.textContent="Update Appointment";
   }
+
+  isEditingAppointmentForm=true;
 }
 
 // Seed dummy events
@@ -3066,26 +3069,18 @@ function sendAppointmentDeleteToBackend(groupId) {
   }
 }
 
-function isAppointmentPopupOpen() {
-  const popup=document.getElementById("appointmentPopup");
-  if(!popup) return false;
-
-  const style=window.getComputedStyle(popup);
-  const visibleByDisplay=style.display!=="none";
-  const visibleByOpacity=style.visibility!=="hidden" && style.opacity!=="0";
-
-  return visibleByDisplay||visibleByOpacity||popup.classList.contains("open")||popup.classList.contains("visible");
-}
-
 function isUserEditingAppointment() {
-  if(typeof isAppointmentPopupOpen==="function" && isAppointmentPopupOpen()){
+  // Primary flag: explicitly set when the appointment form is in use
+  if(typeof isEditingAppointmentForm!=="undefined" && isEditingAppointmentForm){
     return true;
   }
 
+  // Also treat "editingJobGroupId" as editing if it exists
   if(typeof editingJobGroupId!="undefined" && editingJobGroupId){
     return true;
   }
 
+  // If you have dragging/resizing flags, include them:
   if(typeof isDraggingAppointment!="undefined" && isDraggingAppointment){
     return true;
   }
@@ -3328,6 +3323,7 @@ async function createOrUpdateAppointment(){
 
   const eventsForGroup=events.filter(ev=>ev.jobGroupId===groupId);
   sendAppointmentToBackend(groupId,eventsForGroup);
+  isEditingAppointmentForm=false;
 }
 
 // Delete appointment (entire group)
@@ -3351,6 +3347,7 @@ function deleteAppointment(){
   setAppointmentFormLocked(false);
   setPopupEditable(false);
   closeAppointmentPopup();
+  isEditingAppointmentForm=false;
 }
 
 // Clear appointment form manually
@@ -3364,6 +3361,7 @@ function clearAppointmentForm(){
   editingJobGroupId=null;
   btnCreateAppointment.textContent="Save Appointment";
   if(statusEl)statusEl.textContent="Cleared form.";
+  isEditingAppointmentForm=false;
   renderCalendar();
   setAppointmentFormLocked(false);
   setPopupEditable(false);
@@ -3437,6 +3435,7 @@ function loadJobEventIntoForm(ev){
   if(statusEl)statusEl.textContent="Editing existing appointment.";
   setAppointmentFormLocked(true);
   setPopupEditable(false);
+  isEditingAppointmentForm=true;
 }
 
 // Calendar clicks
