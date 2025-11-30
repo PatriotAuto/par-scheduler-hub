@@ -2771,6 +2771,12 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
 
   const primary = eventsForGroup[0];
 
+  // Build a combined services string from all events in the group
+  const servicesList = eventsForGroup
+    .map(ev => ev.serviceName || ev.label || "")
+    .filter(s => s && s.trim().length > 0);
+  const servicesText = servicesList.join(", ");
+
   const payload = {
     id: groupId,
     date: primary.date,
@@ -2786,7 +2792,7 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     vehicleYear: primary.vehicleYear || "",
     vehicleMake: primary.vehicleMake || "",
     vehicleModel: primary.vehicleModel || "",
-    services: primary.services ? primary.services.join(", ") : (primary.serviceName || ""),
+    services: servicesText,
     status: primary.status || "",
     serviceProgress: primary.serviceProgress || "",
     invoiced: !!primary.invoiced,
