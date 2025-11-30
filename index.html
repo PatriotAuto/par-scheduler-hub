@@ -2723,7 +2723,8 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
         return;
       }
 
-      const minutes = 90;
+      let minutes = row.minutes ? parseInt(row.minutes, 10) : 90;
+      if (Number.isNaN(minutes) || minutes <= 0) minutes = 90;
       const endTime = addMinutesToTime(timeStr, minutes);
       const servicesText = row.services || "";
       const invoiced = row.invoiced === "YES";
