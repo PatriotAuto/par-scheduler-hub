@@ -912,6 +912,12 @@ let selectedSlot=null;
 let editingJobGroupId=null;
 let appointmentLocked=false;
 
+// Auto-refresh + idle tracking
+let lastAutoRefreshTime=0;
+let lastUserInteractionTime=Date.now();
+const AUTO_REFRESH_INTERVAL_MS=60000;  // 60 seconds between checks
+const AUTO_IDLE_THRESHOLD_MS=20000;    // user must be idle 20s before refresh
+
 // DOM refs
 const headerBtnAppointments=document.getElementById("btnAppointmentsPanel");
 const headerBtnTimeOff=document.getElementById("btnTimeOffPanel");
@@ -3060,6 +3066,87 @@ function sendAppointmentDeleteToBackend(groupId) {
   }
 }
 
+function isAppointmentPopupOpen() {
+  const popup=document.getElementById("appointmentPopup");
+  if(!popup) return false;
+
+  const style=window.getComputedStyle(popup);
+  const visibleByDisplay=style.display!=="none";
+  const visibleByOpacity=style.visibility!=="hidden" && style.opacity!=="0";
+
+  return visibleByDisplay||visibleByOpacity||popup.classList.contains("open")||popup.classList.contains("visible");
+}
+
+function isUserEditingAppointment() {
+  if(typeof isAppointmentPopupOpen==="function" && isAppointmentPopupOpen()){
+    return true;
+  }
+
+  if(typeof editingJobGroupId!="undefined" && editingJobGroupId){
+    return true;
+  }
+
+  if(typeof isDraggingAppointment!="undefined" && isDraggingAppointment){
+    return true;
+  }
+  if(typeof isResizingAppointment!="undefined" && isResizingAppointment){
+    return true;
+  }
+
+  return false;
+}
+
+function isSafeToAutoRefresh(){
+  const now=Date.now();
+
+  const idleTime=now-lastUserInteractionTime;
+  if(idleTime<AUTO_IDLE_THRESHOLD_MS){
+    return false;
+  }
+
+  if(isUserEditingAppointment()){
+    return false;
+  }
+
+  return true;
+}
+
+function attachUserInteractionListeners(){
+  const resetIdle=function(){
+    lastUserInteractionTime=Date.now();
+  };
+
+  window.addEventListener("mousemove",resetIdle);
+  window.addEventListener("mousedown",resetIdle);
+  window.addEventListener("keydown",resetIdle);
+  window.addEventListener("touchstart",resetIdle);
+  window.addEventListener("wheel",resetIdle);
+}
+
+function maybeAutoRefreshFromBackend(){
+  if(!GOOGLE_BACKEND_URL) return;
+
+  const now=Date.now();
+
+  if(now-lastAutoRefreshTime<AUTO_REFRESH_INTERVAL_MS){
+    return;
+  }
+
+  lastAutoRefreshTime=now;
+
+  if(!isSafeToAutoRefresh()){
+    return;
+  }
+
+  if(typeof loadAppointmentsFromBackend==="function"){
+    try{
+      loadAppointmentsFromBackend({ replaceLocal:true });
+    }catch(err){
+      console.error("Auto-refresh from backend failed",err);
+    }
+  }
+}
+
 // Appointment create/update
 async function createOrUpdateAppointment(){
   const overrideClosed = document.getElementById("checkboxOverrideClosed").checked;
@@ -3761,6 +3848,7 @@ refreshAllServiceAssignmentRows();
 setStatusState("Scheduled",false,false);
 setAppointmentFormLocked(false);
 updateVinHelper(defaultVinHelperText);
+attachUserInteractionListeners();
 // Load configuration from backend, overriding local defaults where available
 loadTechSchedulesFromBackend();
 loadTechTimeOffFromBackend();
@@ -3768,6 +3856,7 @@ loadHolidaysFromBackend();
 loadServicesFromBackend();
 renderCalendar();
 loadAppointmentsFromBackend({ replaceLocal: true });
+setInterval(maybeAutoRefreshFromBackend,15000);
 
 
 </script>
