@@ -1643,16 +1643,36 @@ function addServiceRow(initial){
   durationLabel.style.fontSize="10px";
   durationLabel.style.textTransform="none";
   durationLabel.style.letterSpacing="0";
-  durationLabel.textContent="Est. Duration (mins)";
-  const durationInput=document.createElement("input");
-  durationInput.type="number";
-  durationInput.min="15";
-  durationInput.step="15";
-  durationInput.placeholder="Est. mins";
-  durationInput.className="sa-minutes";
-  durationInput.value="90";
+  durationLabel.textContent="Est. Duration";
+  const durationSelect=document.createElement("select");
+  durationSelect.className="sa-minutes serviceMinutes";
+  const durationOptions=[
+    { value:"15", label:"0.25 hr (0:15)" },
+    { value:"30", label:"0.5 hr (0:30)" },
+    { value:"45", label:"0.75 hr (0:45)" },
+    { value:"60", label:"1.0 hr" },
+    { value:"75", label:"1.25 hr" },
+    { value:"90", label:"1.5 hr" },
+    { value:"105", label:"1.75 hr" },
+    { value:"120", label:"2.0 hr" },
+    { value:"150", label:"2.5 hr" },
+    { value:"180", label:"3.0 hr" },
+    { value:"210", label:"3.5 hr" },
+    { value:"240", label:"4.0 hr" },
+    { value:"270", label:"4.5 hr" },
+    { value:"300", label:"5.0 hr" },
+    { value:"330", label:"5.5 hr" },
+    { value:"360", label:"6.0 hr" }
+  ];
+  durationOptions.forEach(opt=>{
+    const o=document.createElement("option");
+    o.value=opt.value;
+    o.textContent=opt.label;
+    durationSelect.appendChild(o);
+  });
+  durationSelect.value="90";
   durationGroup.appendChild(durationLabel);
-  durationGroup.appendChild(durationInput);
+  durationGroup.appendChild(durationSelect);
 
   const priceGroup=document.createElement("div");
   priceGroup.className="field-group";
@@ -1700,14 +1720,14 @@ function addServiceRow(initial){
 
   deptSelect.addEventListener("change",()=>{
     populateServiceOptionsForSelect(deptSelect,svcSelect,null);
-    durationInput.value="";
+    durationSelect.value="90";
     priceInput.value="";
   });
 
   svcSelect.addEventListener("change",()=>{
     const defaults=findServiceDefaults(deptSelect.value,svcSelect.value);
     if(defaults){
-      durationInput.value=defaults.minutes||90;
+      durationSelect.value=(defaults.minutes||90).toString();
       priceInput.value=defaults.price||0;
     }
   });
@@ -1719,7 +1739,7 @@ function addServiceRow(initial){
     }
     if(initial.tech) techSelect.value=initial.tech;
     if(initial.time) timeSelect.value=initial.time;
-    if(initial.minutes) durationInput.value=initial.minutes;
+    if(initial.minutes) durationSelect.value=initial.minutes;
     if(typeof initial.price!=="undefined") priceInput.value=initial.price;
     if(initial.serviceProgress) progressInput.value=initial.serviceProgress;
     if(initial.id) row.dataset.eventId=initial.id;
@@ -1741,9 +1761,9 @@ function refreshAllServiceAssignmentRows(){
     const svcSelect=row.querySelector(".sa-service");
     const prevDept=deptSelect.value;
     const prevSvc=svcSelect.value;
-    const minutesInput=row.querySelector(".sa-minutes");
+    const minutesSelect=row.querySelector(".serviceMinutes");
     const priceInput=row.querySelector(".sa-price");
-    const prevMinutes=minutesInput.value;
+    const prevMinutes=minutesSelect?.value||"";
     const prevPrice=priceInput.value;
     const progressInput=row.querySelector(".sa-progress");
     const prevProgress=progressInput?.value||"In Queue";
@@ -1756,7 +1776,7 @@ function refreshAllServiceAssignmentRows(){
     if(prevDept && servicePackages[prevDept]) deptSelect.value=prevDept;
 
     populateServiceOptionsForSelect(deptSelect,svcSelect,prevSvc);
-    minutesInput.value=prevMinutes;
+    if(minutesSelect && prevMinutes) minutesSelect.value=prevMinutes;
     priceInput.value=prevPrice;
     if(progressInput) progressInput.value=prevProgress;
   });
@@ -1769,7 +1789,8 @@ function getServiceAssignmentsFromForm(){
     const serviceName=row.querySelector(".sa-service")?.value||"";
     const tech=row.querySelector(".sa-tech")?.value||"";
     const time=row.querySelector(".sa-time")?.value||"";
-    const minutes=parseInt(row.querySelector(".sa-minutes")?.value||"0",10)||90;
+    const minutesSelect=row.querySelector(".serviceMinutes");
+    const minutes=minutesSelect?parseInt(minutesSelect.value,10)||0:0;
     const price=parseFloat(row.querySelector(".sa-price")?.value||"0")||0;
     const serviceProgress=row.querySelector(".sa-progress")?.value||"In Queue";
     if(!dept && !serviceName && !tech && !time) return;
@@ -2780,6 +2801,7 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
       tech: ev.tech || "",
       dept: ev.dept || "",
       services: ev.serviceName || ev.label || "",
+      minutes: typeof ev.minutes === "number" ? ev.minutes : parseInt(ev.minutes||"0",10)||0,
       status: ev.status || primary.status || "",
       serviceProgress: ev.serviceProgress || primary.serviceProgress || "",
       invoiced: !!ev.invoiced,
