@@ -2769,9 +2769,10 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
   if (!GOOGLE_BACKEND_URL) return;
   if (!eventsForGroup || !eventsForGroup.length) return;
 
+  // Use the first event in the group as the "primary" for shared fields
   const primary = eventsForGroup[0];
 
-  // Build per-service payloads for the group
+  // Build per-service payloads (one per bubble)
   const serviceEventsPayload = eventsForGroup.map(ev => {
     return {
       date: ev.date,
@@ -2796,10 +2797,10 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
   });
 
   const payload = {
-    // group-level id (jobGroupId)
+    // group-level id for this appointment
     id: groupId,
 
-    // shared appointment fields
+    // shared appointment fields (taken from the primary event)
     date: primary.date,
     time: primary.startTime || primary.time || "",
     tech: primary.tech || "",
@@ -2814,7 +2815,6 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     vehicleMake: primary.vehicleMake || "",
     vehicleModel: primary.vehicleModel || "",
 
-    // status + progress at job level (also duplicated into serviceEventsPayload)
     status: primary.status || "",
     serviceProgress: primary.serviceProgress || "",
     invoiced: !!primary.invoiced,
@@ -2829,7 +2829,7 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     notes: primary.notes || "",
     overrideClosed: !!primary.overrideClosed,
 
-    // all service lines for this job
+    // all per-service lines
     events: serviceEventsPayload
   };
 
@@ -2838,10 +2838,8 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
   try {
     fetch(GOOGLE_BACKEND_URL, {
       method: "POST",
-      mode: "no-cors", // fire-and-forget
-      headers: {
-        "Content-Type": "application/json"
-      },
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }).catch(err => {
       console.error("Failed to send appointment to backend", err);
