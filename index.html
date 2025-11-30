@@ -2674,7 +2674,7 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
   try {
     console.log("loadAppointmentsFromBackend: fetching from backend...");
 
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?ts=" + Date.now(), {
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadAppointments&ts=" + Date.now(), {
       method: "GET"
     });
 
