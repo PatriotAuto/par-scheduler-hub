@@ -2184,7 +2184,7 @@ function renderDealerQueue(){
       cell.dataset.tech=tech;
       cell.dataset.time=time;
 
-      const sched=techSchedules[tech][dayName];
+      const sched=techSchedules[tech]?.[dayName];
       if(!sched || sched.off){
         cell.classList.add("off-shift");
       }else{
@@ -2449,12 +2449,15 @@ function loadScheduleIntoForm(tech){
       s.value="09:00";e.value="17:00";o.checked=false;s.disabled=false;e.disabled=false;
       return;
     }
-    const cfg=techSchedules[tech][d];
-    s.value=cfg.start;
-    e.value=cfg.end;
-    o.checked=cfg.off;
-    s.disabled=cfg.off;
-    e.disabled=cfg.off;
+    const cfg=techSchedules[tech]?.[d];
+    const startVal = cfg && cfg.start ? cfg.start : "09:00";
+    const endVal = cfg && cfg.end ? cfg.end : "17:00";
+    const offVal = cfg ? cfg.off : false;
+    s.value=startVal;
+    e.value=endVal;
+    o.checked=offVal;
+    s.disabled=offVal;
+    e.disabled=offVal;
   });
 }
 function attachOffCheckboxHandlers(){
@@ -2796,21 +2799,23 @@ async function loadTechSchedulesFromBackend() {
     const data = await resp.json();
     if (!data.ok || !Array.isArray(data.rows)) return;
 
-    techSchedules = {};
+    const mergedSchedules = JSON.parse(JSON.stringify(techSchedules || {}));
     data.rows.forEach(function(row) {
       var tech = row.tech;
       var weekday = row.weekday;
       if (!tech || !weekday) return;
 
-      if (!techSchedules[tech]) techSchedules[tech] = {};
+      if (!mergedSchedules[tech]) mergedSchedules[tech] = {};
 
       var off = (row.off === "YES");
-      techSchedules[tech][weekday] = {
+      mergedSchedules[tech][weekday] = {
         start: row.startTime || "",
         end: row.endTime || "",
         off: off
       };
     });
+
+    techSchedules = mergedSchedules;
 
     const selectedTech = scheduleTechSelect?.value;
     if (selectedTech && techSchedules[selectedTech]) {
