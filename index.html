@@ -491,6 +491,22 @@
   padding: 4px 8px;
   font-size: 0.8rem;
 }
+
+.customer-history {
+  margin-top: 16px;
+}
+
+.customer-history h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+#customerHistory .table-wrapper {
+  margin-top: 4px;
+  display: none; /* hidden until we have data */
+}
   </style>
 </head>
 <body>
@@ -985,26 +1001,48 @@
               </div>
             </div>
 
-            <div class="form-actions">
-              <button type="submit" class="btn-primary" id="customerSaveBtn">Save Customer</button>
-              <button type="button" class="btn-secondary" id="customerCancelBtn">Cancel</button>
-            </div>
-          </form>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" id="customerSaveBtn">Save Customer</button>
+            <button type="button" class="btn-secondary" id="customerCancelBtn">Cancel</button>
+          </div>
+        </form>
 
+        <div id="customerHistory" class="customer-history">
+          <h3>Past Appointments</h3>
+          <div id="customerHistoryEmpty" class="empty-state">
+            No past appointments found for this customer.
+          </div>
           <div class="table-wrapper">
-            <table id="customerTable">
+            <table id="customerHistoryTable">
               <thead>
                 <tr>
-                  <th style="width: 20%">Name</th>
-                  <th style="width: 15%">Phone</th>
-                  <th style="width: 25%">Email</th>
-                  <th style="width: 20%">Notes</th>
-                  <th style="width: 10%">Marketing</th>
-                  <th style="width: 10%; text-align: right;">Actions</th>
+                  <th style="width: 15%">Date</th>
+                  <th style="width: 10%">Time</th>
+                  <th style="width: 25%">Vehicle</th>
+                  <th style="width: 25%">Services</th>
+                  <th style="width: 15%">Status</th>
+                  <th style="width: 10%">Tech</th>
                 </tr>
               </thead>
-              <tbody id="customerTableBody"></tbody>
+              <tbody></tbody>
             </table>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="customerTable">
+            <thead>
+              <tr>
+                <th style="width: 20%">Name</th>
+                <th style="width: 15%">Phone</th>
+                <th style="width: 25%">Email</th>
+                <th style="width: 20%">Notes</th>
+                <th style="width: 10%">Marketing</th>
+                <th style="width: 10%; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customerTableBody"></tbody>
+          </table>
             <div id="customerEmptyState" class="empty-state">
               No customers yet. Add your first customer using the form above.
             </div>
@@ -4244,6 +4282,116 @@ setInterval(maybeAutoRefreshFromBackend,15000);
     });
   }
 
+  function loadCustomerAppointments(customer) {
+    const historySection = document.getElementById('customerHistory');
+    const tbody = document.querySelector('#customerHistoryTable tbody');
+    const empty = document.getElementById('customerHistoryEmpty');
+    const tableWrapper = document.querySelector('#customerHistory .table-wrapper');
+
+    if (!historySection || !tbody || !empty || !tableWrapper) return;
+
+    // Clear current history state
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    tableWrapper.style.display = 'none';
+    historySection.style.display = 'block';
+
+    if (!customer) {
+      // no customer selected
+      return;
+    }
+
+    const phone = customer.phone || '';
+    const email = customer.email || '';
+
+    if (!phone && !email) {
+      // nothing to search by, leave empty state
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('action', 'crm.listCustomerAppointments');
+    if (phone) params.set('phone', phone);
+    if (email) params.set('email', email);
+
+    fetch(CUSTOMER_API_URL + '?' + params.toString())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load appointments');
+        }
+        return response.json();
+      })
+      .then(data => {
+        const appts = Array.isArray(data) ? data : [];
+        renderCustomerAppointments(appts);
+      })
+      .catch(err => {
+        console.error(err);
+        // keep empty state visible; no alert needed
+      });
+  }
+
+  function renderCustomerAppointments(appts) {
+    const tbody = document.querySelector('#customerHistoryTable tbody');
+    const empty = document.getElementById('customerHistoryEmpty');
+    const tableWrapper = document.querySelector('#customerHistory .table-wrapper');
+
+    if (!tbody || !empty || !tableWrapper) return;
+
+    tbody.innerHTML = '';
+
+    if (!appts.length) {
+      empty.style.display = 'block';
+      tableWrapper.style.display = 'none';
+      return;
+    }
+
+    empty.style.display = 'none';
+    tableWrapper.style.display = 'table'; // show table when we have data
+
+    appts.forEach(appt => {
+      const tr = document.createElement('tr');
+
+      const date = appt.date || '';
+      const time = appt.time || appt.startTime || '';
+      const vehicle = [
+        appt.vehicleYear || '',
+        appt.vehicleMake || '',
+        appt.vehicleModel || ''
+      ].filter(Boolean).join(' ') || (appt.vin || '');
+
+      const services = appt.services || appt.serviceName || '';
+      const status = appt.status || '';
+      const tech = appt.tech || '';
+
+      tr.innerHTML = `
+        <td>${escapeHtml(String(date))}</td>
+        <td>${escapeHtml(String(time))}</td>
+        <td>${escapeHtml(vehicle)}</td>
+        <td>${escapeHtml(services)}</td>
+        <td>${escapeHtml(status)}</td>
+        <td>${escapeHtml(tech)}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function clearCustomerAppointmentsHistory() {
+    const historySection = document.getElementById('customerHistory');
+    const tbody = document.querySelector('#customerHistoryTable tbody');
+    const empty = document.getElementById('customerHistoryEmpty');
+    const tableWrapper = document.querySelector('#customerHistory .table-wrapper');
+
+    if (!historySection || !tbody || !empty || !tableWrapper) return;
+
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    tableWrapper.style.display = 'none';
+    // You can hide the whole section if no customer is selected:
+    // historySection.style.display = 'none';
+  }
+
   function handleSearchChange(event) {
     const term = event.target.value.trim().toLowerCase();
     if (!term) {
@@ -4283,9 +4431,12 @@ setInterval(maybeAutoRefreshFromBackend,15000);
       document.getElementById('customerSmsOptIn').checked = !!customer.smsOptIn;
       document.getElementById('customerExternalId').value = customer.externalClientId || '';
       document.getElementById('customerSaveBtn').textContent = 'Update Customer';
+
+      loadCustomerAppointments(customer);
     } else {
       resetCustomerFormFields();
       document.getElementById('customerSaveBtn').textContent = 'Save Customer';
+      clearCustomerAppointmentsHistory();
     }
 
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4294,8 +4445,10 @@ setInterval(maybeAutoRefreshFromBackend,15000);
   function resetCustomerForm() {
     const form = document.getElementById('customerForm');
     if (!form) return;
+
     resetCustomerFormFields();
     form.style.display = 'none';
+    clearCustomerAppointmentsHistory();
   }
 
   function resetCustomerFormFields() {
