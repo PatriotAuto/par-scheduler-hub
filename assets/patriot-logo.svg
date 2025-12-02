@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 200" role="img" aria-label="Patriot Auto Restyling logo">
+  <defs>
+    <linearGradient id="carGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d9d9d9" />
+      <stop offset="50%" stop-color="#f2f2f2" />
+      <stop offset="100%" stop-color="#b5b5b5" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="none" />
+  <path d="M40 120 Q260 -10 480 120" fill="none" stroke="#b00010" stroke-width="18" stroke-linecap="round" />
+  <path d="M90 125 Q130 110 150 110 L220 110 C235 110 250 118 265 128 L320 128 C335 128 345 133 352 138 L380 138 C398 138 414 148 422 162 L384 162 C380 152 372 146 362 146 L316 146 C304 157 286 163 266 163 L188 163 C160 163 130 152 115 144 L86 144 C82 135 83 130 90 125 Z" fill="url(#carGradient)" stroke="#3b3b3b" stroke-width="3" stroke-linejoin="round" />
+  <circle cx="164" cy="162" r="16" fill="#2f2f2f" stroke="#111" stroke-width="3" />
+  <circle cx="164" cy="162" r="8" fill="#f4f4f4" />
+  <circle cx="298" cy="162" r="16" fill="#2f2f2f" stroke="#111" stroke-width="3" />
+  <circle cx="298" cy="162" r="8" fill="#f4f4f4" />
+  <rect x="210" y="116" width="70" height="18" rx="4" ry="4" fill="#0f172a" opacity="0.25" />
+  <text x="260" y="192" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="700" fill="#f7f7f7" stroke="#0f172a" stroke-width="3" paint-order="stroke">PATRIOT AUTO RESTYLING</text>
+  <text x="260" y="192" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="700" fill="#f2f2f2">PATRIOT AUTO RESTYLING</text>
+  <text x="260" y="214" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="4" fill="#b00010">DETAIL · TINT · ACCESSORIES</text>
+</svg>
