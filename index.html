@@ -597,6 +597,53 @@
   color: #111827;
 }
 
+.search-modal {
+  background: #ffffff !important;
+  color: #000000 !important;
+  padding: 25px !important;
+  border-radius: 12px !important;
+  max-width: 800px !important;
+  width: 90% !important;
+}
+
+.search-modal h2,
+.search-modal h3,
+.search-modal h4,
+.search-modal p,
+.search-modal span,
+.search-modal div {
+  color: #000 !important;
+}
+
+.search-result-entry {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background: #f5f5f5;
+}
+
+.search-result-entry:hover {
+  background: #e9e9e9;
+}
+
+.search-result-entry .title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #000 !important;
+}
+
+.search-result-entry .details {
+  font-size: 14px;
+  line-height: 1.3;
+  color: #333 !important;
+}
+
+.search-modal-overlay {
+  background: rgba(0,0,0,0.55) !important;
+}
+
 /* Reuse lookup-list styles already defined, but ensure scroll */
 
 .global-search-section .lookup-list {
@@ -1256,9 +1303,9 @@
   </div>
 </div>
 
-<div id="globalSearchOverlay" class="global-search-overlay" style="display:none;">
+<div id="globalSearchOverlay" class="global-search-overlay search-modal-overlay" style="display:none;">
   <div class="global-search-overlay-backdrop"></div>
-  <div class="global-search-modal">
+  <div class="global-search-modal search-modal">
     <div class="global-search-modal-header">
       <h2>Search Results</h2>
       <button type="button" id="globalSearchCloseButton" class="btn-xs">Close</button>
@@ -4564,40 +4611,29 @@ function renderGlobalSearchResults(query,result){
 
     customers.forEach(c=>{
       const li=document.createElement("li");
+      const fullName=[c.firstName,c.lastName].filter(Boolean).join(" ")||"(No name)";
+      const phone=c.phone||"";
+      const email=c.email||"";
 
-      const main=document.createElement("div");
-      main.className="lookup-main-line";
-      main.textContent=[c.firstName,c.lastName].filter(Boolean).join(" ")||"(No name)";
+      li.innerHTML=`
+        <div class="search-result-entry">
+          <div class="title">${escapeHtml(fullName)}</div>
+          <div class="details">
+            ${escapeHtml(phone)}<br>
+            ${escapeHtml(email)}
+          </div>
+          <button type="button" class="btn btn-primary btn-xs" data-action="use-appointment">
+            Use in Appointment
+          </button>
+        </div>
+      `;
 
-      const sub=document.createElement("div");
-      sub.className="lookup-sub-line";
-      const parts=[];
-      if(c.phone) parts.push(c.phone);
-      if(c.email) parts.push(c.email);
-      if(c.lastVehicleYear || c.lastVehicleMake || c.lastVehicleModel || c.lastVehicleVIN){
-        parts.push(
-          [c.lastVehicleYear,c.lastVehicleMake,c.lastVehicleModel].filter(Boolean).join(" ")+
-          (c.lastVehicleVIN?' • '+c.lastVehicleVIN:"")
-        );
+      const useBtn=li.querySelector('[data-action="use-appointment"]');
+      if(useBtn){
+        useBtn.addEventListener("click",function(){
+          fillAppointmentFormFromCustomer(c);
+        });
       }
-      sub.textContent=parts.join(" | ");
-
-      const actions=document.createElement("div");
-      actions.className="lookup-actions";
-
-      const useBtn=document.createElement("button");
-      useBtn.type="button";
-      useBtn.className="btn-xs";
-      useBtn.textContent="Use in Appointment";
-      useBtn.addEventListener("click",function(){
-        fillAppointmentFormFromCustomer(c);
-      });
-
-      actions.appendChild(useBtn);
-
-      li.appendChild(main);
-      li.appendChild(sub);
-      li.appendChild(actions);
 
       customersList.appendChild(li);
     });
@@ -5096,4 +5132,4 @@ setInterval(maybeAutoRefreshFromBackend,15000);
 </body>
 </html>
 
-     
+         
