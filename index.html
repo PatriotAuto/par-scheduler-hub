@@ -508,6 +508,124 @@
   display: none; /* hidden until we have data */
 }
 
+.global-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.global-search input {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  font-size: 0.9rem;
+}
+
+.btn-global-search {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+/* Overlay */
+
+.global-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+}
+
+.global-search-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.global-search-modal {
+  position: relative;
+  margin: 40px auto;
+  max-width: 900px;
+  max-height: 80vh;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.3);
+  padding: 16px 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.global-search-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.global-search-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.global-search-summary {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.global-search-sections {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  overflow: auto;
+}
+
+.global-search-section {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.global-search-section h3 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Reuse lookup-list styles already defined, but ensure scroll */
+
+.global-search-section .lookup-list {
+  max-height: 230px;
+  overflow-y: auto;
+}
+
+/* Appointments table inside modal */
+
+#globalSearchAppointmentsTableWrapper {
+  display: none;
+}
+
+#globalSearchAppointmentsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+#globalSearchAppointmentsTable th,
+#globalSearchAppointmentsTable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#globalSearchAppointmentsTable tbody tr:hover {
+  background: #f9fafb;
+}
+
 /* PAR logo inside the header */
 .par-logo-container {
   display: flex;
@@ -542,6 +660,18 @@
         <button id="btnRefreshFromCloud" class="header-btn">Refresh From Cloud</button>
       </div>
     </header>
+
+    <div id="globalSearchBar" class="global-search">
+      <input
+        id="globalSearchInput"
+        type="text"
+        placeholder="Search by name, phone, email, VIN, or stock #..."
+        autocomplete="off"
+      />
+      <button id="globalSearchButton" type="button" class="btn btn-primary btn-global-search">
+        Search
+      </button>
+    </div>
 
     <div class="main">
     <div class="left">
@@ -1126,6 +1256,57 @@
   </div>
 </div>
 
+<div id="globalSearchOverlay" class="global-search-overlay" style="display:none;">
+  <div class="global-search-overlay-backdrop"></div>
+  <div class="global-search-modal">
+    <div class="global-search-modal-header">
+      <h2>Search Results</h2>
+      <button type="button" id="globalSearchCloseButton" class="btn-xs">Close</button>
+    </div>
+
+    <div id="globalSearchSummary" class="global-search-summary"></div>
+
+    <div class="global-search-sections">
+      <section class="global-search-section">
+        <h3>Customers</h3>
+        <div id="globalSearchCustomersEmpty" class="empty-state">
+          No customers found for this search.
+        </div>
+        <ul id="globalSearchCustomersList" class="lookup-list"></ul>
+      </section>
+
+      <section class="global-search-section">
+        <h3>Appointments</h3>
+        <div id="globalSearchAppointmentsEmpty" class="empty-state">
+          No appointments found for this search.
+        </div>
+        <div class="table-wrapper" id="globalSearchAppointmentsTableWrapper">
+          <table id="globalSearchAppointmentsTable">
+            <thead>
+              <tr>
+                <th style="width: 18%;">Date</th>
+                <th style="width: 12%;">Time</th>
+                <th style="width: 25%;">Customer</th>
+                <th style="width: 25%;">Vehicle</th>
+                <th style="width: 20%;">Services</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="global-search-section">
+        <h3>Invoices</h3>
+        <div id="globalSearchInvoicesEmpty" class="empty-state">
+          No invoices found (invoices not wired yet).
+        </div>
+        <ul id="globalSearchInvoicesList" class="lookup-list"></ul>
+      </section>
+    </div>
+  </div>
+</div>
+
 <script>
 const techs=["William","Limage","Kaiden","Luke","Fafa","Matt"];
 document.documentElement.style.setProperty("--tech-count",techs.length);
@@ -1245,6 +1426,15 @@ let lastAutoRefreshTime=0;
 let lastUserInteractionTime=Date.now();
 const AUTO_REFRESH_INTERVAL_MS=60000;  // 60 seconds between checks
 const AUTO_IDLE_THRESHOLD_MS=20000;    // user must be idle 20s before refresh
+const GLOBAL_SEARCH_DEBOUNCE_MS=400;
+let globalSearchTimer=null;
+
+document.addEventListener("DOMContentLoaded",function(){
+  if(typeof setupAppointmentSmartLookup==="function"){
+    setupAppointmentSmartLookup();
+  }
+  setupGlobalSearchBar();
+});
 
 // DOM refs
 const headerBtnAppointments=document.getElementById("btnAppointmentsPanel");
@@ -4155,6 +4345,342 @@ document.addEventListener("click",e=>{
   if(dpActiveInput && dpActiveInput.contains(e.target)) return;
   hideDatePicker();
 });
+
+if(typeof fillAppointmentFormFromCustomer!=="function"){
+  window.fillAppointmentFormFromCustomer=function(c){
+    if(!c) return;
+    const firstNameEl=document.getElementById("inputCustomerFirstName");
+    const lastNameEl=document.getElementById("inputCustomerLastName");
+    const phoneEl=document.getElementById("inputCustomerPhone");
+    const emailEl=document.getElementById("inputCustomerEmail");
+    const vinEl=document.getElementById("inputVin");
+    const stockEl=document.getElementById("inputStockNumber");
+    const yearEl=document.getElementById("inputVehicleYear");
+    const makeEl=document.getElementById("inputVehicleMake");
+    const modelEl=document.getElementById("inputVehicleModel");
+    const notesEl=document.getElementById("inputNotes");
+
+    if(firstNameEl) firstNameEl.value=c.firstName||"";
+    if(lastNameEl) lastNameEl.value=c.lastName||"";
+    if(phoneEl) phoneEl.value=c.phone||"";
+    if(emailEl) emailEl.value=c.email||"";
+    if(vinEl) vinEl.value=c.vin||c.lastVehicleVIN||"";
+    if(stockEl) stockEl.value=c.stockNumber||c.lastStockNumber||"";
+    if(yearEl) yearEl.value=c.vehicleYear||c.lastVehicleYear||"";
+    if(makeEl) makeEl.value=c.vehicleMake||c.lastVehicleMake||"";
+    if(modelEl) modelEl.value=c.vehicleModel||c.lastVehicleModel||"";
+    if(notesEl && c.notes) notesEl.value=c.notes;
+
+    isEditingAppointmentForm=true;
+    const formEl=document.getElementById("appointmentForm");
+    if(formEl) formEl.scrollIntoView({behavior:"smooth",block:"start"});
+  };
+}
+
+function setupGlobalSearchBar(){
+  const input=document.getElementById("globalSearchInput");
+  const button=document.getElementById("globalSearchButton");
+  const overlay=document.getElementById("globalSearchOverlay");
+  const closeBtn=document.getElementById("globalSearchCloseButton");
+
+  if(!input || !button || !overlay || !closeBtn) return;
+
+  input.addEventListener("input",function(){
+    if(globalSearchTimer) clearTimeout(globalSearchTimer);
+    const value=input.value.trim();
+    if(!value){
+      closeGlobalSearchOverlay();
+      return;
+    }
+    globalSearchTimer=setTimeout(()=>runGlobalSearch(value),GLOBAL_SEARCH_DEBOUNCE_MS);
+  });
+
+  input.addEventListener("keydown",function(e){
+    if(e.key==="Enter"){
+      e.preventDefault();
+      const value=input.value.trim();
+      if(value){
+        runGlobalSearch(value);
+      }
+    }
+  });
+
+  button.addEventListener("click",function(){
+    const value=input.value.trim();
+    if(value){
+      runGlobalSearch(value);
+    }
+  });
+
+  closeBtn.addEventListener("click",function(){
+    closeGlobalSearchOverlay();
+  });
+
+  overlay.addEventListener("click",function(e){
+    if(e.target===overlay || (e.target && e.target.classList && e.target.classList.contains("global-search-overlay-backdrop"))){
+      closeGlobalSearchOverlay();
+    }
+  });
+}
+
+function openGlobalSearchOverlay(){
+  const overlay=document.getElementById("globalSearchOverlay");
+  if(overlay) overlay.style.display="block";
+}
+
+function closeGlobalSearchOverlay(){
+  const overlay=document.getElementById("globalSearchOverlay");
+  const summary=document.getElementById("globalSearchSummary");
+  const customersEmpty=document.getElementById("globalSearchCustomersEmpty");
+  const customersList=document.getElementById("globalSearchCustomersList");
+  const apptsEmpty=document.getElementById("globalSearchAppointmentsEmpty");
+  const apptsWrap=document.getElementById("globalSearchAppointmentsTableWrapper");
+  const apptsBody=document.querySelector("#globalSearchAppointmentsTable tbody");
+  const invEmpty=document.getElementById("globalSearchInvoicesEmpty");
+  const invList=document.getElementById("globalSearchInvoicesList");
+
+  if(overlay) overlay.style.display="none";
+  if(summary) summary.textContent="";
+  if(customersList) customersList.innerHTML="";
+  if(customersEmpty) customersEmpty.style.display="block";
+  if(apptsBody) apptsBody.innerHTML="";
+  if(apptsEmpty) apptsEmpty.style.display="block";
+  if(apptsWrap) apptsWrap.style.display="none";
+  if(invList) invList.innerHTML="";
+  if(invEmpty) invEmpty.style.display="block";
+}
+
+function runGlobalSearch(rawQuery){
+  const query=(rawQuery||"").trim();
+  if(!query){
+    closeGlobalSearchOverlay();
+    return;
+  }
+
+  const payload=buildGlobalSearchPayload(query);
+
+  const summary=document.getElementById("globalSearchSummary");
+  if(summary){
+    summary.textContent='Searching for: "'+query+'"...';
+  }
+
+  fetch(CUSTOMER_API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      action:"crm.smartLookup",
+      payload:payload
+    })
+  })
+    .then(response=>{
+      if(!response.ok) throw new Error("Global search failed");
+      return response.json();
+    })
+    .then(result=>{
+      renderGlobalSearchResults(query,result);
+    })
+    .catch(err=>{
+      console.error(err);
+      const summaryEl=document.getElementById("globalSearchSummary");
+      if(summaryEl){
+        summaryEl.textContent="Error running search.";
+      }
+      openGlobalSearchOverlay();
+    });
+}
+
+function buildGlobalSearchPayload(query){
+  const q=query.trim();
+  const payload={
+    firstName:"",
+    lastName:"",
+    phone:"",
+    email:"",
+    vin:"",
+    stockNumber:""
+  };
+
+  const isEmail=q.includes("@");
+  const digitsOnly=q.replace(/\D+/g,"");
+  const isMostlyDigits=digitsOnly.length>=Math.floor(q.length*0.6);
+  const isVinLike=q.length>=11 && q.length<=20 && /^[A-Za-z0-9]+$/.test(q);
+
+  if(isEmail){
+    payload.email=q;
+    return payload;
+  }
+
+  if(isVinLike){
+    payload.vin=q.toUpperCase();
+    return payload;
+  }
+
+  if(isMostlyDigits){
+    payload.phone=q;
+    payload.stockNumber=q;
+    return payload;
+  }
+
+  const parts=q.split(/\s+/);
+  if(parts.length>=2){
+    payload.firstName=parts[0];
+    payload.lastName=parts.slice(1).join(" ");
+  }else{
+    payload.lastName=q;
+  }
+
+  return payload;
+}
+
+function renderGlobalSearchResults(query,result){
+  openGlobalSearchOverlay();
+
+  const summary=document.getElementById("globalSearchSummary");
+  const customersEmpty=document.getElementById("globalSearchCustomersEmpty");
+  const customersList=document.getElementById("globalSearchCustomersList");
+  const apptsEmpty=document.getElementById("globalSearchAppointmentsEmpty");
+  const apptsWrap=document.getElementById("globalSearchAppointmentsTableWrapper");
+  const apptsBody=document.querySelector("#globalSearchAppointmentsTable tbody");
+  const invEmpty=document.getElementById("globalSearchInvoicesEmpty");
+  const invList=document.getElementById("globalSearchInvoicesList");
+
+  const customers=(result && Array.isArray(result.customers))?result.customers:[];
+  const appointments=(result && Array.isArray(result.appointments))?result.appointments:[];
+  const invoices=[];
+
+  const lookupType=(result && result.lookupType)||"UNKNOWN";
+
+  if(summary){
+    const total=customers.length+appointments.length+invoices.length;
+    if(total===0){
+      summary.textContent='No matches found for "'+query+'". ('+lookupType+')';
+    }else{
+      summary.textContent='Found '+total+' results for "'+query+'". ('+lookupType+')';
+    }
+  }
+
+  if(customersList) customersList.innerHTML="";
+  if(!customers.length){
+    if(customersEmpty) customersEmpty.style.display="block";
+  }else{
+    if(customersEmpty) customersEmpty.style.display="none";
+
+    customers.forEach(c=>{
+      const li=document.createElement("li");
+
+      const main=document.createElement("div");
+      main.className="lookup-main-line";
+      main.textContent=[c.firstName,c.lastName].filter(Boolean).join(" ")||"(No name)";
+
+      const sub=document.createElement("div");
+      sub.className="lookup-sub-line";
+      const parts=[];
+      if(c.phone) parts.push(c.phone);
+      if(c.email) parts.push(c.email);
+      if(c.lastVehicleYear || c.lastVehicleMake || c.lastVehicleModel || c.lastVehicleVIN){
+        parts.push(
+          [c.lastVehicleYear,c.lastVehicleMake,c.lastVehicleModel].filter(Boolean).join(" ")+
+          (c.lastVehicleVIN?' • '+c.lastVehicleVIN:"")
+        );
+      }
+      sub.textContent=parts.join(" | ");
+
+      const actions=document.createElement("div");
+      actions.className="lookup-actions";
+
+      const useBtn=document.createElement("button");
+      useBtn.type="button";
+      useBtn.className="btn-xs";
+      useBtn.textContent="Use in Appointment";
+      useBtn.addEventListener("click",function(){
+        fillAppointmentFormFromCustomer(c);
+      });
+
+      actions.appendChild(useBtn);
+
+      li.appendChild(main);
+      li.appendChild(sub);
+      li.appendChild(actions);
+
+      customersList.appendChild(li);
+    });
+  }
+
+  if(apptsBody) apptsBody.innerHTML="";
+  if(!appointments.length){
+    if(apptsEmpty) apptsEmpty.style.display="block";
+    if(apptsWrap) apptsWrap.style.display="none";
+  }else{
+    if(apptsEmpty) apptsEmpty.style.display="none";
+    if(apptsWrap) apptsWrap.style.display="table";
+
+    appointments.forEach(a=>{
+      const tr=document.createElement("tr");
+
+      const date=a.date||"";
+      const time=a.time||a.startTime||"";
+      const name=[
+        a.customerFirstName||"",
+        a.customerLastName||""
+      ].filter(Boolean).join(" ");
+
+      const vehicle=[
+        a.vehicleYear||"",
+        a.vehicleMake||"",
+        a.vehicleModel||""
+      ].filter(Boolean).join(" ")||(a.vin||"");
+
+      const services=a.services||a.serviceName||"";
+
+      tr.innerHTML=`
+        <td>${escapeHtml(String(date))}</td>
+        <td>${escapeHtml(String(time))}</td>
+        <td>${escapeHtml(name)}</td>
+        <td>${escapeHtml(vehicle)}</td>
+        <td>${escapeHtml(services)}</td>
+      `;
+
+      tr.addEventListener("click",function(){
+        fillAppointmentFormFromAppointment(a);
+      });
+
+      apptsBody.appendChild(tr);
+    });
+  }
+
+  if(invList) invList.innerHTML="";
+  if(invEmpty) invEmpty.style.display="block";
+}
+
+function fillAppointmentFormFromAppointment(a){
+  const firstNameEl=document.getElementById("inputCustomerFirstName");
+  const lastNameEl=document.getElementById("inputCustomerLastName");
+  const phoneEl=document.getElementById("inputCustomerPhone");
+  const emailEl=document.getElementById("inputCustomerEmail");
+  const vinEl=document.getElementById("inputVin");
+  const stockEl=document.getElementById("inputStockNumber");
+  const yearEl=document.getElementById("inputVehicleYear");
+  const makeEl=document.getElementById("inputVehicleMake");
+  const modelEl=document.getElementById("inputVehicleModel");
+  const notesEl=document.getElementById("inputNotes");
+
+  if(firstNameEl) firstNameEl.value=a.customerFirstName||"";
+  if(lastNameEl) lastNameEl.value=a.customerLastName||"";
+  if(phoneEl) phoneEl.value=a.phone||"";
+  if(emailEl) emailEl.value=a.email||"";
+  if(vinEl) vinEl.value=a.vin||"";
+  if(stockEl) stockEl.value=a.stockNumber||"";
+  if(yearEl) yearEl.value=a.vehicleYear||"";
+  if(makeEl) makeEl.value=a.vehicleMake||"";
+  if(modelEl) modelEl.value=a.vehicleModel||"";
+  if(notesEl && a.notes) notesEl.value=a.notes;
+
+  const dateEl=document.getElementById("datePicker");
+  if(dateEl && a.date) dateEl.value=a.date;
+
+  isEditingAppointmentForm=true;
+  closeGlobalSearchOverlay();
+}
 
 // Init
 // Init
