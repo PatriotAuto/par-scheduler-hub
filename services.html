@@ -700,12 +700,12 @@
         <span>Internal Scheduler Hub · Daily Tech View</span>
       </div>
       <div class="header-actions">
-        <a href="index.html" id="btnAppointmentsPanel" class="header-btn nav-button active">Calendar</a>
+        <a href="index.html" id="btnAppointmentsPanel" class="header-btn nav-button">Calendar</a>
         <a href="customers.html" id="btnCustomersNav" class="header-btn nav-button">Customers</a>
         <a href="tech-time-off.html" id="btnTimeOffPanel" class="header-btn nav-button">Tech Time Off</a>
         <a href="holidays.html" id="btnHolidaysNav" class="header-btn nav-button">Holidays</a>
         <a href="tech-schedules.html" id="btnSchedulesPanel" class="header-btn nav-button">Tech Schedules</a>
-        <a href="services.html" id="btnServicesPanel" class="header-btn nav-button">Services</a>
+        <a href="services.html" id="btnServicesPanel" class="header-btn nav-button active">Services</a>
         <button id="btnRefreshFromCloud" class="header-btn">Refresh From Cloud</button>
       </div>
     </header>
@@ -722,8 +722,10 @@
       </button>
     </div>
 
+    <h1 class="page-title" style="padding: 16px 24px 0; margin: 0;">Services</h1>
+
     <div class="main">
-    <div class="left">
+    <div class="left" style="display:none;">
       <div class="left-top-row">
         <div class="chips" id="chipsContainer"></div>
         
@@ -776,7 +778,7 @@
 
     <div class="right">
       <!-- Appointments -->
-      <div id="appointmentPanel">
+      <div id="appointmentPanel" style="display:none;">
         <div class="panel-title">Create / Edit Appointment</div>
         <div class="panel-divider"></div>
         <form id="appointmentForm" onsubmit="return false;">
@@ -1106,7 +1108,7 @@
       </div>
 
       <!-- Services library -->
-      <div id="servicesPanel" style="display:none;">
+      <div id="servicesPanel" style="display:block;">
         <div class="panel-title">Service Library</div>
         <div class="panel-divider"></div>
         <form id="servicesForm" onsubmit="return false;">
@@ -3940,7 +3942,7 @@ function clearTimeOffForm(){
 
 
 function loadJobEventIntoForm(ev){
-  setPanel("appointments");
+  setPanel("services");
 
   const groupKey=ev.jobGroupId||ev.id;
   editingJobGroupId=groupKey;
