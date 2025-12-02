@@ -3551,7 +3551,6 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
     fetch(GOOGLE_BACKEND_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }).catch(err => {
       console.error("Failed to send appointment to backend", err);
@@ -3576,7 +3575,6 @@ function sendAppointmentDeleteToBackend(groupId) {
     fetch(GOOGLE_BACKEND_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }).catch(function(err) {
       console.error("Failed to send delete to backend", err);
@@ -4466,7 +4464,6 @@ function runGlobalSearch(rawQuery){
 
   fetch(CUSTOMER_API_URL,{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
       action:"crm.smartLookup",
       payload:payload
@@ -4753,7 +4750,6 @@ setInterval(maybeAutoRefreshFromBackend,15000);
   async function saveCustomerToBackend(customer) {
     const response = await fetch(CUSTOMER_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'crm.saveCustomer',
         payload: customer
@@ -4767,7 +4763,6 @@ setInterval(maybeAutoRefreshFromBackend,15000);
   async function deleteCustomerFromBackend(customerId) {
     const response = await fetch(CUSTOMER_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'crm.deleteCustomer',
         payload: { id: customerId }
