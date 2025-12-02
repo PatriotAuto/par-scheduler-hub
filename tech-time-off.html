@@ -684,6 +684,63 @@
   height: 40px;
   object-fit: contain;
 }
+
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .main {
+    flex-direction: column;
+  }
+
+  .left,
+  .right {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .left-top-row,
+  .customer-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .customer-form .form-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .customer-form .form-field,
+  .customer-form .form-field-full {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  #globalSearchBar,
+  .global-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .global-search input {
+    width: 100%;
+  }
+
+  .btn-global-search {
+    align-self: flex-end;
+    margin-top: 4px;
+  }
+
+  .global-search-modal,
+  .search-modal {
+    width: 95vw;
+    margin: 10px auto;
+    max-height: 85vh;
+  }
+}
 </style>
 </head>
 <body>
@@ -1205,28 +1262,6 @@
             <button type="button" class="btn-secondary" id="customerCancelBtn">Cancel</button>
           </div>
         </form>
-
-        <div id="customerHistory" class="customer-history">
-          <h3>Past Appointments</h3>
-          <div id="customerHistoryEmpty" class="empty-state">
-            No past appointments found for this customer.
-          </div>
-          <div class="table-wrapper">
-            <table id="customerHistoryTable">
-              <thead>
-                <tr>
-                  <th style="width: 15%">Date</th>
-                  <th style="width: 10%">Time</th>
-                  <th style="width: 25%">Vehicle</th>
-                  <th style="width: 25%">Services</th>
-                  <th style="width: 15%">Status</th>
-                  <th style="width: 10%">Tech</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
 
         <div class="table-wrapper">
           <table id="customerTable">
