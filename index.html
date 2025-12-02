@@ -5,18 +5,6 @@
   <title>Patriot Auto Restyling – Scheduler Hub v1.8</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    .par-logo-container {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  padding: 15px 0;
-}
-
-.par-logo {
-  height: 80px;
-  object-fit: contain;
-}
-
     :root {
       --par-navy:#050b18;--par-navy-soft:#0b1f33;--par-red:#e30613;--par-light:#f5f7fb;
       --par-border:#2b3950;--par-text:#fdfdfd;--par-muted:#9ca7c0;
@@ -519,14 +507,30 @@
   margin-top: 4px;
   display: none; /* hidden until we have data */
 }
+
+/* PAR logo inside the header */
+.par-logo-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.par-logo {
+  height: 40px;
+  object-fit: contain;
+}
+</style>
+</head>
 <body>
   <div class="page">
     <header>
       <div class="title">
         <div class="par-logo-container">
-          <img src="assets/img/FullLogo_Transparent_NoBuffer (1).png"
-               alt="Patriot Auto Restyling Logo"
-               class="par-logo">
+          <img
+            src="assets/img/FullLogo_Transparent_NoBuffer (1).png"
+            alt="Patriot Auto Restyling Logo"
+            class="par-logo"
+          />
         </div>
         <span>Internal Scheduler Hub · Daily Tech View</span>
       </div>
@@ -539,18 +543,7 @@
       </div>
     </header>
 
-  </style>
-</head>
-
-      <button id="btnAppointmentsPanel" class="header-btn active">Appointments</button>
-      <button id="btnTimeOffPanel" class="header-btn">Tech Time Off</button>
-      <button id="btnSchedulesPanel" class="header-btn">Tech Schedules</button>
-      <button id="btnServicesPanel" class="header-btn">Services</button>
-      <button id="btnRefreshFromCloud" class="header-btn">Refresh From Cloud</button>
-    </div>
-  </header>
-
-  <div class="main">
+    <div class="main">
     <div class="left">
       <div class="left-top-row">
         <div class="chips" id="chipsContainer"></div>
@@ -4582,4 +4575,4 @@ setInterval(maybeAutoRefreshFromBackend,15000);
 </body>
 </html>
 
-                                                                              
+     
