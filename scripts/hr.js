@@ -251,71 +251,89 @@ async function postJson(url, body) {
     if (delBtn) delBtn.disabled = !emp.employeeId;
   }
 
-  async function saveEmployee() {
-    const employee = {
-      employeeId: qs("#empId").value || null,
-      firstName: qs("#empFirstName").value.trim(),
-      lastName: qs("#empLastName").value.trim(),
-      role: qs("#empRole").value.trim(),
-      status: qs("#empStatus").value || "Active",
-      payType: qs("#empPayType").value || "",
-      baseHourlyRate: parseFloat(qs("#empBaseRate").value) || "",
-      salaryAnnual: parseFloat(qs("#empSalary").value) || "",
-      flatRateMultiplier: parseFloat(qs("#empFlatMultiplier").value) || 1,
-      defaultCommissionType: qs("#empCommType").value || "",
-      defaultCommissionValue:
-        qs("#empCommValue").value !== ""
-          ? parseFloat(qs("#empCommValue").value)
-          : "",
-      departments: readSelectedDepartments(),
-      isTechnician: qs("#empIsTechnician").checked,
-      notes: qs("#empNotes").value.trim(),
-    };
+ async function saveEmployee() {
+  const employee = {
+    employeeId: qs("#empId").value || null,
+    firstName: qs("#empFirstName").value.trim(),
+    lastName: qs("#empLastName").value.trim(),
+    role: qs("#empRole").value.trim(),
+    status: qs("#empStatus").value || "Active",
+    payType: qs("#empPayType").value || "",
+    baseHourlyRate: parseFloat(qs("#empBaseRate").value) || "",
+    salaryAnnual: parseFloat(qs("#empSalary").value) || "",
+    flatRateMultiplier: parseFloat(qs("#empFlatMultiplier").value) || 1,
+    defaultCommissionType: qs("#empCommType").value || "",
+    defaultCommissionValue:
+      qs("#empCommValue").value !== ""
+        ? parseFloat(qs("#empCommValue").value)
+        : "",
+    departments: readSelectedDepartments(),
+    isTechnician: qs("#empIsTechnician").checked,
+    notes: qs("#empNotes").value.trim(),
+  };
 
-    if (!employee.firstName || !employee.lastName) {
-      alert("First and last name are required.");
-      return;
-    }
-
-    try {
-      const result = await postJson(GOOGLE_BACKEND_URL, {
-        action: "saveEmployee",
-        employee,
-      });
-
-      if (result && result.employeeId) {
-        employee.employeeId = result.employeeId;
-      }
-
-      await loadEmployees();
-      if (employee.employeeId) {
-        selectEmployee(employee.employeeId);
-      }
-      alert("Employee saved.");
-    } catch (err) {
-      console.error("Save employee failed", err);
-      alert("Failed to save employee. Check console for details.");
-    }
+  if (!employee.firstName || !employee.lastName) {
+    alert("First and last name are required.");
+    return;
   }
 
-  async function deleteEmployee() {
-    const id = qs("#empId").value;
-    if (!id) return;
-    if (!confirm("Delete this employee? This cannot be undone.")) return;
+  try {
+    // Build a GET URL with JSON payload
+    const params = new URLSearchParams();
+    params.set("action", "saveEmployee");
+    params.set("employee", JSON.stringify(employee));
 
-    try {
-      await postJson(GOOGLE_BACKEND_URL, {
-        action: "deleteEmployee",
-        employeeId: id,
-      });
-      await loadEmployees();
-      clearEmployeeForm();
-      alert("Employee deleted.");
-    } catch (err) {
-      console.error("Delete employee failed", err);
-      alert("Failed to delete employee. Check console for details.");
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
+      method: "GET",
+    });
+
+    if (!resp.ok) {
+      throw new Error("Network error: " + resp.status);
     }
+
+    const result = await resp.json();
+    if (result && result.employeeId) {
+      employee.employeeId = result.employeeId;
+    }
+
+    await loadEmployees();
+    if (employee.employeeId) {
+      selectEmployee(employee.employeeId);
+    }
+    alert("Employee saved.");
+  } catch (err) {
+    console.error("Save employee failed", err);
+    alert("Failed to save employee. Check console for details.");
   }
+}
+
+ async function deleteEmployee() {
+  const id = qs("#empId").value;
+  if (!id) return;
+  if (!confirm("Delete this employee? This cannot be undone.")) return;
+
+  try {
+    const params = new URLSearchParams();
+    params.set("action", "deleteEmployee");
+    params.set("employeeId", id);
+
+    const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
+      method: "GET",
+    });
+
+    if (!resp.ok) {
+      throw new Error("Network error: " + resp.status);
+    }
+
+    await loadEmployees();
+    clearEmployeeForm();
+    alert("Employee deleted.");
+  } catch (err) {
+    console.error("Delete employee failed", err);
+    alert("Failed to delete employee. Check console for details.");
+  }
+}
+
 
   function setupEmployeeEvents() {
     const btnNew = qs("#btnNewEmployee");
