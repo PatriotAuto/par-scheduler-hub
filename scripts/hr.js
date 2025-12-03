@@ -13,10 +13,15 @@
     return el;
   }
 
-   let departments = [];
+  const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  let departments = [];
   let employees = [];
   let filteredEmployees = [];
   let selectedEmployeeId = null;
+
+  let scheduleEntries = [];
+  let currentScheduleEmployeeId = null;
 
   let timeOffEntries = [];
   let filteredTimeOffEntries = [];
@@ -124,6 +129,7 @@ async function postJson(url, body) {
 
       renderEmployeeList();
       populateTimeOffEmployeeSelects();
+      populateScheduleEmployeeSelect();
     } catch (err) {
       console.error("Failed to load employees", err);
     }
@@ -435,6 +441,241 @@ async function postJson(url, body) {
     }
   }
 
+  function populateScheduleEmployeeSelect() {
+    const select = qs("#scheduleEmployee");
+    if (!select) return;
+
+    const current = select.value;
+    select.innerHTML = '<option value="">Select employee...</option>';
+
+    // Only show employees marked as technicians
+    employees
+      .filter((emp) => emp.isTechnician)
+      .forEach((emp) => {
+        const label =
+          ((emp.firstName || "") + " " + (emp.lastName || "")).trim() ||
+          emp.employeeId ||
+          "(Unnamed)";
+
+        const opt = document.createElement("option");
+        opt.value = emp.employeeId || "";
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+
+    if (current) {
+      select.value = current;
+    }
+  }
+
+  function clearScheduleForm() {
+    currentScheduleEmployeeId = null;
+    const select = qs("#scheduleEmployee");
+    if (select) select.value = "";
+
+    WEEK_DAYS.forEach((day) => {
+      qsa(`.sch-working[data-day="${day}"]`).forEach((el) =>
+        (el.checked = false)
+      );
+      qsa(`.sch-start[data-day="${day}"]`).forEach((el) => (el.value = ""));
+      qsa(`.sch-end[data-day="${day}"]`).forEach((el) => (el.value = ""));
+      qsa(`.sch-location[data-day="${day}"]`).forEach(
+        (el) => (el.value = "")
+      );
+      qsa(`.sch-bay[data-day="${day}"]`).forEach((el) => (el.value = ""));
+    });
+  }
+
+  function readScheduleForm() {
+    const employeeId = qs("#scheduleEmployee") ? qs("#scheduleEmployee").value : "";
+    if (!employeeId) return null;
+
+    const emp = employees.find((e) => e.employeeId === employeeId);
+    const employeeName =
+      (emp && ((emp.firstName || "") + " " + (emp.lastName || "")).trim()) ||
+      "";
+
+    const entries = WEEK_DAYS.map((day) => {
+      const working = qsa(`.sch-working[data-day="${day}"]`)[0];
+      const start = qsa(`.sch-start[data-day="${day}"]`)[0];
+      const end = qsa(`.sch-end[data-day="${day}"]`)[0];
+      const loc = qsa(`.sch-location[data-day="${day}"]`)[0];
+      const bay = qsa(`.sch-bay[data-day="${day}"]`)[0];
+
+      const isWorking = working && working.checked;
+      const startTime = start ? start.value : "";
+      const endTime = end ? end.value : "";
+      const location = loc ? loc.value.trim() : "";
+      const bayVal = bay ? bay.value.trim() : "";
+
+      return {
+        dayOfWeek: day,
+        isWorking: isWorking,
+        startTime: startTime,
+        endTime: endTime,
+        location: location,
+        bay: bayVal,
+      };
+    });
+
+    return {
+      employeeId,
+      employeeName,
+      entries,
+    };
+  }
+
+  function fillScheduleForm(entries) {
+    // clear first
+    WEEK_DAYS.forEach((day) => {
+      qsa(`.sch-working[data-day="${day}"]`).forEach((el) =>
+        (el.checked = false)
+      );
+      qsa(`.sch-start[data-day="${day}"]`).forEach((el) => (el.value = ""));
+      qsa(`.sch-end[data-day="${day}"]`).forEach((el) => (el.value = ""));
+      qsa(`.sch-location[data-day="${day}"]`).forEach(
+        (el) => (el.value = "")
+      );
+      qsa(`.sch-bay[data-day="${day}"]`).forEach((el) => (el.value = ""));
+    });
+
+    entries.forEach((e) => {
+      const day = e.dayOfWeek;
+      if (!day) return;
+
+      const working = qsa(`.sch-working[data-day="${day}"]`)[0];
+      const start = qsa(`.sch-start[data-day="${day}"]`)[0];
+      const end = qsa(`.sch-end[data-day="${day}"]`)[0];
+      const loc = qsa(`.sch-location[data-day="${day}"]`)[0];
+      const bay = qsa(`.sch-bay[data-day="${day}"]`)[0];
+
+      if (working) working.checked = !!e.isWorking;
+      if (start && e.startTime) start.value = e.startTime;
+      if (end && e.endTime) end.value = e.endTime;
+      if (loc && e.location) loc.value = e.location;
+      if (bay && e.bay) bay.value = e.bay;
+    });
+  }
+
+  async function loadScheduleForEmployee(employeeId) {
+    if (!employeeId) {
+      clearScheduleForm();
+      return;
+    }
+    currentScheduleEmployeeId = employeeId;
+
+    try {
+      const url =
+        GOOGLE_BACKEND_URL +
+        "?action=getEmployeeSchedule&employeeId=" +
+        encodeURIComponent(employeeId);
+
+      const data = await getJson(url);
+      const schedule = (data && data.schedule) || [];
+
+      // Normalize into entries for the form
+      const entries = schedule.map((row) => ({
+        dayOfWeek: row.dayOfWeek,
+        isWorking: row.isWorking,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        location: row.location,
+        bay: row.bay,
+      }));
+
+      fillScheduleForm(entries);
+    } catch (err) {
+      console.error("Failed to load schedule", err);
+      alert("Failed to load schedule. Check console for details.");
+    }
+  }
+
+  async function saveSchedule() {
+    const payload = readScheduleForm();
+    if (!payload || !payload.employeeId) {
+      alert("Select an employee first.");
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "saveEmployeeSchedule");
+      params.set("schedule", JSON.stringify(payload));
+
+      const resp = await fetch(
+        GOOGLE_BACKEND_URL + "?" + params.toString(),
+        { method: "GET" }
+      );
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      const result = await resp.json();
+      if (!result || result.ok === false) {
+        console.error("saveEmployeeSchedule backend error:", result);
+        alert(
+          "Failed to save schedule: " +
+            (result && result.error ? result.error : "Unknown error")
+        );
+        return;
+      }
+
+      alert("Schedule saved.");
+    } catch (err) {
+      console.error("Save schedule failed", err);
+      alert("Failed to save schedule. Check console for details.");
+    }
+  }
+
+  async function clearScheduleForEmployee() {
+    const select = qs("#scheduleEmployee");
+    if (!select || !select.value) {
+      alert("Select an employee first.");
+      return;
+    }
+    if (!confirm("Clear schedule for this employee?")) return;
+
+    // Saving an empty entries array for this employee will clear rows on backend
+    const payload = {
+      employeeId: select.value,
+      employeeName: "",
+      entries: [],
+    };
+
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "saveEmployeeSchedule");
+      params.set("schedule", JSON.stringify(payload));
+
+      const resp = await fetch(
+        GOOGLE_BACKEND_URL + "?" + params.toString(),
+        { method: "GET" }
+      );
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      const result = await resp.json();
+      if (!result || result.ok === false) {
+        console.error("clearSchedule backend error:", result);
+        alert(
+          "Failed to clear schedule: " +
+            (result && result.error ? result.error : "Unknown error")
+        );
+        return;
+      }
+
+      clearScheduleForm();
+      select.value = "";
+      alert("Schedule cleared for employee.");
+    } catch (err) {
+      console.error("Clear schedule failed", err);
+      alert("Failed to clear schedule. Check console for details.");
+    }
+  }
+
   async function loadTimeOff() {
     const container = qs("#timeOffList");
     if (container) {
@@ -681,6 +922,32 @@ async function postJson(url, body) {
     }
   }
 
+  function setupScheduleEvents() {
+    const select = qs("#scheduleEmployee");
+    if (select) {
+      select.addEventListener("change", () => {
+        const empId = select.value;
+        loadScheduleForEmployee(empId);
+      });
+    }
+
+    const btnSave = qs("#btnSaveSchedule");
+    if (btnSave) {
+      btnSave.addEventListener("click", (e) => {
+        e.preventDefault();
+        saveSchedule();
+      });
+    }
+
+    const btnClear = qs("#btnClearSchedule");
+    if (btnClear) {
+      btnClear.addEventListener("click", (e) => {
+        e.preventDefault();
+        clearScheduleForEmployee();
+      });
+    }
+  }
+
   // ---- Holidays (read-only list for now) ----
   async function loadHolidays() {
     const container = qs("#holidayList");
@@ -730,6 +997,7 @@ async function postJson(url, body) {
     setupTabs();
     setupEmployeeEvents();
     setupTimeOffEvents();
+    setupScheduleEvents();
     clearEmployeeForm();
 
     await loadDepartments();
