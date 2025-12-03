@@ -188,27 +188,102 @@
         </div>
       </section>
 
-      <!-- TIME OFF (placeholder for future wiring) -->
+          <!-- TIME OFF (fully wired) -->
       <section class="hr-tab-content" data-tab="timeoff">
         <div class="hr-card">
           <div class="hr-card-header">
             <h2>Employee Time Off</h2>
           </div>
-          <p class="hr-muted">
-            This tab will replace the old <strong>Tech Time Off</strong> controls.
-            We&apos;ll manage time-off requests and approvals here, tied directly to employees.
-          </p>
-          <ul class="hr-roadmap-list">
-            <li>Day / date range requests for each employee</li>
-            <li>Statuses: Pending, Approved, Denied</li>
-            <li>Automatic blocks on the scheduler when time off is approved</li>
-          </ul>
-          <p class="hr-muted">
-            For now, you can keep using the existing Tech Time Off sheet/buttons until
-            we move the logic over to this tab.
-          </p>
+
+          <div class="hr-hours-layout">
+            <!-- Left: list / filters -->
+            <section class="hr-hours-column">
+              <h3>Existing Time Off</h3>
+              <div class="hr-field">
+                <label>Filter by employee</label>
+                <select id="timeOffFilterEmployee" class="hr-select">
+                  <option value="">All employees</option>
+                </select>
+              </div>
+              <div id="timeOffList" class="hr-holiday-list">
+                <!-- populated by JS -->
+              </div>
+            </section>
+
+            <!-- Right: form -->
+            <section class="hr-hours-column">
+              <h3>Add / Edit Time Off</h3>
+              <form id="timeOffForm" class="hr-form" autocomplete="off">
+                <input type="hidden" id="timeOffId" />
+
+                <div class="hr-form-grid">
+                  <div class="hr-field hr-field-full">
+                    <label>Employee</label>
+                    <select id="timeOffEmployee" class="hr-select" required>
+                      <option value="">Select employee...</option>
+                    </select>
+                  </div>
+
+                  <div class="hr-field">
+                    <label>Start date</label>
+                    <input id="timeOffStartDate" type="date" class="hr-input" required />
+                  </div>
+
+                  <div class="hr-field">
+                    <label>End date</label>
+                    <input id="timeOffEndDate" type="date" class="hr-input" />
+                  </div>
+
+                  <div class="hr-field">
+                    <label>Start time</label>
+                    <input id="timeOffStartTime" type="time" class="hr-input" />
+                  </div>
+
+                  <div class="hr-field">
+                    <label>End time</label>
+                    <input id="timeOffEndTime" type="time" class="hr-input" />
+                  </div>
+
+                  <div class="hr-field hr-field-inline">
+                    <label class="hr-checkbox-label">
+                      <input id="timeOffAllDay" type="checkbox" />
+                      <span>All day</span>
+                    </label>
+                  </div>
+
+                  <div class="hr-field hr-field-full">
+                    <label>Status</label>
+                    <select id="timeOffStatus" class="hr-select">
+                      <option value="Planned">Planned</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Denied">Denied</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  <div class="hr-field hr-field-full">
+                    <label>Reason / Notes</label>
+                    <textarea id="timeOffReason" class="hr-textarea" rows="2"></textarea>
+                  </div>
+                </div>
+
+                <div class="hr-form-actions">
+                  <button type="button" id="btnSaveTimeOff" class="hr-btn hr-btn-primary">
+                    Save Time Off
+                  </button>
+                  <button type="button" id="btnClearTimeOff" class="hr-btn hr-btn-ghost">
+                    Clear
+                  </button>
+                  <button type="button" id="btnDeleteTimeOff" class="hr-btn hr-btn-danger" disabled>
+                    Delete
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
         </div>
       </section>
+
 
       <!-- SCHEDULE (placeholder for future wiring) -->
       <section class="hr-tab-content" data-tab="schedule">
