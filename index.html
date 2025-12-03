@@ -2286,20 +2286,22 @@ function renderServiceLibrary(){
   });
 }
 
-btnAddCategory.addEventListener("click",()=>{
-  const name=inputNewCategoryName.value.trim();
-  if(!name) return;
-  if(servicePackages[name]){
-    alert("That category already exists.");
-    return;
-  }
-  servicePackages[name]=[];
-  saveServicePackagesToStorage();
-  inputNewCategoryName.value="";
-  renderServiceLibrary();
-  refreshAllServiceAssignmentRows();
-  renderDeptChips();         // <-- NEW
-});
+if(btnAddCategory){
+  btnAddCategory.addEventListener("click",()=>{
+    const name=inputNewCategoryName.value.trim();
+    if(!name) return;
+    if(servicePackages[name]){
+      alert("That category already exists.");
+      return;
+    }
+    servicePackages[name]=[];
+    saveServicePackagesToStorage();
+    inputNewCategoryName.value="";
+    renderServiceLibrary();
+    refreshAllServiceAssignmentRows();
+    renderDeptChips();         // <-- NEW
+  });
+}
 
 
 // Events utilities
@@ -3865,17 +3867,19 @@ bodyEl.addEventListener("click",e=>{
   }
 });
 
-dealerQueueListEl.addEventListener("click",e=>{
-  const item=e.target.closest(".dealer-queue-item");
-  if(!item) return;
-  const id=item.dataset.eventId;
-  const ev=events.find(ev=>ev.id===id);
-  if(!ev) return;
-  if(ev.type==="job"){
-    loadJobEventIntoForm(ev);
-    openAppointmentPopup(ev);
-  }
-});
+if(dealerQueueListEl){
+  dealerQueueListEl.addEventListener("click",e=>{
+    const item=e.target.closest(".dealer-queue-item");
+    if(!item) return;
+    const id=item.dataset.eventId;
+    const ev=events.find(ev=>ev.id===id);
+    if(!ev) return;
+    if(ev.type==="job"){
+      loadJobEventIntoForm(ev);
+      openAppointmentPopup(ev);
+    }
+  });
+}
 
 // Day navigation
 document.getElementById("btnPrevDay").addEventListener("click",()=>{
@@ -3888,13 +3892,21 @@ document.getElementById("btnNextDay").addEventListener("click",()=>{
 });
 
 // Panel buttons
-headerBtnAppointments.addEventListener("click",()=>setPanel("appointments"));
-headerBtnTimeOff.addEventListener("click",()=>setPanel("timeoff"));
-headerBtnSchedules.addEventListener("click",()=>setPanel("schedules"));
-headerBtnServices.addEventListener("click",()=>{
-  setPanel("services");
-  renderServiceLibrary();
-});
+if(headerBtnAppointments){
+  headerBtnAppointments.addEventListener("click",()=>setPanel("appointments"));
+}
+if(headerBtnTimeOff){
+  headerBtnTimeOff.addEventListener("click",()=>setPanel("timeoff"));
+}
+if(headerBtnSchedules){
+  headerBtnSchedules.addEventListener("click",()=>setPanel("schedules"));
+}
+if(headerBtnServices){
+  headerBtnServices.addEventListener("click",()=>{
+    setPanel("services");
+    renderServiceLibrary();
+  });
+}
 if(btnRefreshFromCloud){
   btnRefreshFromCloud.addEventListener("click",()=>{
     loadAppointmentsFromBackend({ replaceLocal:true });
@@ -3902,11 +3914,13 @@ if(btnRefreshFromCloud){
 }
 
 // Schedules panel
-scheduleTechSelect.addEventListener("change",()=>{
-  const tech=scheduleTechSelect.value;
-  loadScheduleIntoForm(tech);
-  scheduleStatus.textContent=tech?`Editing weekly schedule for ${tech}.`:"";
-});
+if(scheduleTechSelect){
+  scheduleTechSelect.addEventListener("change",()=>{
+    const tech=scheduleTechSelect.value;
+    loadScheduleIntoForm(tech);
+    scheduleStatus.textContent=tech?`Editing weekly schedule for ${tech}.`:"";
+  });
+}
 document.getElementById("btnSaveSchedules").addEventListener("click",saveScheduleFromForm);
 
 // Time off buttons
@@ -3940,9 +3954,13 @@ if(btnVinScan){
 }
 
 // Appointment buttons
-btnCreateAppointment.addEventListener("click",createOrUpdateAppointment);
+if(btnCreateAppointment){
+  btnCreateAppointment.addEventListener("click",createOrUpdateAppointment);
+}
 document.getElementById("btnClear").addEventListener("click",clearAppointmentForm);
-btnDeleteAppointment.addEventListener("click",deleteAppointment);
+if(btnDeleteAppointment){
+  btnDeleteAppointment.addEventListener("click",deleteAppointment);
+}
 
 // Appointment popup controls
 if(btnUnlockEditing){
@@ -4063,7 +4081,9 @@ if(popupPaid){
 }
 
 // Add service row button
-btnAddServiceRow.addEventListener("click",()=>addServiceRow());
+if(btnAddServiceRow){
+  btnAddServiceRow.addEventListener("click",()=>addServiceRow());
+}
 
 // Custom Date Picker
 function buildDatePickerGrid(){
