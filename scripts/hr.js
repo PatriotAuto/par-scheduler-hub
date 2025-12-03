@@ -116,24 +116,20 @@ async function postJson(url, body) {
   }
 
   // ---- Employees ----
-  async function loadEmployees() {
-    try {
-      const data = await getJson(GOOGLE_BACKEND_URL + "?action=getEmployees");
-      employees = data.employees || data || [];
-      employees.sort((a, b) => {
-        const aName = ((a.lastName || "") + " " + (a.firstName || "")).toLowerCase();
-        const bName = ((b.lastName || "") + " " + (b.firstName || "")).toLowerCase();
-        return aName.localeCompare(bName);
-      });
-      filteredEmployees = employees.slice();
-      renderEmployeeList();
+ async function loadEmployees() {
+  try {
+    const data = await getJson(GOOGLE_BACKEND_URL + "?action=getEmployees");
+    employees = (data && data.employees) || [];
+    filteredEmployees = employees.slice();
+    renderEmployeeList();
 
-    // 🔽 THIS LINE IS WHAT FILLS THE TIME OFF DROPDOWNS
+    // Populate the Time Off dropdowns
     populateTimeOffEmployeeSelects();
   } catch (err) {
     console.error("Failed to load employees", err);
   }
 }
+
       
     } catch (err) {
       console.error("Failed to load employees", err);
