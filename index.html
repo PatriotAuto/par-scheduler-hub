@@ -3041,23 +3041,8 @@ function renderDealerQueue(){
 
 // Seed dummy events
 function seedDummyEvents(){
-  const todayIso=toISODate(currentDate);
-  let idCounter=1;
-    const base=[
-      {tech:"William",dept:"Detailing",type:"job",serviceName:"Full Detail",label:"Full Detail – F-150",time:"09:00",minutes:210,price:450,status:"Scheduled",dealer:false,customerFirstName:"Alex",customerLastName:"Smith",customerName:"Alex Smith",vin:"1FTFW1E50PFA12345",stockNumber:"STK-101",vehicleYear:"2023",vehicleMake:"Ford",vehicleModel:"F-150",serviceProgress:"In Queue"},
-      {tech:"Limage",dept:"Detailing",type:"job",serviceName:"Interior Detail",label:"Interior – Civic",time:"10:00",minutes:150,price:275,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"08:30",deliveryTime:"17:00",customerFirstName:"Dana",customerLastName:"Zeigler",customerName:"Dana Zeigler",vin:"19XFC2F59GE000111",stockNumber:"STK-102",vehicleYear:"2016",vehicleMake:"Honda",vehicleModel:"Civic",serviceProgress:"In Queue"},
-      {tech:"Matt",dept:"Tint",type:"job",serviceName:"Full Tint",label:"Full Tint – Model 3",time:"09:30",minutes:120,price:380,status:"Scheduled",dealer:true,rideNeeded:true,rideTime:"09:00",customerWaiting:true,customerFirstName:"Chris",customerLastName:"Jones",customerName:"Chris Jones",vin:"5YJ3E1EA7KF317222",stockNumber:"STK-103",vehicleYear:"2019",vehicleMake:"Tesla",vehicleModel:"Model 3",serviceProgress:"In Queue"},
-      {tech:"Matt",dept:"PPF",type:"job",serviceName:"Full Front PPF",label:"Full Front – Supra",time:"12:00",minutes:240,price:1600,status:"Scheduled",dealer:false,customerFirstName:"Taylor",customerLastName:"Kim",customerName:"Taylor Kim",vin:"JT2JA82J0R0000456",stockNumber:"STK-104",vehicleYear:"2024",vehicleMake:"Toyota",vehicleModel:"Supra",serviceProgress:"In Queue"},
-      {tech:"William",dept:"Ceramic",type:"job",serviceName:"5 Year Coating",label:"5yr – Silverado",time:"14:00",minutes:240,price:1400,status:"Scheduled",dealer:false,customerFirstName:"Morgan",customerLastName:"Clark",customerName:"Morgan Clark",vin:"3GCUYDED2PG111888",stockNumber:"STK-105",vehicleYear:"2023",vehicleMake:"Chevrolet",vehicleModel:"Silverado",serviceProgress:"In Queue"},
-      {tech:"Fafa",dept:"Detailing",type:"job",serviceName:"Quick Clean",label:"Quick Clean – CR-V",time:"15:00",minutes:60,price:120,status:"Scheduled",dealer:false,customerFirstName:"Jamie",customerLastName:"Lopez",customerName:"Jamie Lopez",vin:"2HKRW2H5XHH123321",stockNumber:"STK-106",vehicleYear:"2017",vehicleMake:"Honda",vehicleModel:"CR-V",serviceProgress:"In Queue"},
-      {tech:"Matt",dept:"Electronics",type:"job",serviceName:"Remote Start",label:"Remote Start – RAM",time:"11:00",minutes:120,price:450,status:"Scheduled",dealer:true,pickupDelivery:true,pickupTime:"10:30",deliveryTime:"16:30",customerFirstName:"Robin",customerLastName:"Davis",customerName:"Robin Davis",vin:"1C6SRFMT3NN401234",stockNumber:"STK-107",vehicleYear:"2022",vehicleMake:"RAM",vehicleModel:"1500",serviceProgress:"In Queue"},
-      {tech:"William",dept:"Detailing",type:"timeoff",label:"Time Off",time:"13:00",notes:"Doctor appt"}
-    ];
-    events=base.map(e=>{
-      const id="seed-"+(idCounter++);
-      return {...e,id,date:todayIso,jobGroupId: e.type==="job" ? id : undefined};
-    });
-  }
+  events = [];
+}
 
 // Panels
 function setPanel(mode){
