@@ -116,28 +116,16 @@ async function postJson(url, body) {
   }
 
   // ---- Employees ----
- async function loadEmployees() {
-  try {
-    const data = await getJson(GOOGLE_BACKEND_URL + "?action=getEmployees");
-    employees = (data && data.employees) || [];
-    filteredEmployees = employees.slice();
-    renderEmployeeList();
+  async function loadEmployees() {
+    try {
+      const data = await getJson(GOOGLE_BACKEND_URL + "?action=getEmployees");
+      employees = (data && data.employees) || [];
+      filteredEmployees = employees.slice();
 
-    // Populate the Time Off dropdowns
-    populateTimeOffEmployeeSelects();
-  } catch (err) {
-    console.error("Failed to load employees", err);
-  }
-}
-
-      
-    } catch (err) {
-      console.error("Failed to load employees", err);
-      employees = [];
-      filteredEmployees = [];
       renderEmployeeList();
       populateTimeOffEmployeeSelects();
-
+    } catch (err) {
+      console.error("Failed to load employees", err);
     }
   }
 
@@ -254,49 +242,6 @@ async function postJson(url, body) {
         badge.textContent = "";
       }
     }
-function populateTimeOffEmployeeSelects() {
-  const selectMain = qs("#timeOffEmployee");
-  const selectFilter = qs("#timeOffFilterEmployee");
-  if (!selectMain && !selectFilter) return;
-
-  const currentMain = selectMain ? selectMain.value : "";
-  const currentFilter = selectFilter ? selectFilter.value : "";
-
-  if (selectMain) {
-    selectMain.innerHTML = '<option value="">Select employee...</option>';
-  }
-  if (selectFilter) {
-    selectFilter.innerHTML = '<option value="">All employees</option>';
-  }
-
-  employees.forEach((emp) => {
-    const label =
-      ((emp.firstName || "") + " " + (emp.lastName || "")).trim() ||
-      emp.employeeId ||
-      "(Unnamed)";
-
-    if (selectMain) {
-      const opt = document.createElement("option");
-      opt.value = emp.employeeId || "";
-      opt.textContent = label;
-      selectMain.appendChild(opt);
-    }
-
-    if (selectFilter) {
-      const opt2 = document.createElement("option");
-      opt2.value = emp.employeeId || "";
-      opt2.textContent = label;
-      selectFilter.appendChild(opt2);
-    }
-  });
-
-  if (selectMain && currentMain) {
-    selectMain.value = currentMain;
-  }
-  if (selectFilter && currentFilter) {
-    selectFilter.value = currentFilter;
-  }
-}
 
     renderDepartmentChips(emp.departments || []);
 
@@ -304,94 +249,94 @@ function populateTimeOffEmployeeSelects() {
     if (delBtn) delBtn.disabled = !emp.employeeId;
   }
 
-async function saveEmployee() {
-  const employee = {
-    employeeId: qs("#empId").value || null,
-    firstName: qs("#empFirstName").value.trim(),
-    lastName: qs("#empLastName").value.trim(),
-    role: qs("#empRole").value.trim(),
-    status: qs("#empStatus").value || "Active",
-    payType: qs("#empPayType").value || "",
-    baseHourlyRate: parseFloat(qs("#empBaseRate").value) || "",
-    salaryAnnual: parseFloat(qs("#empSalary").value) || "",
-    flatRateMultiplier: parseFloat(qs("#empFlatMultiplier").value) || 1,
-    defaultCommissionType: qs("#empCommType").value || "",
-    defaultCommissionValue:
-      qs("#empCommValue").value !== ""
-        ? parseFloat(qs("#empCommValue").value)
-        : "",
-    departments: readSelectedDepartments(),
-    isTechnician: qs("#empIsTechnician").checked,
-    notes: qs("#empNotes").value.trim(),
-  };
+  async function saveEmployee() {
+    const employee = {
+      employeeId: qs("#empId").value || null,
+      firstName: qs("#empFirstName").value.trim(),
+      lastName: qs("#empLastName").value.trim(),
+      role: qs("#empRole").value.trim(),
+      status: qs("#empStatus").value || "Active",
+      payType: qs("#empPayType").value || "",
+      baseHourlyRate: parseFloat(qs("#empBaseRate").value) || "",
+      salaryAnnual: parseFloat(qs("#empSalary").value) || "",
+      flatRateMultiplier: parseFloat(qs("#empFlatMultiplier").value) || 1,
+      defaultCommissionType: qs("#empCommType").value || "",
+      defaultCommissionValue:
+        qs("#empCommValue").value !== ""
+          ? parseFloat(qs("#empCommValue").value)
+          : "",
+      departments: readSelectedDepartments(),
+      isTechnician: qs("#empIsTechnician").checked,
+      notes: qs("#empNotes").value.trim(),
+    };
 
-  if (!employee.firstName || !employee.lastName) {
-    alert("First and last name are required.");
-    return;
-  }
-
-  try {
-    const params = new URLSearchParams();
-    params.set("action", "saveEmployee");
-    params.set("employee", JSON.stringify(employee));
-
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
-      method: "GET",
-    });
-
-    if (!resp.ok) {
-      throw new Error("Network error: " + resp.status);
-    }
-
-    const result = await resp.json();
-
-    if (!result || result.ok === false) {
-      console.error("saveEmployee backend error:", result);
-      alert("Failed to save employee: " + (result && result.error ? result.error : "Unknown error"));
+    if (!employee.firstName || !employee.lastName) {
+      alert("First and last name are required.");
       return;
     }
 
-    if (result.employeeId) {
-      employee.employeeId = result.employeeId;
-    }
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "saveEmployee");
+      params.set("employee", JSON.stringify(employee));
 
-    await loadEmployees();
-    if (employee.employeeId) {
-      selectEmployee(employee.employeeId);
+      const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
+        method: "GET",
+      });
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      const result = await resp.json();
+
+      if (!result || result.ok === false) {
+        console.error("saveEmployee backend error:", result);
+        alert("Failed to save employee: " + (result && result.error ? result.error : "Unknown error"));
+        return;
+      }
+
+      if (result.employeeId) {
+        employee.employeeId = result.employeeId;
+      }
+
+      await loadEmployees();
+      if (employee.employeeId) {
+        selectEmployee(employee.employeeId);
+      }
+      alert("Employee saved.");
+    } catch (err) {
+      console.error("Save employee failed", err);
+      alert("Failed to save employee. Check console for details.");
     }
-    alert("Employee saved.");
-  } catch (err) {
-    console.error("Save employee failed", err);
-    alert("Failed to save employee. Check console for details.");
   }
-}
 
- async function deleteEmployee() {
-  const id = qs("#empId").value;
-  if (!id) return;
-  if (!confirm("Delete this employee? This cannot be undone.")) return;
+  async function deleteEmployee() {
+    const id = qs("#empId").value;
+    if (!id) return;
+    if (!confirm("Delete this employee? This cannot be undone.")) return;
 
-  try {
-    const params = new URLSearchParams();
-    params.set("action", "deleteEmployee");
-    params.set("employeeId", id);
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "deleteEmployee");
+      params.set("employeeId", id);
 
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
-      method: "GET",
-    });
+      const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
+        method: "GET",
+      });
 
-    if (!resp.ok) {
-      throw new Error("Network error: " + resp.status);
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      await loadEmployees();
+      clearEmployeeForm();
+      alert("Employee deleted.");
+    } catch (err) {
+      console.error("Delete employee failed", err);
+      alert("Failed to delete employee. Check console for details.");
     }
-
-    await loadEmployees();
-    clearEmployeeForm();
-    alert("Employee deleted.");
-  } catch (err) {
-    console.error("Delete employee failed", err);
-    alert("Failed to delete employee. Check console for details.");
   }
-}
 
 
   function setupEmployeeEvents() {
@@ -780,14 +725,16 @@ async function saveEmployee() {
     }
   }
 
-   // ---- INIT ----
+  // ---- INIT ----
   document.addEventListener("DOMContentLoaded", async () => {
     setupTabs();
     setupEmployeeEvents();
     setupTimeOffEvents();
     clearEmployeeForm();
+
     await loadDepartments();
     renderDepartmentChips([]);
+
     await loadEmployees();
     await loadHolidays();
     await loadTimeOff();
