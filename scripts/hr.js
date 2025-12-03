@@ -13,10 +13,14 @@
     return el;
   }
 
-  let departments = [];
+   let departments = [];
   let employees = [];
   let filteredEmployees = [];
   let selectedEmployeeId = null;
+
+  let timeOffEntries = [];
+  let filteredTimeOffEntries = [];
+  let selectedTimeOffId = null;
 
   // ---- Fetch helpers ----
   async function getJson(url) {
@@ -128,6 +132,8 @@ async function postJson(url, body) {
       employees = [];
       filteredEmployees = [];
       renderEmployeeList();
+      populateTimeOffEmployeeSelects();
+
     }
   }
 
@@ -390,6 +396,298 @@ async function saveEmployee() {
       });
     }
   }
+  // ---- TIME OFF ----
+
+  function populateTimeOffEmployeeSelects() {
+    const selectMain = qs("#timeOffEmployee");
+    const selectFilter = qs("#timeOffFilterEmployee");
+    if (!selectMain && !selectFilter) return;
+
+    // get current selection to restore
+    const currentMain = selectMain ? selectMain.value : "";
+    const currentFilter = selectFilter ? selectFilter.value : "";
+
+    if (selectMain) {
+      selectMain.innerHTML = '<option value="">Select employee...</option>';
+    }
+    if (selectFilter) {
+      selectFilter.innerHTML = '<option value="">All employees</option>';
+    }
+
+    employees.forEach((emp) => {
+      const label =
+        ((emp.firstName || "") + " " + (emp.lastName || "")).trim() ||
+        emp.employeeId ||
+        "(Unnamed)";
+
+      if (selectMain) {
+        const opt = document.createElement("option");
+        opt.value = emp.employeeId || "";
+        opt.textContent = label;
+        selectMain.appendChild(opt);
+      }
+
+      if (selectFilter) {
+        const opt2 = document.createElement("option");
+        opt2.value = emp.employeeId || "";
+        opt2.textContent = label;
+        selectFilter.appendChild(opt2);
+      }
+    });
+
+    if (selectMain && currentMain) {
+      selectMain.value = currentMain;
+    }
+    if (selectFilter && currentFilter) {
+      selectFilter.value = currentFilter;
+    }
+  }
+
+  async function loadTimeOff() {
+    const container = qs("#timeOffList");
+    if (container) {
+      container.innerHTML = "";
+    }
+    try {
+      const data = await getJson(GOOGLE_BACKEND_URL + "?action=getTimeOff");
+      timeOffEntries = (data && data.timeOff) || [];
+      filteredTimeOffEntries = timeOffEntries.slice();
+      renderTimeOffList();
+    } catch (err) {
+      console.error("Failed to load time off", err);
+      if (container) {
+        const msg = createEl("div", "hr-empty");
+        msg.textContent =
+          "Failed to load time off from backend. Check console for details.";
+        container.appendChild(msg);
+      }
+    }
+  }
+
+  function renderTimeOffList() {
+    const list = qs("#timeOffList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (!filteredTimeOffEntries.length) {
+      const empty = createEl("div", "hr-empty");
+      empty.textContent = "No time off entries yet.";
+      list.appendChild(empty);
+      return;
+    }
+
+    filteredTimeOffEntries.forEach((entry) => {
+      const item = createEl("button", "hr-holiday-item");
+      item.type = "button";
+      item.setAttribute("data-id", entry.timeOffId || "");
+
+      const title = createEl("div", "hr-holiday-name");
+      const name =
+        entry.employeeName ||
+        entry.employeeId ||
+        "(Unknown employee)";
+      title.textContent = name;
+
+      const meta = createEl("div", "hr-holiday-meta");
+      const start = entry.startDate || "";
+      const end = entry.endDate || "";
+      let range = start;
+      if (end && end !== start) {
+        range = start + " → " + end;
+      }
+      const parts = [];
+      if (range) parts.push(range);
+      if (entry.allDay) parts.push("All day");
+      if (entry.startTime && entry.endTime && !entry.allDay) {
+        parts.push(entry.startTime + "–" + entry.endTime);
+      }
+      if (entry.status) parts.push(entry.status);
+      meta.textContent = parts.join(" • ");
+
+      item.appendChild(title);
+      item.appendChild(meta);
+
+      if (entry.timeOffId && entry.timeOffId === selectedTimeOffId) {
+        item.classList.add("hr-employee-item-selected");
+      }
+
+      item.addEventListener("click", () => {
+        selectTimeOffEntry(entry.timeOffId);
+      });
+
+      list.appendChild(item);
+    });
+  }
+
+  function clearTimeOffForm() {
+    selectedTimeOffId = null;
+    const form = qs("#timeOffForm");
+    if (!form) return;
+    form.reset();
+    qs("#timeOffId").value = "";
+    const delBtn = qs("#btnDeleteTimeOff");
+    if (delBtn) delBtn.disabled = true;
+  }
+
+  function selectTimeOffEntry(id) {
+    const entry = timeOffEntries.find((t) => t.timeOffId === id);
+    if (!entry) return;
+    selectedTimeOffId = id;
+    qs("#timeOffId").value = entry.timeOffId || "";
+    qs("#timeOffEmployee").value = entry.employeeId || "";
+    qs("#timeOffStartDate").value = entry.startDate || "";
+    qs("#timeOffEndDate").value = entry.endDate || "";
+    qs("#timeOffStartTime").value = entry.startTime || "";
+    qs("#timeOffEndTime").value = entry.endTime || "";
+    qs("#timeOffAllDay").checked = !!entry.allDay;
+    qs("#timeOffStatus").value = entry.status || "Planned";
+    qs("#timeOffReason").value = entry.reason || "";
+
+    const delBtn = qs("#btnDeleteTimeOff");
+    if (delBtn) delBtn.disabled = !entry.timeOffId;
+
+    // highlight selection
+    const items = qsa("#timeOffList .hr-holiday-item");
+    items.forEach((el) => {
+      const rowId = el.getAttribute("data-id");
+      el.classList.toggle("hr-employee-item-selected", rowId === selectedTimeOffId);
+    });
+  }
+
+  async function saveTimeOff() {
+    const empId = qs("#timeOffEmployee").value;
+    if (!empId) {
+      alert("Please select an employee.");
+      return;
+    }
+    const emp = employees.find((e) => e.employeeId === empId);
+    const startDate = qs("#timeOffStartDate").value;
+    if (!startDate) {
+      alert("Start date is required.");
+      return;
+    }
+
+    const timeOff = {
+      timeOffId: qs("#timeOffId").value || null,
+      employeeId: empId,
+      employeeName:
+        (emp && ((emp.firstName || "") + " " + (emp.lastName || "")).trim()) || "",
+      startDate: startDate,
+      endDate: qs("#timeOffEndDate").value || startDate,
+      startTime: qs("#timeOffStartTime").value || "",
+      endTime: qs("#timeOffEndTime").value || "",
+      allDay: qs("#timeOffAllDay").checked,
+      status: qs("#timeOffStatus").value || "Planned",
+      reason: qs("#timeOffReason").value.trim(),
+    };
+
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "saveTimeOff");
+      params.set("timeoff", JSON.stringify(timeOff));
+
+      const resp = await fetch(
+        GOOGLE_BACKEND_URL + "?" + params.toString(),
+        { method: "GET" }
+      );
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      const result = await resp.json();
+      if (!result || result.ok === false) {
+        console.error("saveTimeOff backend error:", result);
+        alert(
+          "Failed to save time off: " +
+            (result && result.error ? result.error : "Unknown error")
+        );
+        return;
+      }
+
+      if (result.timeOffId) {
+        timeOff.timeOffId = result.timeOffId;
+      }
+
+      await loadTimeOff();
+      if (timeOff.timeOffId) {
+        selectTimeOffEntry(timeOff.timeOffId);
+      }
+      alert("Time off saved.");
+    } catch (err) {
+      console.error("Save time off failed", err);
+      alert("Failed to save time off. Check console for details.");
+    }
+  }
+
+  async function deleteTimeOff() {
+    const id = qs("#timeOffId").value;
+    if (!id) return;
+    if (!confirm("Delete this time off entry? This cannot be undone.")) return;
+
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "deleteTimeOff");
+      params.set("timeOffId", id);
+
+      const resp = await fetch(
+        GOOGLE_BACKEND_URL + "?" + params.toString(),
+        { method: "GET" }
+      );
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      await loadTimeOff();
+      clearTimeOffForm();
+      alert("Time off deleted.");
+    } catch (err) {
+      console.error("Delete time off failed", err);
+      alert("Failed to delete time off. Check console for details.");
+    }
+  }
+
+  function setupTimeOffEvents() {
+    const btnSave = qs("#btnSaveTimeOff");
+    if (btnSave) {
+      btnSave.addEventListener("click", (e) => {
+        e.preventDefault();
+        saveTimeOff();
+      });
+    }
+
+    const btnClear = qs("#btnClearTimeOff");
+    if (btnClear) {
+      btnClear.addEventListener("click", (e) => {
+        e.preventDefault();
+        clearTimeOffForm();
+      });
+    }
+
+    const btnDelete = qs("#btnDeleteTimeOff");
+    if (btnDelete) {
+      btnDelete.addEventListener("click", (e) => {
+        e.preventDefault();
+        deleteTimeOff();
+      });
+    }
+
+    const filterSelect = qs("#timeOffFilterEmployee");
+    if (filterSelect) {
+      filterSelect.addEventListener("change", () => {
+        const empId = filterSelect.value;
+        if (!empId) {
+          filteredTimeOffEntries = timeOffEntries.slice();
+        } else {
+          filteredTimeOffEntries = timeOffEntries.filter(
+            (t) => t.employeeId === empId
+          );
+        }
+        renderTimeOffList();
+      });
+    }
+  }
 
   // ---- Holidays (read-only list for now) ----
   async function loadHolidays() {
@@ -435,14 +733,17 @@ async function saveEmployee() {
     }
   }
 
-  // ---- INIT ----
+   // ---- INIT ----
   document.addEventListener("DOMContentLoaded", async () => {
     setupTabs();
     setupEmployeeEvents();
+    setupTimeOffEvents();
     clearEmployeeForm();
     await loadDepartments();
     renderDepartmentChips([]);
     await loadEmployees();
     await loadHolidays();
+    await loadTimeOff();
   });
+
 })();
