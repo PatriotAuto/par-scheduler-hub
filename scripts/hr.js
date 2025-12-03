@@ -127,6 +127,14 @@ async function postJson(url, body) {
       });
       filteredEmployees = employees.slice();
       renderEmployeeList();
+
+    // 🔽 THIS LINE IS WHAT FILLS THE TIME OFF DROPDOWNS
+    populateTimeOffEmployeeSelects();
+  } catch (err) {
+    console.error("Failed to load employees", err);
+  }
+}
+      
     } catch (err) {
       console.error("Failed to load employees", err);
       employees = [];
@@ -250,6 +258,49 @@ async function postJson(url, body) {
         badge.textContent = "";
       }
     }
+function populateTimeOffEmployeeSelects() {
+  const selectMain = qs("#timeOffEmployee");
+  const selectFilter = qs("#timeOffFilterEmployee");
+  if (!selectMain && !selectFilter) return;
+
+  const currentMain = selectMain ? selectMain.value : "";
+  const currentFilter = selectFilter ? selectFilter.value : "";
+
+  if (selectMain) {
+    selectMain.innerHTML = '<option value="">Select employee...</option>';
+  }
+  if (selectFilter) {
+    selectFilter.innerHTML = '<option value="">All employees</option>';
+  }
+
+  employees.forEach((emp) => {
+    const label =
+      ((emp.firstName || "") + " " + (emp.lastName || "")).trim() ||
+      emp.employeeId ||
+      "(Unnamed)";
+
+    if (selectMain) {
+      const opt = document.createElement("option");
+      opt.value = emp.employeeId || "";
+      opt.textContent = label;
+      selectMain.appendChild(opt);
+    }
+
+    if (selectFilter) {
+      const opt2 = document.createElement("option");
+      opt2.value = emp.employeeId || "";
+      opt2.textContent = label;
+      selectFilter.appendChild(opt2);
+    }
+  });
+
+  if (selectMain && currentMain) {
+    selectMain.value = currentMain;
+  }
+  if (selectFilter && currentFilter) {
+    selectFilter.value = currentFilter;
+  }
+}
 
     renderDepartmentChips(emp.departments || []);
 
