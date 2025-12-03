@@ -26,7 +26,8 @@
         <button class="hr-tab-button hr-tab-active" data-tab="employees">Employees</button>
         <button class="hr-tab-button" data-tab="timeoff">Time Off</button>
         <button class="hr-tab-button" data-tab="schedule">Schedule</button>
-        <button class="hr-tab-button" data-tab="hours">Holidays &amp; Store Hours</button>
+        <button class="hr-tab-button" data-tab="holidays">Holidays</button>
+        <button class="hr-tab-button" data-tab="hours">Store Hours</button>
       </nav>
 
       <section class="hr-employees-list-panel" data-panel="employees">
@@ -285,33 +286,141 @@
       </section>
 
 
-      <!-- SCHEDULE (placeholder for future wiring) -->
+      <!-- SCHEDULE: EMPLOYEE WEEKLY TEMPLATE -->
       <section class="hr-tab-content" data-tab="schedule">
         <div class="hr-card">
           <div class="hr-card-header">
             <h2>Employee Weekly Schedule</h2>
           </div>
-          <p class="hr-muted">
-            This will replace the old <strong>Tech Schedule</strong> buttons and let you
-            define weekly templates for each employee (days, times, locations).
-          </p>
-          <ul class="hr-roadmap-list">
-            <li>Per-employee weekly template schedules</li>
-            <li>Option for multiple locations or bays</li>
-            <li>Integration with shop hours and time off</li>
-          </ul>
-          <p class="hr-muted">
-            We can wire this to a new <code>EmployeeSchedule</code> sheet so the scheduler
-            knows when each employee is available.
-          </p>
+
+          <div class="hr-field hr-field-full">
+            <label>Employee</label>
+            <select id="scheduleEmployee" class="hr-select">
+              <option value="">Select employee...</option>
+            </select>
+            <p class="hr-muted">
+              This defines the default weekly template for the selected employee
+              (used by the scheduler to know when they are available).
+            </p>
+          </div>
+
+          <div class="hr-schedule-grid-wrapper">
+            <table class="hr-schedule-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Working</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Location</th>
+                  <th>Bay</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- One row per day, data-day will drive JS -->
+                <tr data-day="Mon">
+                  <td>Monday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Mon" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Mon" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Mon" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Mon" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Mon" /></td>
+                </tr>
+                <tr data-day="Tue">
+                  <td>Tuesday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Tue" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Tue" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Tue" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Tue" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Tue" /></td>
+                </tr>
+                <tr data-day="Wed">
+                  <td>Wednesday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Wed" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Wed" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Wed" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Wed" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Wed" /></td>
+                </tr>
+                <tr data-day="Thu">
+                  <td>Thursday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Thu" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Thu" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Thu" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Thu" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Thu" /></td>
+                </tr>
+                <tr data-day="Fri">
+                  <td>Friday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Fri" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Fri" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Fri" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Fri" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Fri" /></td>
+                </tr>
+                <tr data-day="Sat">
+                  <td>Saturday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Sat" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Sat" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Sat" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Sat" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Sat" /></td>
+                </tr>
+                <tr data-day="Sun">
+                  <td>Sunday</td>
+                  <td><input type="checkbox" class="sch-working" data-day="Sun" /></td>
+                  <td><input type="time" class="hr-input sch-start" data-day="Sun" /></td>
+                  <td><input type="time" class="hr-input sch-end" data-day="Sun" /></td>
+                  <td><input type="text" class="hr-input sch-location" data-day="Sun" /></td>
+                  <td><input type="text" class="hr-input sch-bay" data-day="Sun" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="hr-form-actions">
+            <button type="button" id="btnSaveSchedule" class="hr-btn hr-btn-primary">
+              Save Weekly Schedule
+            </button>
+            <button type="button" id="btnClearSchedule" class="hr-btn hr-btn-ghost">
+              Clear For Employee
+            </button>
+          </div>
         </div>
       </section>
 
-      <!-- HOLIDAYS & STORE HOURS -->
+      <!-- HOLIDAYS -->
+      <section class="hr-tab-content" data-tab="holidays">
+        <div class="hr-card hr-hours-card">
+          <div class="hr-card-header">
+            <h2>Holiday Schedule</h2>
+          </div>
+
+          <div class="hr-hours-layout">
+            <section class="hr-hours-column">
+              <h3>Holiday Schedule</h3>
+              <p class="hr-muted">
+                This reads from your existing <code>Holidays</code> sheet using the
+                existing backend endpoint (<code>action=loadHolidays</code>).
+              </p>
+              <div id="holidayList" class="hr-holiday-list">
+                <!-- Populated from loadHolidays -->
+              </div>
+            </section>
+          </div>
+
+          <div class="hr-callout">
+            <strong>Next step:</strong> we can add save/update endpoints for Holidays so this
+            tab becomes the single source of truth for planned closures.
+          </div>
+        </div>
+      </section>
+
+      <!-- STORE HOURS -->
       <section class="hr-tab-content" data-tab="hours">
         <div class="hr-card hr-hours-card">
           <div class="hr-card-header">
-            <h2>Holidays &amp; Store Hours</h2>
+            <h2>Store Hours</h2>
           </div>
 
           <div class="hr-hours-layout">
@@ -329,22 +438,11 @@
                 </div>
               </div>
             </section>
-
-            <section class="hr-hours-column">
-              <h3>Holiday Schedule</h3>
-              <p class="hr-muted">
-                This reads from your existing <code>Holidays</code> sheet using the
-                existing backend endpoint (<code>action=loadHolidays</code>).
-              </p>
-              <div id="holidayList" class="hr-holiday-list">
-                <!-- Populated from loadHolidays -->
-              </div>
-            </section>
           </div>
 
           <div class="hr-callout">
-            <strong>Next step:</strong> we can add save/update endpoints for Holidays and
-            Shop Hours so this tab becomes the single source of truth for when the shop is open or closed.
+            <strong>Next step:</strong> we can add save/update endpoints for Shop Hours so this
+            tab becomes the single source of truth for when the shop is open or closed.
           </div>
         </div>
       </section>
