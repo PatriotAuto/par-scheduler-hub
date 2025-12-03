@@ -1093,8 +1093,7 @@
 </div>
 
 <script>
-const techs=["William","Limage","Kaiden","Luke","Fafa","Matt"];
-document.documentElement.style.setProperty("--tech-count",techs.length);
+document.documentElement.style.setProperty("--tech-count",6);
 const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const workTimes=["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00"];
 
@@ -1183,7 +1182,7 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
-const GOOGLE_BACKEND_URL = "https://script.google.com/macros/s/AKfycbzfTUv9h_3U4RYFZgH7HH_mybySDGrva75urTpyYE5bXDyfuFTrwBIL2kqgthFbzjmb/exec";
+const GOOGLE_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzorXFwQy8kjSH8T42eYkRWv16GNCs4B7GJ5re-bmIj8FlnVlyYgqozYYWfYEY8TFcZ/exec';
 const CUSTOMER_API_URL = 'https://script.google.com/macros/s/AKfycbzfTUv9h_3U4RYFZgH7HH_mybySDGrva75urTpyYE5bXDyfuFTrwBIL2kqgthFbzjmb/exec';
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
@@ -1219,7 +1218,12 @@ document.addEventListener("DOMContentLoaded",function(){
   if(typeof setupAppointmentSmartLookup==="function"){
     setupAppointmentSmartLookup();
   }
-  setupGlobalSearchBar();
+  if(typeof setupGlobalSearchBar==="function"){
+    setupGlobalSearchBar();
+  }
+
+  // NEW: load technicians from Employees sheet
+  loadTechsFromCloud();
 });
 
 // DOM refs
@@ -3244,6 +3248,40 @@ async function loadServicesFromBackend() {
     }
   } catch (err) {
     console.error("Error loading Services from backend", err);
+  }
+}
+
+let techs = [];
+
+async function loadTechsFromCloud() {
+  try {
+    const url = GOOGLE_BACKEND_URL + '?action=getEmployees';
+    const resp = await fetch(url);
+    const json = await resp.json();
+    const employees = json.employees || json;
+
+    techs = (employees || [])
+      .filter(e => {
+        const isTech = e.isTechnician;
+        const status = String(e.status || '').toLowerCase();
+        return isTech && status === 'active';
+      })
+      .map(e => {
+        const first = e.firstName || '';
+        const last  = e.lastName || '';
+        const full  = (first + ' ' + last).trim();
+        return e.displayName || full || e.employeeId;
+      });
+
+    document.documentElement.style.setProperty('--tech-count', techs.length);
+
+    if (typeof renderCalendar === 'function') {
+      renderCalendar();
+    }
+  } catch (err) {
+    console.error('Failed to load employees from backend', err);
+    techs = [];
+    document.documentElement.style.setProperty('--tech-count', 0);
   }
 }
 
