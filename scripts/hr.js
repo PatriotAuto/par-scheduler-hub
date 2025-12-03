@@ -25,15 +25,16 @@
     return resp.json();
   }
 
-  async function postJson(url, body) {
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
-    if (!resp.ok) throw new Error("Network error: " + resp.status);
-    return resp.json();
-  }
+async function postJson(url, body) {
+  const resp = await fetch(url, {
+    method: "POST",
+    // IMPORTANT: no custom headers so the browser doesn't send a CORS preflight
+    body: JSON.stringify(body || {}),
+  });
+  if (!resp.ok) throw new Error("Network error: " + resp.status);
+  return resp.json();
+}
+
 
   // ---- Tabs ----
   function setupTabs() {
