@@ -5,39 +5,19 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages-${{ github.ref }}"
-  cancel-in-progress: true
-
 jobs:
   build:
+    name: Build (PR)
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # This repo is a simple static site (index.html etc.),
-          # so just upload the repo root.
-          path: .
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      # This is a static HTML site, so there's nothing to compile.
+      # If you later add a real build step (npm run build or similar)
+      # you can put it here.
+      - name: Validate repository structure
+        run: |
+          echo "Static site – no build step required."
+          ls -R
