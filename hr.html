@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HR &amp; Employees · Patriot Auto Restyling</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="styles/hr.css" />
+</head>
+<body>
+  <header class="hr-header">
+    <div class="hr-header-left">
+      <h1>HR &amp; Employees</h1>
+      <p class="hr-subtitle">
+        Manage employees, departments, schedules, and shop availability from one place.
+      </p>
+    </div>
+    <div class="hr-header-right">
+      <a href="index.html" class="hr-btn hr-btn-ghost">← Back to Scheduler</a>
+    </div>
+  </header>
+
+  <main class="hr-main">
+    <aside class="hr-sidebar">
+      <nav class="hr-tabs">
+        <button class="hr-tab-button hr-tab-active" data-tab="employees">Employees</button>
+        <button class="hr-tab-button" data-tab="timeoff">Time Off</button>
+        <button class="hr-tab-button" data-tab="schedule">Schedule</button>
+        <button class="hr-tab-button" data-tab="hours">Holidays &amp; Store Hours</button>
+      </nav>
+
+      <section class="hr-employees-list-panel" data-panel="employees">
+        <div class="hr-panel-header">
+          <h2>Employees</h2>
+          <button id="btnNewEmployee" class="hr-btn hr-btn-primary">+ New Employee</button>
+        </div>
+        <div class="hr-search-box">
+          <input
+            id="employeeSearchInput"
+            class="hr-input"
+            placeholder="Search by name, role, or department..."
+          />
+        </div>
+        <div id="employeeList" class="hr-employee-list">
+          <!-- Filled by JS -->
+        </div>
+      </section>
+    </aside>
+
+    <section class="hr-content">
+      <!-- EMPLOYEE DETAILS -->
+      <section class="hr-tab-content hr-tab-content-active" data-tab="employees">
+        <div class="hr-card hr-employee-card">
+          <div class="hr-card-header">
+            <h2 id="employeeFormTitle">Employee Profile</h2>
+            <span id="employeeIdBadge" class="hr-pill hr-pill-muted" hidden></span>
+          </div>
+
+          <form id="employeeForm" class="hr-form" autocomplete="off">
+            <input type="hidden" id="empId" />
+
+            <div class="hr-form-grid">
+              <div class="hr-field">
+                <label>First Name</label>
+                <input id="empFirstName" class="hr-input" required />
+              </div>
+              <div class="hr-field">
+                <label>Last Name</label>
+                <input id="empLastName" class="hr-input" required />
+              </div>
+              <div class="hr-field">
+                <label>Role / Title</label>
+                <input id="empRole" class="hr-input" placeholder="Tech, Service Writer, Manager..." />
+              </div>
+              <div class="hr-field">
+                <label>Status</label>
+                <select id="empStatus" class="hr-select">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                  <option value="Terminated">Terminated</option>
+                </select>
+              </div>
+
+              <div class="hr-field">
+                <label>Pay Type</label>
+                <select id="empPayType" class="hr-select">
+                  <option value="">—</option>
+                  <option value="Hourly">Hourly</option>
+                  <option value="Salary">Salary</option>
+                  <option value="FlatRate">Flat Rate</option>
+                  <option value="Commission">Commission</option>
+                  <option value="Mixed">Mixed</option>
+                </select>
+              </div>
+              <div class="hr-field">
+                <label>Base Hourly Rate</label>
+                <input id="empBaseRate" class="hr-input" type="number" step="0.01" />
+              </div>
+              <div class="hr-field">
+                <label>Salary (Annual)</label>
+                <input id="empSalary" class="hr-input" type="number" step="1" />
+              </div>
+              <div class="hr-field">
+                <label>Flat Rate Multiplier</label>
+                <input
+                  id="empFlatMultiplier"
+                  class="hr-input"
+                  type="number"
+                  step="0.01"
+                  value="1"
+                />
+              </div>
+
+              <div class="hr-field">
+                <label>Default Commission Type</label>
+                <select id="empCommType" class="hr-select">
+                  <option value="">None</option>
+                  <option value="PERCENT">Percent of service</option>
+                  <option value="FLAT">Flat amount</option>
+                </select>
+              </div>
+              <div class="hr-field">
+                <label>Default Commission Value</label>
+                <input
+                  id="empCommValue"
+                  class="hr-input"
+                  type="number"
+                  step="0.01"
+                  placeholder="10 = 10% or $10"
+                />
+              </div>
+
+              <div class="hr-field hr-field-full">
+                <label>Departments (skill groups)</label>
+                <div id="empDepartments" class="hr-department-chips">
+                  <!-- Department chips from backend -->
+                </div>
+                <p class="hr-help">
+                  Used to filter which services each employee can be scheduled for
+                  (Detail, Tint, PPF, Ceramic, Accessories, etc.).
+                </p>
+              </div>
+
+              <div class="hr-field hr-field-inline">
+                <label class="hr-checkbox-label">
+                  <input id="empIsTechnician" type="checkbox" />
+                  <span>Show on scheduler grid as a technician</span>
+                </label>
+              </div>
+
+              <div class="hr-field hr-field-full">
+                <label>Notes</label>
+                <textarea
+                  id="empNotes"
+                  class="hr-textarea"
+                  rows="3"
+                  placeholder="Skills, certifications, restrictions, etc."
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="hr-form-actions">
+              <button type="button" id="btnSaveEmployee" class="hr-btn hr-btn-primary">
+                Save Employee
+              </button>
+              <button
+                type="button"
+                id="btnDeleteEmployee"
+                class="hr-btn hr-btn-danger"
+                disabled
+              >
+                Delete Employee
+              </button>
+            </div>
+          </form>
+
+          <div class="hr-callout">
+            <strong>Future reports:</strong> this profile will feed flat-rate hours,
+            commission, and productivity reports once we wire the reporting engine.
+          </div>
+        </div>
+      </section>
+
+      <!-- TIME OFF (placeholder for future wiring) -->
+      <section class="hr-tab-content" data-tab="timeoff">
+        <div class="hr-card">
+          <div class="hr-card-header">
+            <h2>Employee Time Off</h2>
+          </div>
+          <p class="hr-muted">
+            This tab will replace the old <strong>Tech Time Off</strong> controls.
+            We&apos;ll manage time-off requests and approvals here, tied directly to employees.
+          </p>
+          <ul class="hr-roadmap-list">
+            <li>Day / date range requests for each employee</li>
+            <li>Statuses: Pending, Approved, Denied</li>
+            <li>Automatic blocks on the scheduler when time off is approved</li>
+          </ul>
+          <p class="hr-muted">
+            For now, you can keep using the existing Tech Time Off sheet/buttons until
+            we move the logic over to this tab.
+          </p>
+        </div>
+      </section>
+
+      <!-- SCHEDULE (placeholder for future wiring) -->
+      <section class="hr-tab-content" data-tab="schedule">
+        <div class="hr-card">
+          <div class="hr-card-header">
+            <h2>Employee Weekly Schedule</h2>
+          </div>
+          <p class="hr-muted">
+            This will replace the old <strong>Tech Schedule</strong> buttons and let you
+            define weekly templates for each employee (days, times, locations).
+          </p>
+          <ul class="hr-roadmap-list">
+            <li>Per-employee weekly template schedules</li>
+            <li>Option for multiple locations or bays</li>
+            <li>Integration with shop hours and time off</li>
+          </ul>
+          <p class="hr-muted">
+            We can wire this to a new <code>EmployeeSchedule</code> sheet so the scheduler
+            knows when each employee is available.
+          </p>
+        </div>
+      </section>
+
+      <!-- HOLIDAYS & STORE HOURS -->
+      <section class="hr-tab-content" data-tab="hours">
+        <div class="hr-card hr-hours-card">
+          <div class="hr-card-header">
+            <h2>Holidays &amp; Store Hours</h2>
+          </div>
+
+          <div class="hr-hours-layout">
+            <section class="hr-hours-column">
+              <h3>Shop Hours (per day)</h3>
+              <p class="hr-muted">
+                We&apos;ll store these in a <code>ShopHours</code> sheet so the scheduler
+                knows when the shop is generally open.
+              </p>
+              <div id="shopHoursList" class="hr-hours-list">
+                <!-- Placeholder UI; backend wiring can be added later -->
+                <div class="hr-muted small">
+                  Future: editable open/close times for each day of week
+                  (Mon–Sun), saved to a <strong>ShopHours</strong> sheet.
+                </div>
+              </div>
+            </section>
+
+            <section class="hr-hours-column">
+              <h3>Holiday Schedule</h3>
+              <p class="hr-muted">
+                This reads from your existing <code>Holidays</code> sheet using the
+                existing backend endpoint (<code>action=loadHolidays</code>).
+              </p>
+              <div id="holidayList" class="hr-holiday-list">
+                <!-- Populated from loadHolidays -->
+              </div>
+            </section>
+          </div>
+
+          <div class="hr-callout">
+            <strong>Next step:</strong> we can add save/update endpoints for Holidays and
+            Shop Hours so this tab becomes the single source of truth for when the shop is open or closed.
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const GOOGLE_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbzorXFwQy8kjSH8T42eYkRWv16GNCs4B7GJ5re-bmIj8FlnVlyYgqozYYWfYEY8TFcZ/exec';
+  </script>
+  <script src="scripts/hr.js"></script>
+</body>
+</html>
