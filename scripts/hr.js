@@ -251,7 +251,7 @@ async function postJson(url, body) {
     if (delBtn) delBtn.disabled = !emp.employeeId;
   }
 
- async function saveEmployee() {
+async function saveEmployee() {
   const employee = {
     employeeId: qs("#empId").value || null,
     firstName: qs("#empFirstName").value.trim(),
@@ -278,7 +278,6 @@ async function postJson(url, body) {
   }
 
   try {
-    // Build a GET URL with JSON payload
     const params = new URLSearchParams();
     params.set("action", "saveEmployee");
     params.set("employee", JSON.stringify(employee));
@@ -292,7 +291,14 @@ async function postJson(url, body) {
     }
 
     const result = await resp.json();
-    if (result && result.employeeId) {
+
+    if (!result || result.ok === false) {
+      console.error("saveEmployee backend error:", result);
+      alert("Failed to save employee: " + (result && result.error ? result.error : "Unknown error"));
+      return;
+    }
+
+    if (result.employeeId) {
       employee.employeeId = result.employeeId;
     }
 
