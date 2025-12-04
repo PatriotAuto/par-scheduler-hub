@@ -398,21 +398,65 @@
           </div>
 
           <div class="hr-hours-layout">
+            <!-- LEFT: list of holidays -->
             <section class="hr-hours-column">
               <h3>Holiday Schedule</h3>
               <p class="hr-muted">
-                This reads from your existing <code>Holidays</code> sheet using the
-                existing backend endpoint (<code>action=loadHolidays</code>).
+                These dates come from your <code>Holidays</code> sheet via the backend.
               </p>
               <div id="holidayList" class="hr-holiday-list">
-                <!-- Populated from loadHolidays -->
+                <!-- Populated by JS (loadHolidays / renderHolidayList) -->
               </div>
+            </section>
+
+            <!-- RIGHT: add/edit form -->
+            <section class="hr-hours-column">
+              <h3>Add / Edit Holiday</h3>
+              <form id="holidayForm" class="hr-form" autocomplete="off">
+                <input type="hidden" id="holidayId" />
+
+                <div class="hr-form-grid">
+                  <div class="hr-field hr-field-full">
+                    <label>Holiday Name</label>
+                    <input id="holidayName" class="hr-input" required />
+                  </div>
+
+                  <div class="hr-field">
+                    <label>Date</label>
+                    <input id="holidayDate" type="date" class="hr-input" required />
+                  </div>
+
+                  <div class="hr-field hr-field-inline">
+                    <label class="hr-checkbox-label">
+                      <input id="holidayShopClosed" type="checkbox" />
+                      <span>Shop Closed</span>
+                    </label>
+                  </div>
+
+                  <div class="hr-field hr-field-full">
+                    <label>Notes</label>
+                    <textarea id="holidayNotes" class="hr-textarea" rows="2"></textarea>
+                  </div>
+                </div>
+
+                <div class="hr-form-actions">
+                  <button type="button" id="btnSaveHoliday" class="hr-btn hr-btn-primary">
+                    Save Holiday
+                  </button>
+                  <button type="button" id="btnClearHoliday" class="hr-btn hr-btn-ghost">
+                    Clear
+                  </button>
+                  <button type="button" id="btnDeleteHoliday" class="hr-btn hr-btn-danger" disabled>
+                    Delete
+                  </button>
+                </div>
+              </form>
             </section>
           </div>
 
           <div class="hr-callout">
-            <strong>Next step:</strong> we can add save/update endpoints for Holidays so this
-            tab becomes the single source of truth for planned closures.
+            <strong>Note:</strong> this tab is now the single source of truth for planned closures,
+            stored in the <code>Holidays</code> sheet and used by the scheduler.
           </div>
         </div>
       </section>
