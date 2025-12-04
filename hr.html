@@ -405,7 +405,7 @@
                 These dates come from your <code>Holidays</code> sheet via the backend.
               </p>
               <div id="holidayList" class="hr-holiday-list">
-                <!-- Populated by JS (loadHolidays / renderHolidayList) -->
+                <!-- Populated by JS -->
               </div>
             </section>
 
@@ -426,10 +426,20 @@
                     <input id="holidayDate" type="date" class="hr-input" required />
                   </div>
 
-                  <div class="hr-field hr-field-inline">
+                  <div class="hr-field">
+                    <label>Open Time (shortened)</label>
+                    <input id="holidayOpenTime" type="time" class="hr-input" />
+                  </div>
+
+                  <div class="hr-field">
+                    <label>Close Time (shortened)</label>
+                    <input id="holidayCloseTime" type="time" class="hr-input" />
+                  </div>
+
+                  <div class="hr-field hr-field-inline hr-field-full">
                     <label class="hr-checkbox-label">
                       <input id="holidayShopClosed" type="checkbox" />
-                      <span>Shop Closed</span>
+                      <span>Shop Closed (all day)</span>
                     </label>
                   </div>
 
@@ -455,8 +465,9 @@
           </div>
 
           <div class="hr-callout">
-            <strong>Note:</strong> this tab is now the single source of truth for planned closures,
-            stored in the <code>Holidays</code> sheet and used by the scheduler.
+            <strong>Note:</strong> If <em>Shop Closed</em> is checked, the day is treated as a full
+            closure. If it is unchecked, <em>Open Time</em> and <em>Close Time</em> define shortened
+            hours for the scheduler.
           </div>
         </div>
       </section>

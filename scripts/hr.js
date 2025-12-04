@@ -974,10 +974,18 @@ async function postJson(url, body) {
       title.textContent = h.name || "(Unnamed Holiday)";
 
       const meta = createEl("div", "hr-holiday-meta");
-      let metaParts = [];
+      const metaParts = [];
+
       if (h.date) metaParts.push(h.date);
-      if (h.shopClosed) metaParts.push("Shop Closed");
+
+      if (h.shopClosed) {
+        metaParts.push("Closed all day");
+      } else if (h.openTime && h.closeTime) {
+        metaParts.push(`Open ${h.openTime}–${h.closeTime}`);
+      }
+
       if (h.notes) metaParts.push(h.notes);
+
       meta.textContent = metaParts.join(" • ");
 
       item.appendChild(title);
@@ -1014,6 +1022,8 @@ async function postJson(url, body) {
     qs("#holidayName").value = h.name || "";
     qs("#holidayDate").value = h.date || "";
     qs("#holidayShopClosed").checked = !!h.shopClosed;
+    qs("#holidayOpenTime").value = h.openTime || "";
+    qs("#holidayCloseTime").value = h.closeTime || "";
     qs("#holidayNotes").value = h.notes || "";
 
     const delBtn = qs("#btnDeleteHoliday");
@@ -1042,23 +1052,27 @@ async function postJson(url, body) {
         GOOGLE_BACKEND_URL + "?action=loadHolidays"
       );
 
-      // Expected new backend shape: { holidays: [ { id, name, date, shopClosed, notes } ] }
+      // New backend shape: { ok, holidays: [ { id, name, date, shopClosed, openTime, closeTime, notes } ] }
       if (data && Array.isArray(data.holidays)) {
         holidays = data.holidays.map((row) => ({
           id: String(row.id || row.holidayId || ""),
           name: row.name || row.holidayName || row.Name || "",
           date: row.date || row.Date || "",
           shopClosed: !!(row.shopClosed ?? row.ShopClosed ?? row.closed),
+          openTime: row.openTime || row.OpenTime || "",
+          closeTime: row.closeTime || row.CloseTime || "",
           notes: row.notes || row.Notes || "",
         }));
       } else {
-        // Fallback for older shape: { rows: [...] }
+        // Fallback if something older ever calls it
         const rows = (data && data.rows) || [];
         holidays = rows.map((row, idx) => ({
           id: String(row.id || row.holidayId || row.rowNumber || idx + 1),
           name: row.Name || row.Holiday || row.holidayName || "",
           date: row.Date || row.date || "",
           shopClosed: !!(row.ShopClosed || row.closed),
+          openTime: row.OpenTime || row.openTime || "",
+          closeTime: row.CloseTime || row.closeTime || "",
           notes: row.Notes || row.notes || "",
         }));
       }
@@ -1078,6 +1092,8 @@ async function postJson(url, body) {
     const name = qs("#holidayName").value.trim();
     const date = qs("#holidayDate").value;
     const shopClosed = qs("#holidayShopClosed").checked;
+    const openTime = qs("#holidayOpenTime").value;
+    const closeTime = qs("#holidayCloseTime").value;
     const notes = qs("#holidayNotes").value.trim();
     const id = qs("#holidayId").value || null;
 
@@ -1090,11 +1106,19 @@ async function postJson(url, body) {
       return;
     }
 
+    // Optional sanity: if not closed and one time is set, require both
+    if (!shopClosed && ((openTime && !closeTime) || (!openTime && closeTime))) {
+      alert("For shortened hours, please set both open and close times.");
+      return;
+    }
+
     const holiday = {
       id,
       name,
       date,
       shopClosed,
+      openTime,
+      closeTime,
       notes,
     };
 
