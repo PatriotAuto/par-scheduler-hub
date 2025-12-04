@@ -365,6 +365,8 @@ body {
 .hr-employee-name {
   font-size: 13px;
   font-weight: 600;
+  /* Updated for readability: keep employee names visible on dark backgrounds */
+  color: white !important;
 }
 
 .hr-employee-meta {
