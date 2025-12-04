@@ -1,4 +1,4 @@
-// HR page logic – Employees, Departments, Holidays (read-only for now)
+// HR page logic – Employees, Departments, Holidays
 (function () {
   // ---- DOM helpers ----
   function qs(sel) {
@@ -26,6 +26,10 @@
   let timeOffEntries = [];
   let filteredTimeOffEntries = [];
   let selectedTimeOffId = null;
+
+  // ---- Holidays ----
+  let holidays = [];
+  let selectedHolidayId = null;
 
   // ---- Fetch helpers ----
   async function getJson(url) {
@@ -948,47 +952,252 @@ async function postJson(url, body) {
     }
   }
 
-  // ---- Holidays (read-only list for now) ----
+  // ---- Holidays ----
+  function renderHolidayList() {
+    const list = qs("#holidayList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (!holidays.length) {
+      const empty = createEl("div", "hr-empty");
+      empty.textContent = "No holidays defined yet.";
+      list.appendChild(empty);
+      return;
+    }
+
+    holidays.forEach((h) => {
+      const item = createEl("button", "hr-holiday-item");
+      item.type = "button";
+      item.setAttribute("data-id", h.id || "");
+
+      const title = createEl("div", "hr-holiday-name");
+      title.textContent = h.name || "(Unnamed Holiday)";
+
+      const meta = createEl("div", "hr-holiday-meta");
+      let metaParts = [];
+      if (h.date) metaParts.push(h.date);
+      if (h.shopClosed) metaParts.push("Shop Closed");
+      if (h.notes) metaParts.push(h.notes);
+      meta.textContent = metaParts.join(" • ");
+
+      item.appendChild(title);
+      item.appendChild(meta);
+
+      if (h.id && h.id === selectedHolidayId) {
+        item.classList.add("hr-employee-item-selected");
+      }
+
+      item.addEventListener("click", () => {
+        selectHoliday(h.id);
+      });
+
+      list.appendChild(item);
+    });
+  }
+
+  function clearHolidayForm() {
+    selectedHolidayId = null;
+    const form = qs("#holidayForm");
+    if (!form) return;
+    form.reset();
+    qs("#holidayId").value = "";
+    const delBtn = qs("#btnDeleteHoliday");
+    if (delBtn) delBtn.disabled = true;
+
+    // clear list highlight
+    const items = qsa("#holidayList .hr-holiday-item");
+    items.forEach((el) => el.classList.remove("hr-employee-item-selected"));
+  }
+
+  function fillHolidayForm(h) {
+    qs("#holidayId").value = h.id || "";
+    qs("#holidayName").value = h.name || "";
+    qs("#holidayDate").value = h.date || "";
+    qs("#holidayShopClosed").checked = !!h.shopClosed;
+    qs("#holidayNotes").value = h.notes || "";
+
+    const delBtn = qs("#btnDeleteHoliday");
+    if (delBtn) delBtn.disabled = !h.id;
+  }
+
+  function selectHoliday(id) {
+    const h = holidays.find((x) => x.id === id);
+    if (!h) return;
+    selectedHolidayId = id;
+    fillHolidayForm(h);
+
+    const items = qsa("#holidayList .hr-holiday-item");
+    items.forEach((el) => {
+      const rowId = el.getAttribute("data-id");
+      el.classList.toggle("hr-employee-item-selected", rowId === selectedHolidayId);
+    });
+  }
+
   async function loadHolidays() {
     const container = qs("#holidayList");
-    if (!container) return;
-    container.innerHTML = "";
+    if (container) container.innerHTML = "";
 
     try {
       const data = await getJson(
         GOOGLE_BACKEND_URL + "?action=loadHolidays"
       );
-      const rows = (data && data.rows) || [];
-      if (!rows.length) {
+
+      // Expected new backend shape: { holidays: [ { id, name, date, shopClosed, notes } ] }
+      if (data && Array.isArray(data.holidays)) {
+        holidays = data.holidays.map((row) => ({
+          id: String(row.id || row.holidayId || ""),
+          name: row.name || row.holidayName || row.Name || "",
+          date: row.date || row.Date || "",
+          shopClosed: !!(row.shopClosed ?? row.ShopClosed ?? row.closed),
+          notes: row.notes || row.Notes || "",
+        }));
+      } else {
+        // Fallback for older shape: { rows: [...] }
+        const rows = (data && data.rows) || [];
+        holidays = rows.map((row, idx) => ({
+          id: String(row.id || row.holidayId || row.rowNumber || idx + 1),
+          name: row.Name || row.Holiday || row.holidayName || "",
+          date: row.Date || row.date || "",
+          shopClosed: !!(row.ShopClosed || row.closed),
+          notes: row.Notes || row.notes || "",
+        }));
+      }
+
+      renderHolidayList();
+    } catch (err) {
+      console.error("Failed to load holidays", err);
+      if (container) {
         const msg = createEl("div", "hr-empty");
-        msg.textContent = "No holidays defined yet.";
+        msg.textContent = "Failed to load holidays from backend.";
         container.appendChild(msg);
+      }
+    }
+  }
+
+  async function saveHoliday() {
+    const name = qs("#holidayName").value.trim();
+    const date = qs("#holidayDate").value;
+    const shopClosed = qs("#holidayShopClosed").checked;
+    const notes = qs("#holidayNotes").value.trim();
+    const id = qs("#holidayId").value || null;
+
+    if (!name) {
+      alert("Holiday name is required.");
+      return;
+    }
+    if (!date) {
+      alert("Holiday date is required.");
+      return;
+    }
+
+    const holiday = {
+      id,
+      name,
+      date,
+      shopClosed,
+      notes,
+    };
+
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "saveHoliday");
+      params.set("holiday", JSON.stringify(holiday));
+
+      const resp = await fetch(
+        GOOGLE_BACKEND_URL + "?" + params.toString(),
+        { method: "GET" }
+      );
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      const result = await resp.json();
+      if (!result || result.ok === false) {
+        console.error("saveHoliday backend error:", result);
+        alert(
+          "Failed to save holiday: " +
+            (result && result.error ? result.error : "Unknown error")
+        );
         return;
       }
 
-      rows.forEach((row) => {
-        const item = createEl("div", "hr-holiday-item");
-        const name = row.Name || row.Holiday || row.holidayName || "";
-        const dateVal = row.Date || row.date || "";
-        const closed = row.ShopClosed || row.closed || "";
+      if (result.holidayId) {
+        holiday.id = String(result.holidayId);
+      }
 
-        const title = createEl("div", "hr-holiday-name");
-        title.textContent = name || "(Unnamed Holiday)";
-
-        const meta = createEl("div", "hr-holiday-meta");
-        meta.textContent =
-          String(dateVal) +
-          (closed ? " • Shop Closed" : "");
-
-        item.appendChild(title);
-        item.appendChild(meta);
-        container.appendChild(item);
-      });
+      await loadHolidays();
+      if (holiday.id) {
+        selectHoliday(holiday.id);
+      }
+      alert("Holiday saved.");
     } catch (err) {
-      console.error("Failed to load holidays", err);
-      const msg = createEl("div", "hr-empty");
-      msg.textContent = "Failed to load holidays from backend.";
-      container.appendChild(msg);
+      console.error("Save holiday failed", err);
+      alert("Failed to save holiday. Check console for details.");
+    }
+  }
+
+  async function deleteHoliday() {
+    const id = qs("#holidayId").value;
+    if (!id) return;
+    if (!confirm("Delete this holiday? This cannot be undone.")) return;
+
+    try {
+      const params = new URLSearchParams();
+      params.set("action", "deleteHoliday");
+      params.set("holidayId", id);
+
+      const resp = await fetch(
+        GOOGLE_BACKEND_URL + "?" + params.toString(),
+        { method: "GET" }
+      );
+
+      if (!resp.ok) {
+        throw new Error("Network error: " + resp.status);
+      }
+
+      const result = await resp.json();
+      if (!result || result.ok === false) {
+        console.error("deleteHoliday backend error:", result);
+        alert(
+          "Failed to delete holiday: " +
+            (result && result.error ? result.error : "Unknown error")
+        );
+        return;
+      }
+
+      await loadHolidays();
+      clearHolidayForm();
+      alert("Holiday deleted.");
+    } catch (err) {
+      console.error("Delete holiday failed", err);
+      alert("Failed to delete holiday. Check console for details.");
+    }
+  }
+
+  function setupHolidayEvents() {
+    const btnSave = qs("#btnSaveHoliday");
+    if (btnSave) {
+      btnSave.addEventListener("click", (e) => {
+        e.preventDefault();
+        saveHoliday();
+      });
+    }
+
+    const btnClear = qs("#btnClearHoliday");
+    if (btnClear) {
+      btnClear.addEventListener("click", (e) => {
+        e.preventDefault();
+        clearHolidayForm();
+      });
+    }
+
+    const btnDelete = qs("#btnDeleteHoliday");
+    if (btnDelete) {
+      btnDelete.addEventListener("click", (e) => {
+        e.preventDefault();
+        deleteHoliday();
+      });
     }
   }
 
@@ -998,6 +1207,7 @@ async function postJson(url, body) {
     setupEmployeeEvents();
     setupTimeOffEvents();
     setupScheduleEvents();
+    setupHolidayEvents();
     clearEmployeeForm();
 
     await loadDepartments();
