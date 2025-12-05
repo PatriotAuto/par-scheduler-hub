@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Patriot Scheduler – Users</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --navy: #0b1f33;
+      --red: #e30613;
+      --bg: #f5f7fb;
+      --muted: #5b667c;
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: var(--bg); color: #0f172a; }
+    header { background: linear-gradient(90deg, #050b18, #0a1727); color: #fff; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { margin: 0; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; }
+    header .subtitle { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+    .header-actions { display: flex; gap: 8px; }
+    .btn { border: none; border-radius: 8px; padding: 10px 14px; background: var(--red); color: #fff; cursor: pointer; font-weight: 600; }
+    .btn.secondary { background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    .btn.small { padding: 6px 10px; font-size: 13px; }
+    main { padding: 18px; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .card { background: #fff; border-radius: 12px; box-shadow: 0 6px 18px rgba(15,23,42,0.12); padding: 16px; border: 1px solid rgba(0,0,0,0.06); }
+    .card h2 { margin: 0 0 8px; font-size: 18px; }
+    .card p { margin: 0 0 12px; color: var(--muted); }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 12px; align-items: end; }
+    label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; color: #0f172a; }
+    input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; }
+    .switch-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; }
+    th { background: #f1f5f9; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; }
+    .pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pill.active { background: #dcfce7; color: #166534; }
+    .pill.inactive { background: #fee2e2; color: #991b1b; }
+    .role { background: #e0f2fe; color: #075985; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .notice { background: #fff7ed; border: 1px solid #fed7aa; padding: 10px 12px; border-radius: 10px; color: #92400e; font-size: 14px; }
+    #status { min-height: 18px; font-size: 14px; color: #475569; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Users Admin</h1>
+      <div class="subtitle">Manage access for Patriot Scheduler</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn secondary" id="logoutBtn">Log Out</button>
+    </div>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Create user</h2>
+      <p>Add a new teammate. A temporary password will be shown once.</p>
+      <form id="createForm">
+        <div>
+          <label for="email">Email</label>
+          <input type="email" id="email" required placeholder="name@example.com" autocomplete="email" />
+        </div>
+        <div>
+          <label for="name">Name</label>
+          <input type="text" id="name" required placeholder="Full name" />
+        </div>
+        <div>
+          <label for="role">Role</label>
+          <select id="role">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+            <option value="owner">Owner</option>
+          </select>
+        </div>
+        <div class="switch-row">
+          <input type="checkbox" id="active" checked />
+          <label for="active">Active immediately</label>
+        </div>
+        <div>
+          <button type="submit" class="btn">Create User</button>
+        </div>
+      </form>
+      <div id="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>Users</h2>
+      <p>Reset passwords, change roles, or deactivate users.</p>
+      <div class="notice" id="permissionNotice" style="display:none;">You need admin or owner access to manage users.</div>
+      <div class="table-wrap">
+        <table id="usersTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    ensureLoggedIn();
+    const currentUser = getAuthUser();
+    const tableBody = document.querySelector('#usersTable tbody');
+    const statusDiv = document.getElementById('status');
+    const notice = document.getElementById('permissionNotice');
+
+    if (!currentUser || !['admin', 'owner'].includes((currentUser.role || '').toLowerCase())) {
+      notice.style.display = 'block';
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', logoutAndRedirect);
+
+    document.getElementById('createForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      setStatus('Creating user...');
+      try {
+        const payload = {
+          email: document.getElementById('email').value.trim(),
+          name: document.getElementById('name').value.trim(),
+          role: document.getElementById('role').value,
+          is_active: document.getElementById('active').checked
+        };
+
+        const res = await apiPost('users.create', payload);
+        if (!res.success) throw new Error(res.message || 'Failed');
+        renderUsers();
+        setStatus('User created. Temporary password: ' + res.tempPassword);
+        e.target.reset();
+        document.getElementById('active').checked = true;
+      } catch (err) {
+        console.error(err);
+        setStatus('Error creating user: ' + err.message, true);
+      }
+    });
+
+    async function renderUsers() {
+      tableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+      try {
+        const res = await apiGet('users.list');
+        if (!res.success) throw new Error(res.message || 'Failed to load users');
+        const rows = res.users || [];
+        if (!rows.length) {
+          tableBody.innerHTML = '<tr><td colspan="6">No users yet.</td></tr>';
+          return;
+        }
+
+        tableBody.innerHTML = '';
+        rows.forEach(user => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${user.name || ''}</td>
+            <td>${user.email}</td>
+            <td><span class="pill role">${user.role || 'user'}</span></td>
+            <td><span class="pill ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+            <td>${user.updated_at || ''}</td>
+            <td class="actions"></td>
+          `;
+
+          const actionsCell = tr.querySelector('.actions');
+          const resetBtn = document.createElement('button');
+          resetBtn.className = 'btn small secondary';
+          resetBtn.textContent = 'Reset Password';
+          resetBtn.addEventListener('click', () => resetPassword(user.id));
+
+          const toggleBtn = document.createElement('button');
+          toggleBtn.className = 'btn small';
+          toggleBtn.textContent = user.is_active ? 'Deactivate' : 'Activate';
+          toggleBtn.style.background = user.is_active ? '#0f172a' : '#16a34a';
+          toggleBtn.addEventListener('click', () => toggleActive(user));
+
+          actionsCell.appendChild(resetBtn);
+          actionsCell.appendChild(toggleBtn);
+          tableBody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+        tableBody.innerHTML = `<tr><td colspan="6">${err.message}</td></tr>`;
+      }
+    }
+
+    async function toggleActive(user) {
+      setStatus('Updating ' + user.email + '...');
+      try {
+        const res = await apiPost('users.update', { id: user.id, is_active: !user.is_active });
+        if (!res.success) throw new Error(res.message || 'Failed to update');
+        renderUsers();
+        setStatus('Updated ' + user.email);
+      } catch (err) {
+        setStatus(err.message, true);
+      }
+    }
+
+    async function resetPassword(userId) {
+      setStatus('Resetting password...');
+      try {
+        const res = await apiPost('users.resetPassword', { id: userId });
+        if (!res.success) throw new Error(res.message || 'Failed');
+        renderUsers();
+        alert('Temporary password (shown once): ' + res.tempPassword);
+        setStatus('Temporary password generated.');
+      } catch (err) {
+        setStatus(err.message, true);
+      }
+    }
+
+    function setStatus(msg, isError) {
+      statusDiv.textContent = msg || '';
+      statusDiv.style.color = isError ? '#b3261e' : '#475569';
+    }
+
+    renderUsers();
+  </script>
+</body>
+</html>
