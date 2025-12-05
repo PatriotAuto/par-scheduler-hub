@@ -100,27 +100,30 @@
       loginBtn.disabled = true;
       showError('');
 
-      fetch(API_URL + '?action=login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: email, password: password })
-      })
-        .then(function (res) { return res.json(); })
+      const url = API_URL
+        + '?action=login'
+        + '&email=' + encodeURIComponent(email)
+        + '&password=' + encodeURIComponent(password);
+
+      fetch(url)
+        .then(function (res) {
+          return res.json();
+        })
         .then(function (data) {
           if (!data || !data.success) {
             showError((data && data.message) || 'Login failed.');
             loginBtn.disabled = false;
             return;
           }
+
           // Save token + user to localStorage
           localStorage.setItem(PS_TOKEN_KEY, data.token);
           localStorage.setItem(PS_USER_KEY, JSON.stringify(data.user || {}));
+
           window.location.href = LOGIN_TARGET_PAGE;
         })
         .catch(function (err) {
-          console.error(err);
+          console.error('Login error:', err);
           showError('Error contacting server.');
           loginBtn.disabled = false;
         });
