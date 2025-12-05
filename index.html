@@ -560,6 +560,7 @@
         <a href="customers.html" id="btnCustomersNav" class="header-btn nav-button">Customers</a>
         <a href="hr.html" class="header-btn nav-button">HR / Employees</a>
         <a href="services.html" id="btnServicesPanel" class="header-btn nav-button">Services</a>
+        <span id="adminLinks"></span>
         <button id="btnRefreshFromCloud" class="header-btn">Refresh From Cloud</button>
       </div>
     </header>
@@ -1092,8 +1093,22 @@
 
 <script src="auth.js"></script>
 <script>
-  // Redirect to login if not logged in
+  // Ensure the user is logged in first
   ensureLoggedIn();
+
+  // Get the current user from auth.js
+  const currentUser = getAuthUser();
+
+  // If user is owner or admin, show the Users link
+  if (currentUser && currentUser.role) {
+    const role = String(currentUser.role).toLowerCase();
+    if (role === 'owner' || role === 'admin') {
+      var adminLinks = document.getElementById('adminLinks');
+      if (adminLinks) {
+        adminLinks.innerHTML = '<a href="users.html" style="margin-left:10px;" class="header-btn nav-button">Users</a>';
+      }
+    }
+  }
 </script>
 <script>
 document.documentElement.style.setProperty("--tech-count",6);

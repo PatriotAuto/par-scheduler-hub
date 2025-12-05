@@ -108,6 +108,10 @@
   <script>
     ensureLoggedIn();
     const currentUser = getAuthUser();
+    if (!currentUser || !currentUser.role || ['owner','admin'].indexOf(String(currentUser.role).toLowerCase()) === -1) {
+      alert('Access denied. Admin/Owner only.');
+      window.location.href = 'index.html';
+    }
     const tableBody = document.querySelector('#usersTable tbody');
     const statusDiv = document.getElementById('status');
     const notice = document.getElementById('permissionNotice');
