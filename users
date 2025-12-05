@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Patriot Scheduler - Users</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f5f5f5;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 12px;
+    }
+    .warn {
+      color: #b3261e;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+    input, select {
+      width: 100%;
+      padding: 6px 8px;
+      margin-top: 3px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 8px 12px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+    button.primary {
+      background: #0b5ed7;
+      color: #fff;
+    }
+    button.secondary {
+      background: #e0e0e0;
+      color: #333;
+      margin-left: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      background: #fafafa;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: #e3f2fd;
+      color: #0b5ed7;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+    .pill.active {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .pill.inactive {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .temp-pass {
+      font-family: monospace;
+      font-size: 0.9rem;
+      margin-top: 4px;
+      color: #1d3557;
+      word-break: break-all;
+    }
+    .row-actions button {
+      margin-right: 4px;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <script src="auth.js"></script>
+  <script>
+    // Require login
+    ensureLoggedIn();
+    const currentUser = getAuthUser();
+    if (!currentUser || !currentUser.role ||
+        ['owner','admin'].indexOf(String(currentUser.role).toLowerCase()) === -1) {
+      alert('Access denied. Admin/Owner only.');
+      window.location.href = 'calendar.html';
+    }
+  </script>
+
+  <h1>Users</h1>
+  <div class="warn">
+    Admin/Owner only. Use this page to manage login accounts.  
+    Temp passwords are shown once; share them securely with your staff.
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:1rem;margin-top:0;">Add New User</h2>
+    <label>Email</label>
+    <input type="email" id="newEmail" placeholder="user@example.com">
+
+    <label>Name</label>
+    <input type="text" id="newName" placeholder="Full name">
+
+    <label>Role</label>
+    <select id="newRole">
+      <option value="tech">Tech</option>
+      <option value="manager">Manager</option>
+      <option value="admin">Admin</option>
+      <option value="owner">Owner</option>
+    </select>
+
+    <button class="primary" id="btnCreate">Create User</button>
+    <div id="createResult" class="temp-pass"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:1rem;margin-top:0;">Existing Users</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersTableBody">
+        <!-- filled by JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const usersTableBody = document.getElementById('usersTableBody');
+    const btnCreate = document.getElementById('btnCreate');
+    const newEmail = document.getElementById('newEmail');
+    const newName = document.getElementById('newName');
+    const newRole = document.getElementById('newRole');
+    const createResult = document.getElementById('createResult');
+
+    function refreshUsers() {
+      usersTableBody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
+      apiPost('users.list', {})
+        .then(function (data) {
+          if (!data || !data.success) {
+            usersTableBody.innerHTML = '<tr><td colspan="5">Error loading users.</td></tr>';
+            return;
+          }
+          const users = data.users || [];
+          if (!users.length) {
+            usersTableBody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+            return;
+          }
+          usersTableBody.innerHTML = '';
+          users.forEach(function (u) {
+            const tr = document.createElement('tr');
+
+            const tdEmail = document.createElement('td');
+            tdEmail.textContent = u.email || '';
+            tr.appendChild(tdEmail);
+
+            const tdName = document.createElement('td');
+            tdName.textContent = u.name || '';
+            tr.appendChild(tdName);
+
+            const tdRole = document.createElement('td');
+            const roleSpan = document.createElement('span');
+            roleSpan.className = 'tag';
+            roleSpan.textContent = (u.role || '').toString();
+            tdRole.appendChild(roleSpan);
+            tr.appendChild(tdRole);
+
+            const tdStatus = document.createElement('td');
+            const pill = document.createElement('span');
+            pill.className = 'pill ' + (u.is_active ? 'active' : 'inactive');
+            pill.textContent = u.is_active ? 'Active' : 'Inactive';
+            tdStatus.appendChild(pill);
+            tr.appendChild(tdStatus);
+
+            const tdActions = document.createElement('td');
+            tdActions.className = 'row-actions';
+
+            const btnReset = document.createElement('button');
+            btnReset.className = 'secondary';
+            btnReset.textContent = 'Reset PW';
+            btnReset.onclick = function () {
+              resetPassword(u.id);
+            };
+            tdActions.appendChild(btnReset);
+
+            const btnToggle = document.createElement('button');
+            btnToggle.className = 'secondary';
+            btnToggle.textContent = u.is_active ? 'Deactivate' : 'Activate';
+            btnToggle.onclick = function () {
+              setActive(u.id, !u.is_active);
+            };
+            tdActions.appendChild(btnToggle);
+
+            tr.appendChild(tdActions);
+
+            usersTableBody.appendChild(tr);
+          });
+        })
+        .catch(function (err) {
+          console.error(err);
+          usersTableBody.innerHTML = '<tr><td colspan="5">Error loading users.</td></tr>';
+        });
+    }
+
+    btnCreate.addEventListener('click', function () {
+      const email = newEmail.value.trim();
+      const name  = newName.value.trim();
+      const role  = newRole.value;
+
+      if (!email || !name) {
+        alert('Email and name are required.');
+        return;
+      }
+
+      btnCreate.disabled = true;
+      createResult.textContent = 'Creating user...';
+
+      apiPost('users.create', { email: email, name: name, role: role })
+        .then(function (data) {
+          btnCreate.disabled = false;
+          if (!data || !data.success) {
+            createResult.textContent = 'Error: ' + (data && data.message ? data.message : 'Unknown error');
+            return;
+          }
+          const tempPassword = data.tempPassword;
+          createResult.textContent = 'User created. Temp password: ' + tempPassword;
+          newEmail.value = '';
+          newName.value = '';
+          newRole.value = 'tech';
+          refreshUsers();
+        })
+        .catch(function (err) {
+          btnCreate.disabled = false;
+          console.error(err);
+          createResult.textContent = 'Error creating user.';
+        });
+    });
+
+    function resetPassword(userId) {
+      const confirmReset = confirm('Reset password for this user? A new temp password will be generated.');
+      if (!confirmReset) return;
+
+      apiPost('users.resetPassword', { id: userId })
+        .then(function (data) {
+          if (!data || !data.success) {
+            alert('Error resetting password: ' + (data && data.message ? data.message : 'Unknown error'));
+            return;
+          }
+          const tempPassword = data.tempPassword;
+          alert('New temp password: ' + tempPassword + '\n\nShare this with the user and ask them to log in and change it later.');
+        })
+        .catch(function (err) {
+          console.error(err);
+          alert('Error resetting password.');
+        });
+    }
+
+    function setActive(userId, isActive) {
+      apiPost('users.setActive', { id: userId, is_active: isActive })
+        .then(function (data) {
+          if (!data || !data.success) {
+            alert('Error updating status.');
+            return;
+          }
+          refreshUsers();
+        })
+        .catch(function (err) {
+          console.error(err);
+          alert('Error updating status.');
+        });
+    }
+
+    // Initial load
+    refreshUsers();
+  </script>
+</body>
+</html>
