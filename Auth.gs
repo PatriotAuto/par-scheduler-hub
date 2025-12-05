@@ -1,0 +1,237 @@
+/**
+ * Auth.gs - authentication + user management helpers
+ * Works with Users sheet: id | email | name | role | is_active | password_hash | salt | created_at | updated_at
+ */
+
+var USERS_SHEET_NAME = 'Users';
+var TOKEN_STORE_KEY = 'PS_AUTH_TOKENS';
+var TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+function handleLogin(e) {
+  var payload = parseJsonBody(e.postData && e.postData.contents);
+  if (!payload) {
+    return createJsonResponse({ success: false, message: 'Invalid login payload' }, 400);
+  }
+
+  var email = (payload.email || '').trim().toLowerCase();
+  var password = payload.password || '';
+  if (!email || !password) {
+    return createJsonResponse({ success: false, message: 'Email and password required' }, 400);
+  }
+
+  var user = findUserByEmail(email);
+  if (!user || !user.is_active) {
+    return createJsonResponse({ success: false, message: 'Invalid credentials' }, 401);
+  }
+
+  var hashed = hashPassword(password, user.salt);
+  if (hashed !== user.password_hash) {
+    return createJsonResponse({ success: false, message: 'Invalid credentials' }, 401);
+  }
+
+  var token = issueToken(user);
+  return createJsonResponse({ success: true, token: token, user: sanitizeUser(user) });
+}
+
+function sanitizeUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    is_active: user.is_active,
+    created_at: user.created_at,
+    updated_at: user.updated_at
+  };
+}
+
+function isAdmin(user) {
+  if (!user) return false;
+  var role = (user.role || '').toLowerCase();
+  return role === 'admin' || role === 'owner';
+}
+
+function getUserFromToken(token) {
+  if (!token) return null;
+  var tokens = loadTokenStore();
+  var record = tokens[token];
+  if (!record) return null;
+  if (record.expiresAt && record.expiresAt < Date.now()) {
+    delete tokens[token];
+    saveTokenStore(tokens);
+    return null;
+  }
+
+  var user = getUserById(record.userId);
+  if (!user || !user.is_active) return null;
+  return sanitizeUser(user);
+}
+
+function issueToken(user) {
+  var tokens = loadTokenStore();
+  var token = Utilities.getUuid();
+  tokens[token] = {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    expiresAt: Date.now() + TOKEN_TTL_MS
+  };
+  saveTokenStore(tokens);
+  return token;
+}
+
+function loadTokenStore() {
+  var raw = PropertiesService.getScriptProperties().getProperty(TOKEN_STORE_KEY);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveTokenStore(tokens) {
+  PropertiesService.getScriptProperties().setProperty(TOKEN_STORE_KEY, JSON.stringify(tokens || {}));
+}
+
+function getUsersSheet() {
+  var ss = SpreadsheetApp.getActive();
+  return ss.getSheetByName(USERS_SHEET_NAME) || ss.insertSheet(USERS_SHEET_NAME);
+}
+
+function getAllUsers() {
+  var sheet = getUsersSheet();
+  var data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) return [];
+
+  var headers = data[0];
+  var idx = {};
+  headers.forEach(function (h, i) { idx[String(h).trim()] = i; });
+
+  var users = [];
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var user = {
+      id: row[idx.id],
+      email: (row[idx.email] || '').toString().trim().toLowerCase(),
+      name: row[idx.name] || '',
+      role: row[idx.role] || 'user',
+      is_active: row[idx.is_active] === true || row[idx.is_active] === 'true' || row[idx.is_active] === 'TRUE',
+      password_hash: row[idx.password_hash] || '',
+      salt: row[idx.salt] || '',
+      created_at: row[idx.created_at] || '',
+      updated_at: row[idx.updated_at] || ''
+    };
+    if (user.id) {
+      users.push(user);
+    }
+  }
+  return users;
+}
+
+function getUserById(id) {
+  var list = getAllUsers();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === id) return list[i];
+  }
+  return null;
+}
+
+function findUserByEmail(email) {
+  var list = getAllUsers();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].email === email) return list[i];
+  }
+  return null;
+}
+
+function hashPassword(password, salt) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + password);
+  return Utilities.base64Encode(digest);
+}
+
+function generateTempPassword() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+}
+
+function createUser(email, name, role, isActive) {
+  var sheet = getUsersSheet();
+  var now = new Date().toISOString();
+  var id = Utilities.getUuid();
+  var salt = Utilities.getUuid();
+  var tempPassword = generateTempPassword();
+  var hash = hashPassword(tempPassword, salt);
+
+  var row = [
+    id,
+    email.trim().toLowerCase(),
+    name,
+    role || 'user',
+    isActive !== false,
+    hash,
+    salt,
+    now,
+    now
+  ];
+
+  sheet.appendRow(row);
+  var user = sanitizeUser({
+    id: id,
+    email: email.trim().toLowerCase(),
+    name: name,
+    role: role || 'user',
+    is_active: isActive !== false,
+    password_hash: hash,
+    salt: salt,
+    created_at: now,
+    updated_at: now
+  });
+
+  return { user: user, tempPassword: tempPassword };
+}
+
+function updateUser(id, updates) {
+  var sheet = getUsersSheet();
+  var data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) return null;
+
+  var headers = data[0];
+  var idx = {};
+  headers.forEach(function (h, i) { idx[String(h).trim()] = i; });
+
+  for (var r = 1; r < data.length; r++) {
+    if (data[r][idx.id] === id) {
+      if (updates.name !== undefined) data[r][idx.name] = updates.name;
+      if (updates.role !== undefined) data[r][idx.role] = updates.role;
+      if (updates.is_active !== undefined) data[r][idx.is_active] = updates.is_active;
+      data[r][idx.updated_at] = new Date().toISOString();
+      sheet.getRange(r + 1, 1, 1, data[r].length).setValues([data[r]]);
+      return getUserById(id);
+    }
+  }
+  return null;
+}
+
+function resetUserPassword(id) {
+  var sheet = getUsersSheet();
+  var data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) return null;
+
+  var headers = data[0];
+  var idx = {};
+  headers.forEach(function (h, i) { idx[String(h).trim()] = i; });
+
+  for (var r = 1; r < data.length; r++) {
+    if (data[r][idx.id] === id) {
+      var salt = Utilities.getUuid();
+      var tempPassword = generateTempPassword();
+      var hash = hashPassword(tempPassword, salt);
+      data[r][idx.salt] = salt;
+      data[r][idx.password_hash] = hash;
+      data[r][idx.updated_at] = new Date().toISOString();
+      sheet.getRange(r + 1, 1, 1, data[r].length).setValues([data[r]]);
+      return { user: getUserById(id), tempPassword: tempPassword };
+    }
+  }
+  return null;
+}
