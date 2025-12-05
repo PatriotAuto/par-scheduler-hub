@@ -135,7 +135,7 @@
 
         const res = await apiPost('users.create', payload);
         if (!res.success) throw new Error(res.message || 'Failed');
-        renderUsers();
+        loadUsers();
         setStatus('User created. Temporary password: ' + res.tempPassword);
         e.target.reset();
         document.getElementById('active').checked = true;
@@ -145,49 +145,89 @@
       }
     });
 
-    async function renderUsers() {
-      tableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
-      try {
-        const res = await apiGet('users.list');
-        if (!res.success) throw new Error(res.message || 'Failed to load users');
-        const rows = res.users || [];
-        if (!rows.length) {
-          tableBody.innerHTML = '<tr><td colspan="6">No users yet.</td></tr>';
-          return;
-        }
-
-        tableBody.innerHTML = '';
-        rows.forEach(user => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${user.name || ''}</td>
-            <td>${user.email}</td>
-            <td><span class="pill role">${user.role || 'user'}</span></td>
-            <td><span class="pill ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
-            <td>${user.updated_at || ''}</td>
-            <td class="actions"></td>
-          `;
-
-          const actionsCell = tr.querySelector('.actions');
-          const resetBtn = document.createElement('button');
-          resetBtn.className = 'btn small secondary';
-          resetBtn.textContent = 'Reset Password';
-          resetBtn.addEventListener('click', () => resetPassword(user.id));
-
-          const toggleBtn = document.createElement('button');
-          toggleBtn.className = 'btn small';
-          toggleBtn.textContent = user.is_active ? 'Deactivate' : 'Activate';
-          toggleBtn.style.background = user.is_active ? '#0f172a' : '#16a34a';
-          toggleBtn.addEventListener('click', () => toggleActive(user));
-
-          actionsCell.appendChild(resetBtn);
-          actionsCell.appendChild(toggleBtn);
-          tableBody.appendChild(tr);
-        });
-      } catch (err) {
-        console.error(err);
-        tableBody.innerHTML = `<tr><td colspan="6">${err.message}</td></tr>`;
+    function renderUsers(rows) {
+      const users = rows || [];
+      if (!users.length) {
+        tableBody.innerHTML = '<tr><td colspan="6">No users yet.</td></tr>';
+        return;
       }
+
+      tableBody.innerHTML = '';
+      users.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${user.name || ''}</td>
+          <td>${user.email}</td>
+          <td><span class="pill role">${user.role || 'user'}</span></td>
+          <td><span class="pill ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+          <td>${user.updated_at || ''}</td>
+          <td class="actions"></td>
+        `;
+
+        const actionsCell = tr.querySelector('.actions');
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn small secondary';
+        resetBtn.textContent = 'Reset Password';
+        resetBtn.addEventListener('click', () => resetPassword(user.id));
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn small';
+        toggleBtn.textContent = user.is_active ? 'Deactivate' : 'Activate';
+        toggleBtn.style.background = user.is_active ? '#0f172a' : '#16a34a';
+        toggleBtn.addEventListener('click', () => toggleActive(user));
+
+        actionsCell.appendChild(resetBtn);
+        actionsCell.appendChild(toggleBtn);
+        tableBody.appendChild(tr);
+      });
+    }
+
+    function showError(msg) {
+      const message = msg || 'Failed to load users';
+      console.error(message);
+      tableBody.innerHTML = `<tr><td colspan="6">${message}</td></tr>`;
+      setStatus(message, true);
+    }
+
+    function loadUsers() {
+      tableBody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+
+      const tokenStr = getAuthToken();
+      const currentUser = getAuthUser();
+
+      if (!tokenStr || !currentUser) {
+        showError('You are not logged in.');
+        return;
+      }
+
+      if (!currentUser.role || (currentUser.role !== 'owner' && currentUser.role !== 'admin')) {
+        showError('You do not have permission to view users.');
+        return;
+      }
+
+      fetch(API_URL + '?action=users.list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Token': tokenStr
+        },
+        body: JSON.stringify({})
+      })
+        .then(function (res) {
+          return res.json();
+        })
+        .then(function (data) {
+          console.log('users.list response:', data);
+          if (!data || !data.success) {
+            const msg = (data && (data.message || data.error)) || 'Failed to load users';
+            throw new Error(msg);
+          }
+          renderUsers(data.users || []);
+        })
+        .catch(function (err) {
+          console.error('Failed to load users:', err);
+          showError('Failed to load users: ' + err.message);
+        });
     }
 
     async function toggleActive(user) {
@@ -195,7 +235,7 @@
       try {
         const res = await apiPost('users.update', { id: user.id, is_active: !user.is_active });
         if (!res.success) throw new Error(res.message || 'Failed to update');
-        renderUsers();
+        loadUsers();
         setStatus('Updated ' + user.email);
       } catch (err) {
         setStatus(err.message, true);
@@ -207,7 +247,7 @@
       try {
         const res = await apiPost('users.resetPassword', { id: userId });
         if (!res.success) throw new Error(res.message || 'Failed');
-        renderUsers();
+        loadUsers();
         alert('Temporary password (shown once): ' + res.tempPassword);
         setStatus('Temporary password generated.');
       } catch (err) {
@@ -220,7 +260,7 @@
       statusDiv.style.color = isError ? '#b3261e' : '#475569';
     }
 
-    renderUsers();
+    loadUsers();
   </script>
 </body>
 </html>
