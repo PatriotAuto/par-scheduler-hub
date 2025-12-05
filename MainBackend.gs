@@ -22,8 +22,18 @@ function handleRequest(method, e) {
   }
 
   // Public action: login
-  if (action === 'login' && method === 'POST') {
-    return handleLogin(e);
+  if (action === 'login') {
+    if (method === 'GET') {
+      var payload = {
+        email: (e.parameter && e.parameter.email) ? String(e.parameter.email).trim().toLowerCase() : '',
+        password: (e.parameter && e.parameter.password) ? String(e.parameter.password) : ''
+      };
+      return handleLogin(e, payload);
+    }
+
+    if (method === 'POST') {
+      return handleLogin(e);
+    }
   }
 
   // Authenticated actions

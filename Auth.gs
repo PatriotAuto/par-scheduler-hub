@@ -7,14 +7,14 @@ var USERS_SHEET_NAME = 'Users';
 var TOKEN_STORE_KEY = 'PS_AUTH_TOKENS';
 var TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 
-function handleLogin(e) {
-  var payload = parseJsonBody(e.postData && e.postData.contents);
-  if (!payload) {
+function handleLogin(e, payload) {
+  var parsedPayload = payload || parseJsonBody(e && e.postData && e.postData.contents);
+  if (!parsedPayload) {
     return createJsonResponse({ success: false, message: 'Invalid login payload' }, 400);
   }
 
-  var email = (payload.email || '').trim().toLowerCase();
-  var password = payload.password || '';
+  var email = (parsedPayload.email || '').trim().toLowerCase();
+  var password = parsedPayload.password || '';
   if (!email || !password) {
     return createJsonResponse({ success: false, message: 'Email and password required' }, 400);
   }
