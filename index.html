@@ -1090,6 +1090,11 @@
   </div>
 </div>
 
+<script src="auth.js"></script>
+<script>
+  // Redirect to login if not logged in
+  ensureLoggedIn();
+</script>
 <script>
 document.documentElement.style.setProperty("--tech-count",6);
 const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -2975,16 +2980,7 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
   try {
     console.log("loadAppointmentsFromBackend: fetching from backend...");
 
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadAppointments&ts=" + Date.now(), {
-      method: "GET"
-    });
-
-    if (!resp.ok) {
-      console.error("Backend GET failed:", resp.status, resp.statusText);
-      return;
-    }
-
-    const data = await resp.json();
+    const data = await apiGet('loadAppointments', { ts: Date.now() });
     console.log("Backend raw payload:", data);
 
     if (!data || !data.ok || !Array.isArray(data.rows)) {
@@ -3094,11 +3090,7 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
 async function loadTechSchedulesFromBackend() {
   if (!GOOGLE_BACKEND_URL) return;
   try {
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadTechSchedules&ts=" + Date.now(), {
-      method: "GET"
-    });
-    if (!resp.ok) return;
-    const data = await resp.json();
+    const data = await apiGet('loadTechSchedules', { ts: Date.now() });
     if (!data.ok || !Array.isArray(data.rows)) return;
 
     const mergedSchedules = JSON.parse(JSON.stringify(techSchedules || {}));
@@ -3132,11 +3124,7 @@ async function loadTechSchedulesFromBackend() {
 async function loadTechTimeOffFromBackend() {
   if (!GOOGLE_BACKEND_URL) return;
   try {
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadTechTimeOff&ts=" + Date.now(), {
-      method: "GET"
-    });
-    if (!resp.ok) return;
-    const data = await resp.json();
+    const data = await apiGet('loadTechTimeOff', { ts: Date.now() });
     if (!data.ok || !Array.isArray(data.rows)) return;
 
     events = events.filter(ev => ev.type !== "timeoff");
@@ -3193,11 +3181,7 @@ async function loadTechTimeOffFromBackend() {
 async function loadHolidaysFromBackend() {
   if (!GOOGLE_BACKEND_URL) return;
   try {
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadHolidays&ts=" + Date.now(), {
-      method: "GET"
-    });
-    if (!resp.ok) return;
-    const data = await resp.json();
+    const data = await apiGet('loadHolidays', { ts: Date.now() });
     if (!data.ok || !Array.isArray(data.rows)) return;
 
     shopHolidays = data.rows.map(function(row) {
@@ -3220,11 +3204,7 @@ async function loadHolidaysFromBackend() {
 async function loadServicesFromBackend() {
   if (!GOOGLE_BACKEND_URL) return;
   try {
-    const resp = await fetch(GOOGLE_BACKEND_URL + "?action=loadServices&ts=" + Date.now(), {
-      method: "GET"
-    });
-    if (!resp.ok) return;
-    const data = await resp.json();
+    const data = await apiGet('loadServices', { ts: Date.now() });
     if (!data.ok || !Array.isArray(data.rows)) return;
 
     const rebuilt = {};
@@ -3255,9 +3235,7 @@ let techs = [];
 
 async function loadTechsFromCloud() {
   try {
-    const url = GOOGLE_BACKEND_URL + '?action=getEmployees';
-    const resp = await fetch(url);
-    const json = await resp.json();
+    const json = await apiGet('getEmployees');
     const employees = json.employees || json;
 
     techs = (employees || [])
@@ -3357,13 +3335,7 @@ function sendAppointmentToBackend(groupId, eventsForGroup){
   console.log("Sending to backend:", payload);
 
   try {
-    fetch(GOOGLE_BACKEND_URL, {
-      method: "POST",
-      mode: "no-cors",
-      body: JSON.stringify(payload)
-    }).catch(err => {
-      console.error("Failed to send appointment to backend", err);
-    });
+    await apiPost('upsert', payload);
   } catch (e) {
     console.error("Error sending appointment to backend", e);
   }
@@ -3381,11 +3353,7 @@ function sendAppointmentDeleteToBackend(groupId) {
   console.log("Sending delete to backend:", payload);
 
   try {
-    fetch(GOOGLE_BACKEND_URL, {
-      method: "POST",
-      mode: "no-cors",
-      body: JSON.stringify(payload)
-    }).catch(function(err) {
+    apiPost('delete', payload).catch(function(err) {
       console.error("Failed to send delete to backend", err);
     });
   } catch (e) {
@@ -4289,17 +4257,7 @@ function runGlobalSearch(rawQuery){
     summary.textContent='Searching for: "'+query+'"...';
   }
 
-  fetch(CUSTOMER_API_URL,{
-    method:"POST",
-    body:JSON.stringify({
-      action:"crm.smartLookup",
-      payload:payload
-    })
-  })
-    .then(response=>{
-      if(!response.ok) throw new Error("Global search failed");
-      return response.json();
-    })
+  apiPost('crm.smartLookup', { payload: payload })
     .then(result=>{
       renderGlobalSearchResults(query,result);
     })

@@ -33,12 +33,38 @@
 
   // ---- Fetch helpers ----
   async function getJson(url) {
+    try {
+      const parsed = new URL(url, window.location.href);
+      const action = parsed.searchParams.get("action");
+      if (action) {
+        const params = {};
+        parsed.searchParams.forEach((value, key) => {
+          if (key !== "action") {
+            params[key] = value;
+          }
+        });
+        return apiGet(action, params);
+      }
+    } catch (err) {
+      console.warn("Falling back to direct fetch for", url, err);
+    }
+
     const resp = await fetch(url);
     if (!resp.ok) throw new Error("Network error: " + resp.status);
     return resp.json();
   }
 
 async function postJson(url, body) {
+  try {
+    const parsed = new URL(url, window.location.href);
+    const action = parsed.searchParams.get("action");
+    if (action) {
+      return apiPost(action, body);
+    }
+  } catch (err) {
+    console.warn("Falling back to direct POST for", url, err);
+  }
+
   const resp = await fetch(url, {
     method: "POST",
     // IMPORTANT: no custom headers so the browser doesn't send a CORS preflight
@@ -286,19 +312,7 @@ async function postJson(url, body) {
     }
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "saveEmployee");
-      params.set("employee", JSON.stringify(employee));
-
-      const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
-        method: "GET",
-      });
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      const result = await resp.json();
+      const result = await apiPost('saveEmployee', { employee });
 
       if (!result || result.ok === false) {
         console.error("saveEmployee backend error:", result);
@@ -327,19 +341,7 @@ async function postJson(url, body) {
     if (!confirm("Delete this employee? This cannot be undone.")) return;
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "deleteEmployee");
-      params.set("employeeId", id);
-
-      const resp = await fetch(GOOGLE_BACKEND_URL + "?" + params.toString(), {
-        method: "GET",
-      });
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      await loadEmployees();
+      await apiPost('deleteEmployee', { employeeId: id });
       clearEmployeeForm();
       alert("Employee deleted.");
     } catch (err) {
@@ -602,20 +604,7 @@ async function postJson(url, body) {
     }
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "saveEmployeeSchedule");
-      params.set("schedule", JSON.stringify(payload));
-
-      const resp = await fetch(
-        GOOGLE_BACKEND_URL + "?" + params.toString(),
-        { method: "GET" }
-      );
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      const result = await resp.json();
+      const result = await apiPost('saveEmployeeSchedule', { schedule: payload });
       if (!result || result.ok === false) {
         console.error("saveEmployeeSchedule backend error:", result);
         alert(
@@ -648,20 +637,7 @@ async function postJson(url, body) {
     };
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "saveEmployeeSchedule");
-      params.set("schedule", JSON.stringify(payload));
-
-      const resp = await fetch(
-        GOOGLE_BACKEND_URL + "?" + params.toString(),
-        { method: "GET" }
-      );
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      const result = await resp.json();
+      const result = await apiPost('saveEmployeeSchedule', { schedule: payload });
       if (!result || result.ok === false) {
         console.error("clearSchedule backend error:", result);
         alert(
@@ -819,20 +795,7 @@ async function postJson(url, body) {
     };
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "saveTimeOff");
-      params.set("timeoff", JSON.stringify(timeOff));
-
-      const resp = await fetch(
-        GOOGLE_BACKEND_URL + "?" + params.toString(),
-        { method: "GET" }
-      );
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      const result = await resp.json();
+      const result = await apiPost('saveTimeOff', { timeoff: timeOff });
       if (!result || result.ok === false) {
         console.error("saveTimeOff backend error:", result);
         alert(
@@ -863,20 +826,7 @@ async function postJson(url, body) {
     if (!confirm("Delete this time off entry? This cannot be undone.")) return;
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "deleteTimeOff");
-      params.set("timeOffId", id);
-
-      const resp = await fetch(
-        GOOGLE_BACKEND_URL + "?" + params.toString(),
-        { method: "GET" }
-      );
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      await loadTimeOff();
+      await apiPost('deleteTimeOff', { timeOffId: id });
       clearTimeOffForm();
       alert("Time off deleted.");
     } catch (err) {
@@ -1123,20 +1073,7 @@ async function postJson(url, body) {
     };
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "saveHoliday");
-      params.set("holiday", JSON.stringify(holiday));
-
-      const resp = await fetch(
-        GOOGLE_BACKEND_URL + "?" + params.toString(),
-        { method: "GET" }
-      );
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      const result = await resp.json();
+      const result = await apiPost('saveHoliday', { holiday });
       if (!result || result.ok === false) {
         console.error("saveHoliday backend error:", result);
         alert(
@@ -1167,20 +1104,7 @@ async function postJson(url, body) {
     if (!confirm("Delete this holiday? This cannot be undone.")) return;
 
     try {
-      const params = new URLSearchParams();
-      params.set("action", "deleteHoliday");
-      params.set("holidayId", id);
-
-      const resp = await fetch(
-        GOOGLE_BACKEND_URL + "?" + params.toString(),
-        { method: "GET" }
-      );
-
-      if (!resp.ok) {
-        throw new Error("Network error: " + resp.status);
-      }
-
-      const result = await resp.json();
+      const result = await apiPost('deleteHoliday', { holidayId: id });
       if (!result || result.ok === false) {
         console.error("deleteHoliday backend error:", result);
         alert(
