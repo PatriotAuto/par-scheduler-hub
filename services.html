@@ -24,35 +24,11 @@
         Configure all services and packages used by the Scheduler Hub.
       </p>
     </div>
-    <div class="svc-header-right">
-      <a href="index.html" class="svc-btn svc-btn-ghost">← Back to Calendar</a>
-    </div>
   </header>
 
-  <nav class="svc-nav">
-    <a href="index.html">Calendar</a>
-    <a href="services.html">Services</a>
-    <a href="customers.html">Customers</a>
-
-    <span id="navLinksExtra"></span>
+  <nav class="svc-nav header-actions">
+    <a href="index.html" class="header-btn nav-button">Back to Scheduler</a>
   </nav>
-
-  <script>
-    (function () {
-      var user = getStoredUser();
-
-      var html = '<a href="change-password.html" style="margin-left:10px;">Change Password</a>';
-
-      if (user && ['owner','admin'].includes(String(user.role || '').toLowerCase())) {
-        html += '<a href="users.html" style="margin-left:10px;">Users</a>';
-      }
-
-      var extraEl = document.getElementById('navLinksExtra');
-      if (extraEl) {
-        extraEl.innerHTML = html;
-      }
-    })();
-  </script>
 
   <main class="svc-main">
     <section class="svc-intro-card">

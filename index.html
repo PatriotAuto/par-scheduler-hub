@@ -560,7 +560,6 @@
         <a href="customers.html" id="btnCustomersNav" class="header-btn nav-button">Customers</a>
         <a href="hr.html" class="header-btn nav-button">HR / Employees</a>
         <a href="services.html" id="btnServicesPanel" class="header-btn nav-button">Services</a>
-        <span id="navLinksExtra"></span>
         <button id="btnRefreshFromCloud" class="header-btn">Refresh From Cloud</button>
       </div>
     </header>
@@ -1097,21 +1096,6 @@
   if (!ensureLoggedIn()) {
     throw new Error('Not logged in');
   }
-
-  (function () {
-    var user = getStoredUser();
-
-    var html = '<a href="change-password.html" style="margin-left:10px;" class="header-btn nav-button">Change Password</a>';
-
-    if (user && ['owner','admin'].includes(String(user.role || '').toLowerCase())) {
-      html += '<a href="users.html" style="margin-left:10px;" class="header-btn nav-button">Users</a>';
-    }
-
-    var extraEl = document.getElementById('navLinksExtra');
-    if (extraEl) {
-      extraEl.innerHTML = html;
-    }
-  })();
 </script>
 <script>
 document.documentElement.style.setProperty("--tech-count",6);
