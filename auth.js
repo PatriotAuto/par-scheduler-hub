@@ -80,34 +80,6 @@ function logoutAndRedirect() {
   window.location.href = LOGIN_PAGE;
 }
 
-// Generic GET helper: adds action + token; handles auth errors
-function apiGet(action, params) {
-  if (!ensureLoggedIn()) {
-    return Promise.reject('Not logged in');
-  }
-
-  const url = new URL(API_URL);
-  url.searchParams.set('action', action);
-
-  if (params) {
-    Object.keys(params).forEach(function (k) {
-      if (params[k] !== undefined && params[k] !== null) {
-        url.searchParams.set(k, params[k]);
-      }
-    });
-  }
-
-  return fetch(withAuthQuery(url.toString()))
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
-      if (data && data.error === 'AUTH') {
-        logoutAndRedirect();
-        throw new Error('Unauthorized');
-      }
-      return data;
-    });
-}
-
 // Generic POST helper: adds action + token; handles auth errors
 function apiPost(action, body) {
   if (!ensureLoggedIn()) {
@@ -129,4 +101,34 @@ function apiPost(action, body) {
       }
       return data;
     });
+}
+
+/**
+ * Simple GET helper to call Apps Script without CORS headaches.
+ * Sends ?action=...&token=...&extra=params
+ */
+function apiGet(action, extraParams = {}) {
+  const token = getStoredToken ? getStoredToken() : null;
+
+  const search = new URLSearchParams();
+  search.set('action', action);
+  if (token) {
+    search.set('token', token);
+  }
+
+  Object.keys(extraParams).forEach((key) => {
+    const value = extraParams[key];
+    if (value !== undefined && value !== null) {
+      search.set(key, value);
+    }
+  });
+
+  return fetch(API_URL + '?' + search.toString(), {
+    method: 'GET'
+  }).then((res) => {
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
+    }
+    return res.json();
+  });
 }
