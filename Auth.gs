@@ -358,3 +358,96 @@ function adminSetUserPassword_(payload, adminUser) {
     is_active: row[iActive]
   };
 }
+
+/**
+ * Allow a logged-in user to change their own password.
+ * - userObj: user object from requireAuth_(e)
+ * - currentPassword: string
+ * - newPassword: string
+ */
+function changeOwnPassword_(userObj, currentPassword, newPassword) {
+  if (!userObj || !userObj.id) {
+    throw new Error('Missing authenticated user.');
+  }
+
+  currentPassword = (currentPassword || '').trim();
+  newPassword = (newPassword || '').trim();
+
+  if (!currentPassword || !newPassword) {
+    throw new Error('Current and new password are required.');
+  }
+
+  if (newPassword.length < 8) {
+    throw new Error('New password must be at least 8 characters.');
+  }
+
+  // Load Users sheet
+  var sheet = getUsersSheet();
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    throw new Error('No users found.');
+  }
+
+  var headers = values[0];
+  var idx = function(name) { return headers.indexOf(name); };
+
+  var iId        = idx('id');
+  var iEmail     = idx('email');
+  var iHash      = idx('password_hash');
+  var iSalt      = idx('salt');
+  var iActive    = idx('is_active');
+  var iUpdatedAt = idx('updated_at');
+
+  if (iId < 0 || iHash < 0 || iSalt < 0) {
+    throw new Error('Users sheet missing id/password columns.');
+  }
+
+  // Find this user's row by id
+  var rowIndex = -1;
+  var row;
+  for (var r = 1; r < values.length; r++) {
+    var vr = values[r];
+    if (String(vr[iId]) === String(userObj.id)) {
+      rowIndex = r + 1; // 1-based
+      row = vr;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw new Error('User record not found.');
+  }
+
+  var existingSalt = row[iSalt];
+  var existingHash = row[iHash];
+
+  // Verify current password matches
+  var currentHash = hashPassword_(currentPassword, existingSalt);
+  if (currentHash !== existingHash) {
+    throw new Error('Current password is incorrect.');
+  }
+
+  // Create new salt + hash for the new password
+  var newSalt = generateRandomToken_(16);
+  var newHash = hashPassword_(newPassword, newSalt);
+
+  row[iSalt] = newSalt;
+  row[iHash] = newHash;
+
+  // Ensure user stays active
+  if (iActive >= 0 && (row[iActive] === '' || row[iActive] === null)) {
+    row[iActive] = true;
+  }
+
+  if (iUpdatedAt >= 0) {
+    row[iUpdatedAt] = new Date();
+  }
+
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([row]);
+
+  return {
+    id: row[iId],
+    email: iEmail >= 0 ? row[iEmail] : userObj.email,
+    is_active: iActive >= 0 ? row[iActive] : true
+  };
+}

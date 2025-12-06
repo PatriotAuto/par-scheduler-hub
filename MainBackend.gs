@@ -26,6 +26,33 @@ function doGet(e) {
       }
     }
 
+    // --- AUTH: change own password via GET (requires token) ---
+    if (action === 'changePassword') {
+      try {
+        var session = requireAuth_(e); // from Auth.gs
+        if (session && session.errorResponse) return session.errorResponse;
+        var currentUser = session.user;
+        var currentPassword = (e.parameter && e.parameter.currentPassword) ? String(e.parameter.currentPassword) : '';
+        var newPassword = (e.parameter && e.parameter.newPassword) ? String(e.parameter.newPassword) : '';
+
+        var updated = changeOwnPassword_(currentUser, currentPassword, newPassword);
+
+        return createJsonResponse({
+          success: true,
+          user: {
+            id: updated.id,
+            email: updated.email
+          }
+        });
+      } catch (err) {
+        return createJsonResponse({
+          success: false,
+          error: 'CHANGE_PASSWORD_ERROR',
+          message: String(err)
+        });
+      }
+    }
+
     // === COMPAT MODE: public GET endpoints (no auth required) ===
     var PUBLIC_GET_ACTIONS = {
       'loadAppointments': true,
