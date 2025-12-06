@@ -36,6 +36,59 @@
     .pill.inactive { background: #fee2e2; color: #991b1b; }
     .role { background: #e0f2fe; color: #075985; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .actions-cell {
+      position: relative;
+      overflow: visible !important;
+      z-index: 10;
+      text-align: center;
+    }
+
+    .action-btn {
+      display: inline-block;
+      padding: 6px 10px;
+      background: #1f2937;
+      color: #fff !important;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      margin: 2px;
+      z-index: 20;
+    }
+
+    .action-btn:hover {
+      background: #374151;
+    }
+
+    .action-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+      display: none;
+      z-index: 9999;
+    }
+
+    .actions-cell:hover .action-menu {
+      display: block;
+    }
+
+    .action-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 6px 10px;
+      background: white;
+      border: none;
+      color: #111;
+      cursor: pointer;
+    }
+
+    .action-menu button:hover {
+      background: #f3f4f6;
+    }
     .notice { background: #fff7ed; border: 1px solid #fed7aa; padding: 10px 12px; border-radius: 10px; color: #92400e; font-size: 14px; }
     #status { min-height: 18px; font-size: 14px; color: #475569; }
   </style>
@@ -187,7 +240,7 @@
           <td><span class="pill role">${user.role || 'user'}</span></td>
           <td><span class="pill ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
           <td>${user.updated_at || ''}</td>
-          <td class="actions"></td>
+          <td class="actions-cell"><div class="actions"></div></td>
         `;
 
         const actionsCell = tr.querySelector('.actions');
