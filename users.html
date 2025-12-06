@@ -50,6 +50,31 @@
       <button class="btn secondary" id="logoutBtn">Log Out</button>
     </div>
   </header>
+
+  <nav>
+    <a href="index.html">Calendar</a>
+    <a href="services.html">Services</a>
+    <a href="customers.html">Customers</a>
+
+    <span id="navLinksExtra"></span>
+  </nav>
+
+  <script>
+    (function () {
+      var user = getStoredUser();
+
+      var html = '<a href="change-password.html" style="margin-left:10px;">Change Password</a>';
+
+      if (user && ['owner','admin'].includes(String(user.role || '').toLowerCase())) {
+        html += '<a href="users.html" style="margin-left:10px;">Users</a>';
+      }
+
+      var extraEl = document.getElementById('navLinksExtra');
+      if (extraEl) {
+        extraEl.innerHTML = html;
+      }
+    })();
+  </script>
   <main>
     <div class="card">
       <h2>Create user</h2>
