@@ -4,15 +4,68 @@
  */
 
 function doGet(e) {
-  return handleRequest('GET', e || {});
+  try {
+    var action = (e && e.parameter && e.parameter.action)
+      ? e.parameter.action
+      : 'loadAppointments';
+
+    // --- LOGIN via GET (no auth required) ---
+    if (action === 'login') {
+      try {
+        var body = {
+          email: (e.parameter && e.parameter.email) ? String(e.parameter.email).trim() : '',
+          password: (e.parameter && e.parameter.password) ? String(e.parameter.password) : ''
+        };
+        return handleLogin(e, body);
+      } catch (err) {
+        return createJsonResponse({
+          success: false,
+          error: 'LOGIN_ERROR',
+          message: String(err)
+        });
+      }
+    }
+
+    // === COMPAT MODE: public GET endpoints (no auth required) ===
+    var PUBLIC_GET_ACTIONS = {
+      'loadAppointments': true,
+      'loadTechSchedules': true,
+      'loadTechTimeOff': true,
+      'loadServices': true,
+      'crm.listCustomers': true,
+      'crm.listCustomerAppointments': true,
+      'getEmployees': true,
+      'getServices': true,
+      'getDepartments': true,
+      'loadHolidays': true,
+      'getTimeOff': true
+    };
+
+    // Only require auth if this action is NOT in the public list
+    var authedUser = null;
+    if (!PUBLIC_GET_ACTIONS[action]) {
+      var session = requireAuth_(e);
+      if (session && session.errorResponse) return session.errorResponse;
+      authedUser = session.user;
+    }
+
+    return handleRequest('GET', e || {}, {
+      actionOverride: action,
+      skipAuth: !!PUBLIC_GET_ACTIONS[action],
+      authedUser: authedUser
+    });
+  } catch (err) {
+    return createJsonResponse({ ok: false, error: String(err) });
+  }
 }
 
 function doPost(e) {
   return handleRequest('POST', e || {});
 }
 
-function handleRequest(method, e) {
-  var action = (e.parameter && e.parameter.action) || '';
+function handleRequest(method, e, options) {
+  var opts = options || {};
+  var action = opts.actionOverride || (e.parameter && e.parameter.action) || '';
   var body = null;
 
   if (method === 'POST' && e.postData) {
@@ -46,9 +99,12 @@ function handleRequest(method, e) {
   }
 
   // Authenticated actions
-  var session = requireAuth_(e);
-  if (session && session.errorResponse) return session.errorResponse;
-  var authedUser = session.user;
+  var authedUser = opts.authedUser || null;
+  if (!opts.skipAuth && !authedUser) {
+    var session = requireAuth_(e);
+    if (session && session.errorResponse) return session.errorResponse;
+    authedUser = session.user;
+  }
 
   // Dispatch
   if (action === 'users.list') return handleUsersList(authedUser);
