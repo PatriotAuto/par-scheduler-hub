@@ -124,6 +124,11 @@ function handleRequest(method, e, options) {
     if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
     return handleUsersSetActiveGet(adminCheck.user, e);
   }
+  if (action === 'users.setPassword') {
+    adminCheck = requireAdminUser_(authedUser);
+    if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
+    return handleUsersSetPasswordGet(adminCheck.user, e);
+  }
   if (action === 'users.update' && method === 'POST') return handleUsersUpdate(authedUser, e);
   if (action === 'users.resetPassword') {
     adminCheck = requireAdminUser_(authedUser);
@@ -264,6 +269,29 @@ function handleUsersSetActiveGet(currentUser, e) {
   }
 
   return createJsonResponse({ success: true, user: updated });
+}
+
+function handleUsersSetPasswordGet(currentUser, e) {
+  var params = (e && e.parameter) || {};
+  var payloadSet = {
+    id: (params && params.id) ? String(params.id).trim() : '',
+    email: (params && params.email) ? String(params.email).trim() : '',
+    newPassword: (params && params.newPassword) ? String(params.newPassword) : ''
+  };
+
+  try {
+    var updated = adminSetUserPassword_(payloadSet, currentUser);
+    return createJsonResponse({
+      success: true,
+      user: updated
+    });
+  } catch (err) {
+    return createJsonResponse({
+      success: false,
+      error: 'USERS_SET_PASSWORD_ERROR',
+      message: String(err)
+    });
+  }
 }
 
 function handleUsersResetPasswordGet(currentUser, e) {
