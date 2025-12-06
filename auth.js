@@ -107,28 +107,27 @@ function apiPost(action, body) {
  * Simple GET helper to call Apps Script without CORS headaches.
  * Sends ?action=...&token=...&extra=params
  */
-function apiGet(action, extraParams = {}) {
-  const token = getStoredToken ? getStoredToken() : null;
-
-  const search = new URLSearchParams();
-  search.set('action', action);
+async function apiGet(action, extraParams = {}) {
+  const token = getStoredToken();
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
   if (token) {
-    search.set('token', token);
+    url.searchParams.set('token', token);
+  }
+  Object.entries(extraParams).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  });
+
+  const res = await fetch(url.toString(), {
+    method: 'GET',
+    credentials: 'omit'
+  });
+
+  if (!res.ok) {
+    throw new Error('GET failed: ' + res.status + ' ' + res.statusText);
   }
 
-  Object.keys(extraParams).forEach((key) => {
-    const value = extraParams[key];
-    if (value !== undefined && value !== null) {
-      search.set(key, value);
-    }
-  });
-
-  return fetch(API_URL + '?' + search.toString(), {
-    method: 'GET'
-  }).then((res) => {
-    if (!res.ok) {
-      throw new Error('HTTP ' + res.status);
-    }
-    return res.json();
-  });
+  return res.json();
 }

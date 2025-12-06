@@ -286,42 +286,54 @@ async function postJson(url, body) {
   }
 
   async function saveEmployee() {
-    const employee = {
-      employeeId: qs("#empId").value || null,
-      firstName: qs("#empFirstName").value.trim(),
-      lastName: qs("#empLastName").value.trim(),
-      role: qs("#empRole").value.trim(),
-      status: qs("#empStatus").value || "Active",
-      payType: qs("#empPayType").value || "",
-      baseHourlyRate: parseFloat(qs("#empBaseRate").value) || "",
-      salaryAnnual: parseFloat(qs("#empSalary").value) || "",
-      flatRateMultiplier: parseFloat(qs("#empFlatMultiplier").value) || 1,
-      defaultCommissionType: qs("#empCommType").value || "",
-      defaultCommissionValue:
-        qs("#empCommValue").value !== ""
-          ? parseFloat(qs("#empCommValue").value)
-          : "",
-      departments: readSelectedDepartments(),
-      isTechnician: qs("#empIsTechnician").checked,
-      notes: qs("#empNotes").value.trim(),
-    };
-
-    if (!employee.firstName || !employee.lastName) {
-      alert("First and last name are required.");
-      return;
-    }
-
     try {
-      const result = await apiPost('saveEmployee', { employee });
-
-      if (!result || result.ok === false) {
-        console.error("saveEmployee backend error:", result);
-        alert("Failed to save employee: " + (result && result.error ? result.error : "Unknown error"));
+      const user = getStoredUser();
+      const token = getStoredToken();
+      if (!token || !user) {
+        window.location.href = "login.html";
         return;
       }
 
-      if (result.employeeId) {
-        employee.employeeId = result.employeeId;
+      const employee = {
+        employeeId: qs("#empId").value || null,
+        firstName: qs("#empFirstName").value.trim(),
+        lastName: qs("#empLastName").value.trim(),
+        role: qs("#empRole").value.trim(),
+        status: qs("#empStatus").value || "Active",
+        payType: qs("#empPayType").value || "",
+        baseHourlyRate: parseFloat(qs("#empBaseRate").value) || "",
+        salaryAnnual: parseFloat(qs("#empSalary").value) || "",
+        flatRateMultiplier: parseFloat(qs("#empFlatMultiplier").value) || 1,
+        defaultCommissionType: qs("#empCommType").value || "",
+        defaultCommissionValue:
+          qs("#empCommValue").value !== ""
+            ? parseFloat(qs("#empCommValue").value)
+            : "",
+        departments: readSelectedDepartments(),
+        isTechnician: qs("#empIsTechnician").checked,
+        notes: qs("#empNotes").value.trim(),
+      };
+
+      if (!employee.firstName || !employee.lastName) {
+        alert("First and last name are required.");
+        return;
+      }
+
+      const response = await apiGet("saveEmployee", {
+        employee: JSON.stringify(employee),
+      });
+
+      if (!response || response.ok === false) {
+        console.error("saveEmployee backend error:", response);
+        alert(
+          "Failed to save employee: " +
+            (response && response.error ? response.error : "Unknown error")
+        );
+        return;
+      }
+
+      if (response.employeeId) {
+        employee.employeeId = response.employeeId;
       }
 
       await loadEmployees();
@@ -341,7 +353,22 @@ async function postJson(url, body) {
     if (!confirm("Delete this employee? This cannot be undone.")) return;
 
     try {
-      await apiPost('deleteEmployee', { employeeId: id });
+      const user = getStoredUser();
+      const token = getStoredToken();
+      if (!token || !user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const response = await apiGet("deleteEmployee", { employeeId: id });
+
+      if (!response || response.ok === false) {
+        console.error("Delete employee failed response:", response);
+        alert("Failed to delete employee. See console for details.");
+        return;
+      }
+
+      await loadEmployees();
       clearEmployeeForm();
       alert("Employee deleted.");
     } catch (err) {
