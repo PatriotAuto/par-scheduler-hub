@@ -21,6 +21,36 @@
     </div>
   </header>
 
+  <nav class="hr-nav">
+    <a href="index.html">Calendar</a>
+    <a href="services.html">Services</a>
+    <a href="customers.html">Customers</a>
+
+    <span id="navLinksExtra"></span>
+  </nav>
+
+  <script src="auth.js"></script>
+  <script>
+    if (!ensureLoggedIn()) {
+      throw new Error('Not logged in');
+    }
+
+    (function () {
+      var user = getStoredUser();
+
+      var html = '<a href="change-password.html" style="margin-left:10px;">Change Password</a>';
+
+      if (user && ['owner','admin'].includes(String(user.role || '').toLowerCase())) {
+        html += '<a href="users.html" style="margin-left:10px;">Users</a>';
+      }
+
+      var extraEl = document.getElementById('navLinksExtra');
+      if (extraEl) {
+        extraEl.innerHTML = html;
+      }
+    })();
+  </script>
+
   <main class="hr-main">
     <aside class="hr-sidebar">
       <nav class="hr-tabs">
@@ -505,11 +535,7 @@
     </section>
   </main>
 
-  <script src="auth.js"></script>
   <script>
-  if (!ensureLoggedIn()) {
-    throw new Error('Not logged in');
-  }
   const GOOGLE_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
 </script>
   <script src="scripts/hr.js"></script>
