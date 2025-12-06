@@ -53,12 +53,14 @@ function doGet(e) {
       }
     }
 
-    // --- Admin: set user password via GET ---
+    // --- USERS: admin set password for a specific user (GET) ---
     if (action === 'users.setPassword') {
       try {
-        var currentUser = requireAuth_(e);
-        if (currentUser && currentUser.errorResponse) return currentUser.errorResponse;
-        currentUser = currentUser.user;
+        // Must be logged in + admin
+        var currentUser = requireAuth_(e);    // from Auth.gs
+        var adminCheck = requireAdminUser_(currentUser);      // from Auth.gs
+        if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
+        currentUser = adminCheck.user;
 
         var payloadSet = {
           id: (e.parameter && e.parameter.id) ? String(e.parameter.id).trim() : '',
@@ -66,15 +68,15 @@ function doGet(e) {
           newPassword: (e.parameter && e.parameter.newPassword) ? String(e.parameter.newPassword) : ''
         };
 
-        var updated = adminSetUserPassword_(payloadSet, currentUser);
+        var updated = adminSetUserPassword_(payloadSet, currentUser); // from Auth.gs
 
-        return createJsonResponse({
+        return jsonResponse_({
           success: true,
           ok: true,
           user: updated
         });
       } catch (err) {
-        return createJsonResponse({
+        return jsonResponse_({
           success: false,
           ok: false,
           error: 'USERS_SET_PASSWORD_ERROR',
@@ -197,7 +199,9 @@ function handleRequest(method, e, options) {
   return createJsonResponse({ success: false, message: 'Unknown action' }, 404);
 }
 
-function requireAdminUser_(user) {
+function requireAdminUser_(userOrSession) {
+  var user = userOrSession && userOrSession.user ? userOrSession.user : userOrSession;
+
   if (!user) {
     return { errorResponse: createJsonResponse({ error: 'AUTH', success: false, message: 'Unauthorized' }, 401) };
   }
@@ -381,6 +385,10 @@ function createJsonResponse(obj, statusCode) {
   return output;
 }
 
+function jsonResponse_(obj, statusCode) {
+  return createJsonResponse(obj, statusCode);
+}
+
 function parseJsonBody(contents) {
   if (!contents) return null;
   try {
@@ -401,7 +409,7 @@ function outputSheetAsJson_(sheetName) {
 
     var values = sheet.getDataRange().getValues();
     if (values.length < 2) {
-      return createJsonResponse({ ok: true, sheet: sheetName, rows: [] });
+      return jsonResponse_({ ok: true, sheet: sheetName, rows: [] });
     }
 
     var headers = values[0];
@@ -417,9 +425,9 @@ function outputSheetAsJson_(sheetName) {
       rows.push(obj);
     }
 
-    return createJsonResponse({ ok: true, sheet: sheetName, rows: rows });
+    return jsonResponse_({ ok: true, sheet: sheetName, rows: rows });
 
   } catch (err) {
-    return createJsonResponse({ ok: false, sheet: sheetName, error: err.message });
+    return jsonResponse_({ ok: false, sheet: sheetName, error: err.message });
   }
 }
