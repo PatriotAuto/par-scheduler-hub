@@ -53,6 +53,36 @@ function doGet(e) {
       }
     }
 
+    // --- Admin: set user password via GET ---
+    if (action === 'users.setPassword') {
+      try {
+        var currentUser = requireAuth_(e);
+        if (currentUser && currentUser.errorResponse) return currentUser.errorResponse;
+        currentUser = currentUser.user;
+
+        var payloadSet = {
+          id: (e.parameter && e.parameter.id) ? String(e.parameter.id).trim() : '',
+          email: (e.parameter && e.parameter.email) ? String(e.parameter.email).trim() : '',
+          newPassword: (e.parameter && e.parameter.newPassword) ? String(e.parameter.newPassword) : ''
+        };
+
+        var updated = adminSetUserPassword_(payloadSet, currentUser);
+
+        return createJsonResponse({
+          success: true,
+          ok: true,
+          user: updated
+        });
+      } catch (err) {
+        return createJsonResponse({
+          success: false,
+          ok: false,
+          error: 'USERS_SET_PASSWORD_ERROR',
+          message: String(err)
+        });
+      }
+    }
+
     // === COMPAT MODE: public GET endpoints (no auth required) ===
     var PUBLIC_GET_ACTIONS = {
       'loadAppointments': true,
@@ -357,5 +387,39 @@ function parseJsonBody(contents) {
     return JSON.parse(contents);
   } catch (err) {
     return null;
+  }
+}
+
+// Utility to output any sheet as JSON
+function outputSheetAsJson_(sheetName) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      throw new Error('Sheet "' + sheetName + '" not found');
+    }
+
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) {
+      return createJsonResponse({ ok: true, sheet: sheetName, rows: [] });
+    }
+
+    var headers = values[0];
+    var dataRows = values.slice(1);
+    var rows = [];
+
+    for (var i = 0; i < dataRows.length; i++) {
+      var r = dataRows[i];
+      var obj = {};
+      for (var j = 0; j < headers.length; j++) {
+        obj[headers[j]] = r[j];
+      }
+      rows.push(obj);
+    }
+
+    return createJsonResponse({ ok: true, sheet: sheetName, rows: rows });
+
+  } catch (err) {
+    return createJsonResponse({ ok: false, sheet: sheetName, error: err.message });
   }
 }
