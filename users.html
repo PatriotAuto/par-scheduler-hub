@@ -327,9 +327,23 @@
             newPassword: newPassword
           })
             .then(function (data) {
-              if (!data || !data.success) {
-                console.error('Set password failed:', data);
-                alert('Failed to set password: ' + (data && data.message ? data.message : 'Unknown error'));
+              console.log('users.setPassword response:', data);
+
+              if (!data) {
+                alert('Failed to set password: empty response from server.');
+                return;
+              }
+
+              if (data.success === false) {
+                // Backend explicitly said "no"
+                var msg = data.message || data.error || 'Unknown error from server.';
+                alert('Failed to set password: ' + msg);
+                return;
+              }
+
+              if (data.success !== true) {
+                // Unexpected shape (e.g. fell through to some other action)
+                alert('Failed to set password: backend did not return success=true.');
                 return;
               }
 
