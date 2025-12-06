@@ -263,3 +263,98 @@ function resetUserPassword(id) {
   }
   return null;
 }
+
+function generateRandomToken_(length) {
+  var token = Utilities.getUuid().replace(/-/g, '');
+  if (length && length > 0) {
+    while (token.length < length) {
+      token += Utilities.getUuid().replace(/-/g, '');
+    }
+    return token.slice(0, length);
+  }
+  return token;
+}
+
+function hashPassword_(password, salt) {
+  return hashPassword(password, salt);
+}
+
+/**
+ * Admin-set password for a user, by id or email.
+ * payload: { id?, email?, newPassword }
+ */
+function adminSetUserPassword_(payload, adminUser) {
+  if (!adminUser) {
+    throw new Error('Admin user required.');
+  }
+
+  var newPassword = (payload.newPassword || '').trim();
+  var id = (payload.id || '').trim();
+  var email = (payload.email || '').trim().toLowerCase();
+
+  if (!newPassword) {
+    throw new Error('New password is required.');
+  }
+
+  if (!id && !email) {
+    throw new Error('Must provide user id or email.');
+  }
+
+  var sheet = getUsersSheet();
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    throw new Error('No users found.');
+  }
+
+  var headers = values[0];
+  var idx = function(name) { return headers.indexOf(name); };
+
+  var iId        = idx('id');
+  var iEmail     = idx('email');
+  var iHash      = idx('password_hash');
+  var iSalt      = idx('salt');
+  var iActive    = idx('is_active');
+  var iUpdatedAt = idx('updated_at');
+
+  if (iId < 0 || iEmail < 0 || iHash < 0 || iSalt < 0 || iActive < 0) {
+    throw new Error('Users sheet missing one of: id, email, password_hash, salt, is_active.');
+  }
+
+  var rowIndex = -1;
+  var row;
+
+  for (var r = 1; r < values.length; r++) {
+    var vr = values[r];
+    var rowId = String(vr[iId] || '');
+    var rowEmail = String(vr[iEmail] || '').toLowerCase();
+
+    if ((id && rowId === id) || (email && rowEmail === email)) {
+      rowIndex = r + 1; // 1-based
+      row = vr;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    throw new Error('User not found for setPassword.');
+  }
+
+  // Generate new salt + hash
+  var salt = generateRandomToken_(16);
+  var hash = hashPassword_(newPassword, salt);
+
+  row[iHash]      = hash;
+  row[iSalt]      = salt;
+  row[iActive]    = true;              // ensure active
+  if (iUpdatedAt >= 0) {
+    row[iUpdatedAt] = new Date();
+  }
+
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([row]);
+
+  return {
+    id: row[iId],
+    email: row[iEmail],
+    is_active: row[iActive]
+  };
+}

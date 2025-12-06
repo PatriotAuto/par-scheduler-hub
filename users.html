@@ -31,63 +31,75 @@
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 14px; }
     th { background: #f1f5f9; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; }
-    .pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-    .pill.active { background: #dcfce7; color: #166534; }
-    .pill.inactive { background: #fee2e2; color: #991b1b; }
-    .role { background: #e0f2fe; color: #075985; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .actions-cell {
-      position: relative;
-      overflow: visible !important;
-      z-index: 10;
-      text-align: center;
+    .user-actions-cell {
+      text-align: right;
+      white-space: nowrap;
     }
 
-    .action-btn {
+    .user-action-btn {
       display: inline-block;
-      padding: 6px 10px;
-      background: #1f2937;
-      color: #fff !important;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      margin: 2px;
-      z-index: 20;
-    }
-
-    .action-btn:hover {
-      background: #374151;
-    }
-
-    .action-menu {
-      position: absolute;
-      top: 100%;
-      right: 0;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 8px;
-      display: none;
-      z-index: 9999;
-    }
-
-    .actions-cell:hover .action-menu {
-      display: block;
-    }
-
-    .action-menu button {
-      display: block;
-      width: 100%;
-      text-align: left;
-      padding: 6px 10px;
-      background: white;
+      padding: 6px 14px;
+      margin-left: 6px;
+      border-radius: 999px;
       border: none;
-      color: #111;
+      font-size: 13px;
       cursor: pointer;
+      font-weight: 500;
     }
 
-    .action-menu button:hover {
-      background: #f3f4f6;
+    .user-action-setpw {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .user-action-setpw:hover {
+      background: #fde68a;
+    }
+
+    .user-action-reset {
+      background: #e5f0ff;
+      color: #1f2937;
+    }
+
+    .user-action-reset:hover {
+      background: #d0e4ff;
+    }
+
+    .user-action-toggle {
+      background: #0b1220; /* dark navy to match your Deactivate pill */
+      color: #ffffff;
+    }
+
+    .user-action-toggle:hover {
+      background: #111827;
+    }
+
+    .user-role-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e0f2ff;
+      color: #0b4f91;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .user-status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .user-status-active {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .user-status-inactive {
+      background: #fee2e2;
+      color: #991b1b;
     }
     .notice { background: #fff7ed; border: 1px solid #fed7aa; padding: 10px 12px; border-radius: 10px; color: #92400e; font-size: 14px; }
     #status { min-height: 18px; font-size: 14px; color: #475569; }
@@ -177,7 +189,7 @@
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody id="users-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -191,7 +203,7 @@
       alert('Access denied. Admin/Owner only.');
       window.location.href = 'index.html';
     }
-    const tableBody = document.querySelector('#usersTable tbody');
+    const tableBody = document.getElementById('users-tbody');
     const statusDiv = document.getElementById('status');
     const notice = document.getElementById('permissionNotice');
 
@@ -224,40 +236,182 @@
       }
     });
 
-    function renderUsers(rows) {
-      const users = rows || [];
-      if (!users.length) {
-        tableBody.innerHTML = '<tr><td colspan="6">No users yet.</td></tr>';
-        return;
-      }
+    function renderUsers(users) {
+      const tbody = document.getElementById('users-tbody');
+      if (!tbody) return;
 
-      tableBody.innerHTML = '';
-      users.forEach(user => {
+      tbody.innerHTML = '';
+
+      users.forEach(function (user) {
         const tr = document.createElement('tr');
+
+        // Compute some labels
+        const roleLabel = user.role || '';
+        const isActive = !(String(user.is_active).toLowerCase() === 'false' || String(user.is_active).toLowerCase() === '0');
+        const statusLabel = isActive ? 'Active' : 'Inactive';
+        const updatedAt = user.updated_at || '';
+
         tr.innerHTML = `
           <td>${user.name || ''}</td>
-          <td>${user.email}</td>
-          <td><span class="pill role">${user.role || 'user'}</span></td>
-          <td><span class="pill ${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
-          <td>${user.updated_at || ''}</td>
-          <td class="actions-cell"><div class="actions"></div></td>
+          <td>${user.email || ''}</td>
+          <td>
+            <span class="user-role-pill">${roleLabel}</span>
+          </td>
+          <td>
+            <span class="user-status-pill ${isActive ? 'user-status-active' : 'user-status-inactive'}">
+              ${statusLabel}
+            </span>
+          </td>
+          <td>${updatedAt}</td>
+          <td class="user-actions-cell">
+            <button
+              class="user-action-btn user-action-setpw"
+              data-id="${user.id || ''}"
+              data-email="${user.email || ''}"
+            >
+              Set Password
+            </button>
+            <button
+              class="user-action-btn user-action-reset"
+              data-email="${user.email || ''}"
+            >
+              Reset Password
+            </button>
+            <button
+              class="user-action-btn user-action-toggle"
+              data-id="${user.id || ''}"
+              data-active="${isActive ? 'true' : 'false'}"
+            >
+              ${isActive ? 'Deactivate' : 'Activate'}
+            </button>
+          </td>
         `;
 
-        const actionsCell = tr.querySelector('.actions');
-        const resetBtn = document.createElement('button');
-        resetBtn.className = 'btn small secondary';
-        resetBtn.textContent = 'Reset Password';
-        resetBtn.addEventListener('click', () => resetPassword(user.id));
+        tbody.appendChild(tr);
+      });
 
-        const toggleBtn = document.createElement('button');
-        toggleBtn.className = 'btn small';
-        toggleBtn.textContent = user.is_active ? 'Deactivate' : 'Activate';
-        toggleBtn.style.background = user.is_active ? '#0f172a' : '#16a34a';
-        toggleBtn.addEventListener('click', () => toggleActive(user));
+      attachUserActionHandlers();
+    }
 
-        actionsCell.appendChild(resetBtn);
-        actionsCell.appendChild(toggleBtn);
-        tableBody.appendChild(tr);
+    function attachUserActionHandlers() {
+      // Set Password buttons (admin chooses a custom password)
+      document.querySelectorAll('.user-action-setpw').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const email = btn.getAttribute('data-email') || '';
+          const id = btn.getAttribute('data-id') || '';
+
+          if (!email && !id) {
+            alert('Missing user id/email.');
+            return;
+          }
+
+          const newPassword = prompt('Enter a new password for ' + (email || 'this user') + ':');
+          if (!newPassword) {
+            // Cancelled or empty
+            return;
+          }
+
+          const confirmPassword = prompt('Confirm the new password:');
+          if (newPassword !== confirmPassword) {
+            alert('Passwords do not match. Try again.');
+            return;
+          }
+
+          if (!confirm('Set this new password for ' + (email || 'this user') + '?')) {
+            return;
+          }
+
+          apiGet('users.setPassword', {
+            id: id,
+            email: email,
+            newPassword: newPassword
+          })
+            .then(function (data) {
+              if (!data || !data.success) {
+                console.error('Set password failed:', data);
+                alert('Failed to set password: ' + (data && data.message ? data.message : 'Unknown error'));
+                return;
+              }
+
+              alert('Password updated successfully for ' + (email || 'this user') + '.');
+            })
+            .catch(function (err) {
+              console.error('Set password error:', err);
+              alert('Failed to set password: ' + err.message);
+            });
+        });
+      });
+
+      // Reset password buttons
+      document.querySelectorAll('.user-action-reset').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const email = btn.getAttribute('data-email');
+          if (!email) {
+            alert('Missing email for this user.');
+            return;
+          }
+
+          if (!confirm('Reset password for ' + email + ' and generate a new temporary password?')) {
+            return;
+          }
+
+          apiGet('users.resetPassword', { email: email })
+            .then(function (data) {
+              if (!data || !data.success) {
+                console.error('Reset password failed:', data);
+                alert('Failed to reset password: ' + (data && data.message ? data.message : 'Unknown error'));
+                return;
+              }
+
+              // Show the temp password so the admin can give it to the user
+              const temp = data.tempPassword || '(no tempPassword returned)';
+              alert('Temporary password for ' + email + ':\n\n' + temp + '\n\nAsk the user to log in and change it.');
+            })
+            .catch(function (err) {
+              console.error('Reset password error:', err);
+              alert('Failed to reset password: ' + err.message);
+            });
+        });
+      });
+
+      // Activate / Deactivate buttons
+      document.querySelectorAll('.user-action-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const id = btn.getAttribute('data-id');
+          const activeAttr = btn.getAttribute('data-active');
+          const currentlyActive = activeAttr === 'true';
+
+          if (!id) {
+            alert('Missing user id.');
+            return;
+          }
+
+          const newActive = !currentlyActive;
+          const actionLabel = newActive ? 'activate' : 'deactivate';
+
+          if (!confirm('Are you sure you want to ' + actionLabel + ' this user?')) {
+            return;
+          }
+
+          apiGet('users.setActive', {
+            id: id,
+            is_active: newActive ? 'true' : 'false'
+          })
+            .then(function (data) {
+              if (!data || !data.success) {
+                console.error('Set active failed:', data);
+                alert('Failed to update user status: ' + (data && data.message ? data.message : 'Unknown error'));
+                return;
+              }
+
+              // Reload users to refresh the table
+              loadUsers();
+            })
+            .catch(function (err) {
+              console.error('Set active error:', err);
+              alert('Failed to update user status: ' + err.message);
+            });
+        });
       });
     }
 
@@ -297,31 +451,6 @@
           console.error('Failed to load users:', err);
           showError('Failed to load users: ' + err.message);
         });
-    }
-
-    async function toggleActive(user) {
-      setStatus('Updating ' + user.email + '...');
-      try {
-        const res = await apiGet('users.setActive', { id: user.id, is_active: (!user.is_active).toString() });
-        if (!res.success) throw new Error(res.message || 'Failed to update');
-        loadUsers();
-        setStatus('Updated ' + user.email);
-      } catch (err) {
-        setStatus(err.message, true);
-      }
-    }
-
-    async function resetPassword(userId) {
-      setStatus('Resetting password...');
-      try {
-        const res = await apiGet('users.resetPassword', { id: userId });
-        if (!res.success) throw new Error(res.message || 'Failed');
-        loadUsers();
-        alert('Temporary password (shown once): ' + res.tempPassword);
-        setStatus('Temporary password generated.');
-      } catch (err) {
-        setStatus(err.message, true);
-      }
     }
 
     function setStatus(msg, isError) {
