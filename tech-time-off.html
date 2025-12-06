@@ -1096,7 +1096,9 @@
 <script src="auth.js"></script>
 <script>
   // Redirect to login if not logged in
-  ensureLoggedIn();
+  if (!ensureLoggedIn()) {
+    throw new Error('Not logged in');
+  }
 </script>
 <script>
 const techs=["William","Limage","Kaiden","Luke","Fafa","Matt"];

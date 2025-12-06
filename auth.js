@@ -3,52 +3,91 @@
 // Main backend URL (Google Apps Script web app)
 const API_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
 
-// Storage keys
-const PS_TOKEN_KEY = 'ps_auth_token';
-const PS_USER_KEY  = 'ps_auth_user';
+// ====== SHARED AUTH HELPERS ======
+const PS_TOKEN_KEY = 'ps_token';
+const PS_USER_KEY = 'ps_user';
+const LOGIN_PAGE = 'login.html';
 
-// Read token from localStorage
-function getAuthToken() {
-  return localStorage.getItem(PS_TOKEN_KEY);
+function getStoredToken() {
+  try {
+    return localStorage.getItem(PS_TOKEN_KEY) || '';
+  } catch (e) {
+    return '';
+  }
 }
 
-// Read current user from localStorage
-function getAuthUser() {
-  const raw = localStorage.getItem(PS_USER_KEY);
-  if (!raw) return null;
+function getStoredUser() {
   try {
-    return JSON.parse(raw);
+    const raw = localStorage.getItem(PS_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
     return null;
   }
 }
 
-// Force user to be logged in; otherwise redirect to login page
+// Backwards-compatible helpers
+function getAuthToken() {
+  return getStoredToken();
+}
+
+function getAuthUser() {
+  return getStoredUser();
+}
+
+// Redirect to login if no token
 function ensureLoggedIn() {
-  const token = getAuthToken();
+  const token = getStoredToken();
   if (!token) {
-    window.location.href = 'login.html';
+    window.location.href = LOGIN_PAGE;
+    return false;
   }
+  return true;
+}
+
+// Build headers for authenticated POST requests
+function buildAuthHeaders(extra) {
+  const token = getStoredToken();
+  const base = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    base['Authorization'] = 'Bearer ' + token;
+  }
+  if (extra) {
+    Object.keys(extra).forEach(function (k) {
+      base[k] = extra[k];
+    });
+  }
+  return base;
+}
+
+// Append token to URL for GET requests
+function withAuthQuery(url) {
+  const token = getStoredToken();
+  if (!token) return url;
+  const joinChar = url.indexOf('?') === -1 ? '?' : '&';
+  return url + joinChar + 'token=' + encodeURIComponent(token);
 }
 
 // Clear auth info and send user to login
 function logoutAndRedirect() {
-  localStorage.removeItem(PS_TOKEN_KEY);
-  localStorage.removeItem(PS_USER_KEY);
-  window.location.href = 'login.html';
+  try {
+    localStorage.removeItem(PS_TOKEN_KEY);
+    localStorage.removeItem(PS_USER_KEY);
+  } catch (e) {
+    // ignore
+  }
+  window.location.href = LOGIN_PAGE;
 }
 
-// Generic GET helper: adds action, token, params; handles auth errors
+// Generic GET helper: adds action + token; handles auth errors
 function apiGet(action, params) {
-  const token = getAuthToken();
-  if (!token) {
-    logoutAndRedirect();
-    return Promise.reject('No auth token');
+  if (!ensureLoggedIn()) {
+    return Promise.reject('Not logged in');
   }
 
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
-  url.searchParams.set('token', token);
 
   if (params) {
     Object.keys(params).forEach(function (k) {
@@ -58,7 +97,7 @@ function apiGet(action, params) {
     });
   }
 
-  return fetch(url.toString())
+  return fetch(withAuthQuery(url.toString()))
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (data && data.error === 'AUTH') {
@@ -69,23 +108,17 @@ function apiGet(action, params) {
     });
 }
 
-// Generic POST helper: adds action & token in query, JSON body; handles auth errors
+// Generic POST helper: adds action + token; handles auth errors
 function apiPost(action, body) {
-  const token = getAuthToken();
-  if (!token) {
-    logoutAndRedirect();
-    return Promise.reject('No auth token');
+  if (!ensureLoggedIn()) {
+    return Promise.reject('Not logged in');
   }
 
-  const url = API_URL + '?action=' +
-    encodeURIComponent(action) +
-    '&token=' + encodeURIComponent(token);
+  const url = withAuthQuery(API_URL + '?action=' + encodeURIComponent(action));
 
   return fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: buildAuthHeaders(),
     body: JSON.stringify(body || {})
   })
     .then(function (res) { return res.json(); })

@@ -507,7 +507,9 @@
 
   <script src="auth.js"></script>
   <script>
-  ensureLoggedIn();
+  if (!ensureLoggedIn()) {
+    throw new Error('Not logged in');
+  }
   const GOOGLE_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
 </script>
   <script src="scripts/hr.js"></script>

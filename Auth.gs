@@ -67,6 +67,34 @@ function getUserFromToken(token) {
   return sanitizeUser(user);
 }
 
+// Extract token from Authorization header, query params, or body and return user
+function requireAuth_(e) {
+  var token = '';
+  var headers = (e && e.headers) || {};
+  var authHeader = headers.Authorization || headers.authorization || '';
+  if (authHeader && authHeader.toLowerCase().indexOf('bearer ') === 0) {
+    token = authHeader.slice(7).trim();
+  }
+
+  if (!token && e && e.parameter && e.parameter.token) {
+    token = String(e.parameter.token);
+  }
+
+  if (!token && e && e.postData && e.postData.contents) {
+    var parsed = parseJsonBody(e.postData.contents);
+    if (parsed && parsed.token) {
+      token = String(parsed.token);
+    }
+  }
+
+  var user = getUserFromToken(token);
+  if (!user) {
+    return { errorResponse: createJsonResponse({ error: 'AUTH', success: false, message: 'Unauthorized' }, 401) };
+  }
+
+  return { user: user, token: token };
+}
+
 function issueToken(user) {
   var tokens = loadTokenStore();
   var token = Utilities.getUuid();
