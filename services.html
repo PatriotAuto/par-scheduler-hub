@@ -10,7 +10,9 @@
 
   <script src="auth.js"></script>
   <script>
-    ensureLoggedIn();
+    if (!ensureLoggedIn()) {
+      throw new Error('Not logged in');
+    }
   </script>
 </head>
 

@@ -106,7 +106,9 @@
 
   <script src="auth.js"></script>
   <script>
-    ensureLoggedIn();
+    if (!ensureLoggedIn()) {
+      throw new Error('Not logged in');
+    }
     const currentUser = getAuthUser();
     if (!currentUser || !currentUser.role || ['owner','admin'].indexOf(String(currentUser.role).toLowerCase()) === -1) {
       alert('Access denied. Admin/Owner only.');
@@ -205,17 +207,7 @@
         return;
       }
 
-      fetch(API_URL + '?action=users.list', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': tokenStr
-        },
-        body: JSON.stringify({})
-      })
-        .then(function (res) {
-          return res.json();
-        })
+      apiPost('users.list', {})
         .then(function (data) {
           console.log('users.list response:', data);
           if (!data || !data.success) {

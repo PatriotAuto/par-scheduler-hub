@@ -13,6 +13,15 @@ function doPost(e) {
 
 function handleRequest(method, e) {
   var action = (e.parameter && e.parameter.action) || '';
+  var body = null;
+
+  if (method === 'POST' && e.postData) {
+    body = parseJsonBody(e.postData && e.postData.contents);
+    if (!action && body && body.action) {
+      action = String(body.action);
+    }
+  }
+
   if (!action) {
     return createJsonResponse({ success: false, message: 'Missing action' }, 400);
   }
@@ -37,11 +46,9 @@ function handleRequest(method, e) {
   }
 
   // Authenticated actions
-  var token = (e.parameter && e.parameter.token) || '';
-  var authedUser = getUserFromToken(token);
-  if (!authedUser) {
-    return createJsonResponse({ error: 'AUTH', success: false, message: 'Unauthorized' }, 401);
-  }
+  var session = requireAuth_(e);
+  if (session && session.errorResponse) return session.errorResponse;
+  var authedUser = session.user;
 
   // Dispatch
   if (action === 'users.list') return handleUsersList(authedUser);

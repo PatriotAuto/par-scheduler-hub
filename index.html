@@ -1094,7 +1094,9 @@
 <script src="auth.js"></script>
 <script>
   // Ensure the user is logged in first
-  ensureLoggedIn();
+  if (!ensureLoggedIn()) {
+    throw new Error('Not logged in');
+  }
 
   // Get the current user from auth.js
   const currentUser = getAuthUser();
