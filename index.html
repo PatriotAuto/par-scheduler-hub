@@ -3281,7 +3281,7 @@ async function loadTechsFromCloud() {
   }
 }
 
-function sendAppointmentToBackend(groupId, eventsForGroup){
+  async function sendAppointmentToBackend(groupId, eventsForGroup){
   if (!GOOGLE_BACKEND_URL) return;
   if (!eventsForGroup || !eventsForGroup.length) return;
 
