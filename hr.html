@@ -16,17 +16,14 @@
         Manage employees, departments, schedules, and shop availability from one place.
       </p>
     </div>
-    <div class="hr-header-right">
-      <a href="index.html" class="hr-btn hr-btn-ghost">← Back to Scheduler</a>
-    </div>
   </header>
 
-  <nav class="hr-nav">
-    <a href="index.html">Calendar</a>
-    <a href="services.html">Services</a>
-    <a href="customers.html">Customers</a>
-
-    <span id="navLinksExtra"></span>
+  <nav class="hr-nav header-actions">
+    <a href="index.html" class="header-btn nav-button">Back to Scheduler</a>
+    <a href="services.html" class="header-btn nav-button">Services</a>
+    <a href="customers.html" class="header-btn nav-button">Customers</a>
+    <a href="change-password.html" class="header-btn nav-button">Change Password</a>
+    <a href="users.html" id="usersLink" class="header-btn nav-button" style="display:none;">Users</a>
   </nav>
 
   <script src="auth.js"></script>
@@ -38,15 +35,14 @@
     (function () {
       var user = getStoredUser();
 
-      var html = '<a href="change-password.html" style="margin-left:10px;">Change Password</a>';
+      var usersLink = document.getElementById('usersLink');
 
-      if (user && ['owner','admin'].includes(String(user.role || '').toLowerCase())) {
-        html += '<a href="users.html" style="margin-left:10px;">Users</a>';
-      }
-
-      var extraEl = document.getElementById('navLinksExtra');
-      if (extraEl) {
-        extraEl.innerHTML = html;
+      if (
+        usersLink &&
+        user &&
+        ['owner', 'admin'].includes(String(user.role || '').toLowerCase())
+      ) {
+        usersLink.style.display = 'inline-flex';
       }
     })();
   </script>

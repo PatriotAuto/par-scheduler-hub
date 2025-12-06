@@ -25,6 +25,37 @@ body {
   color: var(--svc-text-main);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(227, 6, 19, 0.12);
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.header-btn.active {
+  background: rgba(227, 6, 19, 0.3);
+}
+
+.header-btn:hover {
+  background: rgba(227, 6, 19, 0.25);
+}
+
 /* HEADER */
 
 .svc-header {
