@@ -39,6 +39,7 @@
     .notice { background: #fff7ed; border: 1px solid #fed7aa; padding: 10px 12px; border-radius: 10px; color: #92400e; font-size: 14px; }
     #status { min-height: 18px; font-size: 14px; color: #475569; }
   </style>
+  <script src="auth.js"></script>
 </head>
 <body>
   <header>
@@ -128,8 +129,6 @@
       </div>
     </div>
   </main>
-
-  <script src="auth.js"></script>
   <script>
     if (!ensureLoggedIn()) {
       throw new Error('Not logged in');
@@ -160,7 +159,7 @@
           is_active: document.getElementById('active').checked
         };
 
-        const res = await apiPost('users.create', payload);
+        const res = await apiGet('users.create', payload);
         if (!res.success) throw new Error(res.message || 'Failed');
         loadUsers();
         setStatus('User created. Temporary password: ' + res.tempPassword);
@@ -232,7 +231,7 @@
         return;
       }
 
-      apiPost('users.list', {})
+      apiGet('users.list')
         .then(function (data) {
           console.log('users.list response:', data);
           if (!data || !data.success) {
@@ -250,7 +249,7 @@
     async function toggleActive(user) {
       setStatus('Updating ' + user.email + '...');
       try {
-        const res = await apiPost('users.update', { id: user.id, is_active: !user.is_active });
+        const res = await apiGet('users.setActive', { id: user.id, is_active: (!user.is_active).toString() });
         if (!res.success) throw new Error(res.message || 'Failed to update');
         loadUsers();
         setStatus('Updated ' + user.email);
@@ -262,7 +261,7 @@
     async function resetPassword(userId) {
       setStatus('Resetting password...');
       try {
-        const res = await apiPost('users.resetPassword', { id: userId });
+        const res = await apiGet('users.resetPassword', { id: userId });
         if (!res.success) throw new Error(res.message || 'Failed');
         loadUsers();
         alert('Temporary password (shown once): ' + res.tempPassword);

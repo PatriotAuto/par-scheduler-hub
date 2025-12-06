@@ -107,12 +107,44 @@ function handleRequest(method, e, options) {
   }
 
   // Dispatch
-  if (action === 'users.list') return handleUsersList(authedUser);
-  if (action === 'users.create' && method === 'POST') return handleUsersCreate(authedUser, e);
+  var adminCheck;
+  if (action === 'users.list') {
+    adminCheck = requireAdminUser_(authedUser);
+    if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
+    return handleUsersList(adminCheck.user);
+  }
+  if (action === 'users.create') {
+    adminCheck = requireAdminUser_(authedUser);
+    if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
+    if (method === 'POST') return handleUsersCreate(adminCheck.user, e);
+    return handleUsersCreateGet(adminCheck.user, e);
+  }
+  if (action === 'users.setActive') {
+    adminCheck = requireAdminUser_(authedUser);
+    if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
+    return handleUsersSetActiveGet(adminCheck.user, e);
+  }
   if (action === 'users.update' && method === 'POST') return handleUsersUpdate(authedUser, e);
-  if (action === 'users.resetPassword' && method === 'POST') return handleUsersResetPassword(authedUser, e);
+  if (action === 'users.resetPassword') {
+    adminCheck = requireAdminUser_(authedUser);
+    if (adminCheck && adminCheck.errorResponse) return adminCheck.errorResponse;
+    if (method === 'POST') return handleUsersResetPassword(adminCheck.user, e);
+    return handleUsersResetPasswordGet(adminCheck.user, e);
+  }
 
   return createJsonResponse({ success: false, message: 'Unknown action' }, 404);
+}
+
+function requireAdminUser_(user) {
+  if (!user) {
+    return { errorResponse: createJsonResponse({ error: 'AUTH', success: false, message: 'Unauthorized' }, 401) };
+  }
+
+  if (!isAdmin(user)) {
+    return { errorResponse: createJsonResponse({ error: 'AUTH', success: false, message: 'Admin only' }, 403) };
+  }
+
+  return { user: user };
 }
 
 function handleUsersList(currentUser) {
@@ -186,6 +218,68 @@ function handleUsersResetPassword(currentUser, e) {
   }
 
   var reset = resetUserPassword(body.id);
+  if (!reset) {
+    return createJsonResponse({ success: false, message: 'User not found' }, 404);
+  }
+
+  return createJsonResponse({ success: true, user: reset.user, tempPassword: reset.tempPassword });
+}
+
+function handleUsersCreateGet(currentUser, e) {
+  var params = (e && e.parameter) || {};
+  var email = params.email ? String(params.email).trim().toLowerCase() : '';
+  var name = params.name ? String(params.name) : '';
+
+  if (!email || !name) {
+    return createJsonResponse({ success: false, message: 'Missing email or name' }, 400);
+  }
+
+  var role = params.role ? String(params.role) : 'user';
+  var isActive = true;
+  if (params.is_active !== undefined) {
+    var flag = String(params.is_active).toLowerCase();
+    isActive = flag === 'true' || flag === '1' || flag === 'yes';
+  }
+
+  var created = createUser(email, name, role, isActive);
+  return createJsonResponse({ success: true, user: created.user, tempPassword: created.tempPassword });
+}
+
+function handleUsersSetActiveGet(currentUser, e) {
+  var params = (e && e.parameter) || {};
+  var userId = params.id ? String(params.id) : '';
+  if (!userId) {
+    return createJsonResponse({ success: false, message: 'Missing user id' }, 400);
+  }
+
+  var isActive = true;
+  if (params.is_active !== undefined) {
+    var normalized = String(params.is_active).toLowerCase();
+    isActive = normalized === 'true' || normalized === '1' || normalized === 'yes';
+  }
+
+  var updated = updateUser(userId, { is_active: isActive });
+  if (!updated) {
+    return createJsonResponse({ success: false, message: 'User not found' }, 404);
+  }
+
+  return createJsonResponse({ success: true, user: updated });
+}
+
+function handleUsersResetPasswordGet(currentUser, e) {
+  var params = (e && e.parameter) || {};
+  var userId = params.id ? String(params.id) : '';
+
+  if (!userId && params.email) {
+    var user = findUserByEmail(String(params.email).trim().toLowerCase());
+    userId = user ? user.id : '';
+  }
+
+  if (!userId) {
+    return createJsonResponse({ success: false, message: 'Missing user id' }, 400);
+  }
+
+  var reset = resetUserPassword(userId);
   if (!reset) {
     return createJsonResponse({ success: false, message: 'User not found' }, 404);
   }
