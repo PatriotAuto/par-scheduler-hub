@@ -1,7 +1,8 @@
 // auth.js - shared auth & API helpers for Patriot Scheduler
 
 // Main backend URL (Google Apps Script web app)
-const API_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
+const API_URL = API_BASE_URL;
 
 // ====== SHARED AUTH HELPERS ======
 const PS_TOKEN_KEY = 'ps_token';
@@ -10,9 +11,10 @@ const LOGIN_PAGE = 'login.html';
 
 function getStoredToken() {
   try {
-    return localStorage.getItem(PS_TOKEN_KEY) || '';
+    const stored = localStorage.getItem(PS_TOKEN_KEY);
+    return stored || null;
   } catch (e) {
-    return '';
+    return null;
   }
 }
 
@@ -105,29 +107,31 @@ function apiPost(action, body) {
 
 /**
  * Simple GET helper to call Apps Script without CORS headaches.
- * Sends ?action=...&token=...&extra=params
+ * Supports both apiGet({ action: '...' }) and apiGet('action', { extra })
  */
-async function apiGet(action, extraParams = {}) {
+async function apiGet(paramsOrAction, maybeExtraParams = {}) {
+  const params = typeof paramsOrAction === 'string'
+    ? Object.assign({ action: paramsOrAction }, maybeExtraParams || {})
+    : Object.assign({}, paramsOrAction || {});
+
   const token = getStoredToken();
-  const url = new URL(API_URL);
-  url.searchParams.set('action', action);
+  const merged = Object.assign({}, params);
   if (token) {
-    url.searchParams.set('token', token);
+    merged.token = token;
   }
-  Object.entries(extraParams).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url.searchParams.set(key, value);
-    }
-  });
 
-  const res = await fetch(url.toString(), {
+  const qs = new URLSearchParams(merged);
+  const url = API_BASE_URL + '?' + qs.toString();
+
+  const resp = await fetch(url, {
     method: 'GET',
-    credentials: 'omit'
+    // IMPORTANT: do NOT set Content-Type to application/json here,
+    // keep it simple so the browser does not send a CORS preflight
   });
 
-  if (!res.ok) {
-    throw new Error('GET failed: ' + res.status + ' ' + res.statusText);
+  if (!resp.ok) {
+    throw new Error('API GET failed with status ' + resp.status);
   }
 
-  return res.json();
+  return resp.json();
 }

@@ -4175,6 +4175,74 @@ function setupGlobalSearchBar(){
   });
 }
 
+async function loadCustomers(){
+  try{
+    const res=await apiGet({ action:'crm.listCustomers' });
+
+    if(!res || res.ok===false){
+      console.error('Failed to load customers',res);
+      alert('Failed to load customers.');
+      return;
+    }
+
+    const customers=Array.isArray(res.customers)?res.customers:[];
+    renderCustomers(customers);
+  }catch(err){
+    console.error('Failed to load customers (exception)',err);
+    alert('Failed to load customers.');
+  }
+}
+
+function renderCustomers(customers){
+  const customersList=document.getElementById("globalSearchCustomersList");
+  const customersEmpty=document.getElementById("globalSearchCustomersEmpty");
+
+  if(!customersList) return;
+
+  customersList.innerHTML="";
+
+  if(!customers || !customers.length){
+    if(customersEmpty) customersEmpty.style.display="block";
+    return;
+  }
+
+  if(customersEmpty) customersEmpty.style.display="none";
+
+  customers.forEach(c=>{
+    const li=document.createElement("li");
+    const entry=document.createElement("div");
+    entry.className="search-result-entry";
+
+    const title=document.createElement("div");
+    title.className="title";
+    title.textContent=[c.firstName,c.lastName].filter(Boolean).join(" ")||"(No name)";
+
+    const details=document.createElement("div");
+    details.className="details";
+    const phoneLine=document.createElement("div");
+    phoneLine.textContent=c.phone||"";
+    const emailLine=document.createElement("div");
+    emailLine.textContent=c.email||"";
+    details.appendChild(phoneLine);
+    details.appendChild(emailLine);
+
+    const button=document.createElement("button");
+    button.type="button";
+    button.className="btn btn-primary btn-xs";
+    button.dataset.action="use-appointment";
+    button.textContent="Use in Appointment";
+    button.addEventListener("click",function(){
+      fillAppointmentFormFromCustomer(c);
+    });
+
+    entry.appendChild(title);
+    entry.appendChild(details);
+    entry.appendChild(button);
+    li.appendChild(entry);
+    customersList.appendChild(li);
+  });
+}
+
 function openGlobalSearchOverlay(){
   const overlay=document.getElementById("globalSearchOverlay");
   if(overlay) overlay.style.display="block";
@@ -4446,6 +4514,7 @@ loadTechSchedulesFromBackend();
 loadTechTimeOffFromBackend();
 loadHolidaysFromBackend();
 loadServicesFromBackend();
+loadCustomers();
 renderCalendar();
 loadAppointmentsFromBackend({ replaceLocal: true });
 setInterval(maybeAutoRefreshFromBackend,15000);
