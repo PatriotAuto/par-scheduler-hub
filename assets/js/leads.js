@@ -1,24 +1,21 @@
 let leadsCache = [];
+let authToken = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-  const user = getStoredUser();
-  if (!user || !user.token) {
-    if (typeof redirectToLogin === 'function') {
-      redirectToLogin();
-    } else {
-      window.location.href = 'login.html';
-    }
+  authToken = typeof getStoredToken === 'function' ? getStoredToken() : null;
+
+  if (!authToken) {
+    window.location.href = 'login.html';
     return;
   }
 
-  const token = user.token;
   const form = document.getElementById('lead-form');
   const resetBtn = document.getElementById('lead-reset-btn');
   const statusFilter = document.getElementById('leads-status-filter');
   const leadsTbody = document.getElementById('leads-tbody');
 
   if (form) {
-    form.addEventListener('submit', (e) => handleLeadSubmit(e, token));
+    form.addEventListener('submit', (e) => handleLeadSubmit(e));
   }
 
   if (resetBtn) {
@@ -26,24 +23,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (statusFilter) {
-    statusFilter.addEventListener('change', () => loadLeads(token));
+    statusFilter.addEventListener('change', () => loadLeads());
   }
 
   if (leadsTbody) {
     leadsTbody.addEventListener('click', onLeadsTableClick);
   }
 
-  loadLeads(token);
+  loadLeads();
 });
 
-async function loadLeads(token) {
+async function loadLeads() {
   const statusFilter = document.getElementById('leads-status-filter');
   const filterVal = statusFilter ? statusFilter.value : '';
 
   try {
     const res = await apiGet({
-      action: 'leads.list',
-      token: token
+      action: 'leads.list'
     });
 
     if (!res || res.success === false) {
@@ -143,8 +139,14 @@ function resetForm() {
   document.getElementById('lead-form-title').textContent = 'New Lead';
 }
 
-async function handleLeadSubmit(e, token) {
+async function handleLeadSubmit(e) {
   e.preventDefault();
+
+  const token = authToken || (typeof getStoredToken === 'function' ? getStoredToken() : null);
+  if (!token) {
+    window.location.href = 'login.html';
+    return;
+  }
 
   const id = document.getElementById('lead-id').value || null;
   const contactName = document.getElementById('lead-contactName').value.trim();
@@ -193,7 +195,7 @@ async function handleLeadSubmit(e, token) {
     }
 
     resetForm();
-    loadLeads(token);
+    loadLeads();
   } catch (err) {
     console.error('Error saving lead', err);
     alert('Error saving lead.');
@@ -207,10 +209,10 @@ function startEditLead(id) {
     return;
   }
 
-  const user = getStoredUser();
-  if (!user || !user.token) return;
+  const token = authToken || (typeof getStoredToken === 'function' ? getStoredToken() : null);
+  if (!token) return;
 
-  apiGet({ action: 'leads.list', token: user.token })
+  apiGet({ action: 'leads.list', token: token })
     .then((res) => {
       if (!res || res.success === false) return;
       const leads = res.leads || [];
@@ -225,12 +227,12 @@ function startEditLead(id) {
 function confirmDeleteLead(id) {
   if (!confirm('Delete this lead?')) return;
 
-  const user = getStoredUser();
-  if (!user || !user.token) return;
+  const token = authToken || (typeof getStoredToken === 'function' ? getStoredToken() : null);
+  if (!token) return;
 
   apiGet({
     action: 'leads.delete',
-    token: user.token,
+    token: token,
     id: id
   })
     .then((res) => {
@@ -239,7 +241,7 @@ function confirmDeleteLead(id) {
         alert('Failed to delete lead.');
         return;
       }
-      loadLeads(user.token);
+      loadLeads();
     })
     .catch((err) => {
       console.error('Error deleting lead', err);

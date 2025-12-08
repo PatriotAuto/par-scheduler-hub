@@ -82,6 +82,31 @@ function logoutAndRedirect() {
   window.location.href = LOGIN_PAGE;
 }
 
+// Keep logout behavior consistent across the app
+function logout() {
+  logoutAndRedirect();
+}
+
+function handleAuthFailure(json, status) {
+  const err = json && (json.error || json.code);
+
+  const authErrors = [
+    'LOGIN_FAILED',
+    'LOGIN_INACTIVE',
+    'INVALID_TOKEN',
+    'SESSION_EXPIRED',
+    'AUTH_REQUIRED',
+    'UNAUTHORIZED',
+  ];
+
+  if (status === 401 || authErrors.includes(err)) {
+    logout();
+    return true;
+  }
+
+  return false;
+}
+
 // Generic POST helper: adds action + token; handles auth errors
 function apiPost(action, body) {
   if (!ensureLoggedIn()) {
@@ -95,13 +120,18 @@ function apiPost(action, body) {
     headers: buildAuthHeaders(),
     body: JSON.stringify(body || {})
   })
-    .then(function (res) { return res.json(); })
-    .then(function (data) {
-      if (data && data.error === 'AUTH') {
-        logoutAndRedirect();
-        throw new Error('Unauthorized');
+    .then(async function (res) {
+      const json = await res.json().catch(function () { return {}; });
+
+      if (!res.ok || json.success === false || json.ok === false) {
+        const handled = handleAuthFailure(json, res.status);
+        if (!handled) {
+          console.error('API POST error:', action, json);
+        }
+        throw json;
       }
-      return data;
+
+      return json;
     });
 }
 
@@ -129,9 +159,15 @@ async function apiGet(paramsOrAction, maybeExtraParams = {}) {
     // keep it simple so the browser does not send a CORS preflight
   });
 
-  if (!resp.ok) {
-    throw new Error('API GET failed with status ' + resp.status);
+  const json = await resp.json().catch(function () { return {}; });
+
+  if (!resp.ok || json.success === false || json.ok === false) {
+    const handled = handleAuthFailure(json, resp.status);
+    if (!handled) {
+      console.error('API GET error:', url, json);
+    }
+    throw json;
   }
 
-  return resp.json();
+  return json;
 }
