@@ -1,140 +1,188 @@
-function ensureOption(selectEl, value, label) {
-  if (!selectEl || !value) return;
-  const exists = Array.from(selectEl.options || []).some((opt) => opt.value === value);
-  if (!exists) {
-    const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = label || value;
-    selectEl.appendChild(opt);
+// Vehicle dropdown helpers powered by Apps Script
+const VEHICLE_BACKEND_URL = typeof BACKEND_URL !== 'undefined'
+  ? BACKEND_URL
+  : (typeof GOOGLE_BACKEND_URL !== 'undefined'
+    ? GOOGLE_BACKEND_URL
+    : (typeof API_URL !== 'undefined'
+      ? API_URL
+      : '<<REPLACE_WITH_YOUR_APPS_SCRIPT_EXEC_URL>>'));
+
+function buildBackendUrl(action, params) {
+  const url = new URL(VEHICLE_BACKEND_URL);
+  url.searchParams.set('action', action);
+  if (params) {
+    Object.keys(params).forEach(key => {
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.set(key, params[key]);
+      }
+    });
   }
+  return url.toString();
+}
+
+async function apiGetJson(action, params) {
+  const url = buildBackendUrl(action, params);
+  const resp = await fetch(url, { method: 'GET', credentials: 'include' });
+  const data = await resp.json();
+  return data;
+}
+
+function populateSelect(selectEl, items, placeholder) {
+  if (!selectEl) return;
+
+  selectEl.innerHTML = '';
+  const opt = document.createElement('option');
+  opt.value = '';
+  opt.textContent = placeholder || 'Select...';
+  selectEl.appendChild(opt);
+
+  (items || []).forEach(item => {
+    const o = document.createElement('option');
+    o.value = item;
+    o.textContent = item;
+    selectEl.appendChild(o);
+  });
 }
 
 function initVehicleDropdowns(options = {}) {
   const {
-    yearSelectId = 'vehicleYearSelect',
-    makeSelectId = 'vehicleMakeSelect',
-    modelSelectId = 'vehicleModelSelect',
+    yearSelectId = 'vehicleYear',
+    makeSelectId = 'vehicleMake',
+    modelSelectId = 'vehicleModel',
     initialValues = {}
   } = options;
 
-  const yearSelect = document.getElementById(yearSelectId);
-  const makeSelect = document.getElementById(makeSelectId);
-  const modelSelect = document.getElementById(modelSelectId);
+  return new Promise(resolve => {
+    const runInit = () => {
+      const yearSelect = document.getElementById(yearSelectId) || document.getElementById('vehicleYearSelect');
+      const makeSelect = document.getElementById(makeSelectId) || document.getElementById('vehicleMakeSelect');
+      const modelSelect = document.getElementById(modelSelectId) || document.getElementById('vehicleModelSelect');
 
-  if (!yearSelect || !makeSelect || !modelSelect) {
-    return Promise.resolve(null);
-  }
-
-  const resetSelects = () => {
-    yearSelect.innerHTML = '<option value="">Year</option>';
-    makeSelect.innerHTML = '<option value="">Make</option>';
-    modelSelect.innerHTML = '<option value="">Model</option>';
-    makeSelect.disabled = true;
-    modelSelect.disabled = true;
-  };
-
-  const loadMakes = async (year, prefillMake, prefillModel) => {
-    makeSelect.innerHTML = '<option value="">Make</option>';
-    modelSelect.innerHTML = '<option value="">Model</option>';
-    makeSelect.disabled = true;
-    modelSelect.disabled = true;
-
-    if (!year) return;
-
-    const resp = await fetch(API_URL + '?action=vehicles.makes&year=' + encodeURIComponent(year));
-    const json = await resp.json();
-    const makes = (json && json.makes) || [];
-
-    makeSelect.innerHTML = '<option value="">Make</option>' +
-      makes.map((m) => `<option value="${m}">${m}</option>`).join('');
-    makeSelect.disabled = false;
-
-    if (prefillMake) {
-      ensureOption(makeSelect, prefillMake);
-      makeSelect.value = prefillMake;
-      await loadModels(year, prefillMake, prefillModel);
-    }
-  };
-
-  const loadModels = async (year, make, prefillModel) => {
-    modelSelect.innerHTML = '<option value="">Model</option>';
-    modelSelect.disabled = true;
-
-    if (!year || !make) return;
-
-    const resp = await fetch(
-      API_URL + '?action=vehicles.models&year=' + encodeURIComponent(year) +
-      '&make=' + encodeURIComponent(make)
-    );
-    const json = await resp.json();
-    const models = (json && json.models) || [];
-
-    modelSelect.innerHTML = '<option value="">Model</option>' +
-      models.map((m) => `<option value="${m}">${m}</option>`).join('');
-    modelSelect.disabled = false;
-
-    if (prefillModel) {
-      ensureOption(modelSelect, prefillModel);
-      modelSelect.value = prefillModel;
-    }
-  };
-
-  yearSelect.addEventListener('change', async function() {
-    const year = this.value;
-    await loadMakes(year);
-  });
-
-  makeSelect.addEventListener('change', async function() {
-    const year = yearSelect.value;
-    const make = this.value;
-    await loadModels(year, make);
-  });
-
-  const initializeYears = async () => {
-    resetSelects();
-    const resp = await fetch(API_URL + '?action=vehicles.years');
-    const json = await resp.json();
-    const years = (json && json.years) || [];
-
-    yearSelect.innerHTML = '<option value="">Year</option>' +
-      years.map((y) => `<option value="${y}">${y}</option>`).join('');
-
-    if (initialValues.year) {
-      ensureOption(yearSelect, initialValues.year);
-      yearSelect.value = initialValues.year;
-      await loadMakes(initialValues.year, initialValues.make, initialValues.model);
-      if (initialValues.make && !makeSelect.value) {
-        ensureOption(makeSelect, initialValues.make);
-        makeSelect.value = initialValues.make;
-      }
-      if (initialValues.model && !modelSelect.value) {
-        ensureOption(modelSelect, initialValues.model);
-        modelSelect.value = initialValues.model;
-      }
-    }
-  };
-
-  return initializeYears().then(() => ({
-    setValues: async ({ year, make, model } = {}) => {
-      if (!year) {
-        resetSelects();
-        await initializeYears();
+      if (!yearSelect || !makeSelect || !modelSelect) {
+        resolve(null);
         return;
       }
-      ensureOption(yearSelect, year);
-      yearSelect.value = year;
-      await loadMakes(year, make, model);
-      if (make) {
-        ensureOption(makeSelect, make);
-        makeSelect.value = make;
-        if (model) {
-          await loadModels(year, make, model);
-          ensureOption(modelSelect, model);
-          modelSelect.value = model;
-        }
+
+      const resetMakeModel = () => {
+        populateSelect(makeSelect, [], 'Make');
+        makeSelect.disabled = true;
+        populateSelect(modelSelect, [], 'Model');
+        modelSelect.disabled = true;
+      };
+
+      const currentYear = new Date().getFullYear();
+      const startYear = 1985;
+      const years = [];
+      for (let y = currentYear; y >= startYear; y--) {
+        years.push(y);
       }
+      populateSelect(yearSelect, years, 'Year');
+      resetMakeModel();
+
+      const loadModels = async (yearVal, makeVal, prefillModel) => {
+        populateSelect(modelSelect, [], 'Model');
+        modelSelect.disabled = true;
+
+        if (!yearVal || !makeVal) {
+          return;
+        }
+
+        try {
+          modelSelect.classList.add('loading');
+          const data = await apiGetJson('getVehicleModels', { year: yearVal, make: makeVal });
+          if (!data || !data.ok) {
+            console.error('Error loading models:', data);
+            return;
+          }
+
+          populateSelect(modelSelect, data.models || [], 'Model');
+          modelSelect.disabled = false;
+
+          if (prefillModel) {
+            modelSelect.value = prefillModel;
+          }
+        } catch (err) {
+          console.error('Failed to load models:', err);
+        } finally {
+          modelSelect.classList.remove('loading');
+        }
+      };
+
+      const loadMakes = async (yearVal, prefillMake, prefillModel) => {
+        resetMakeModel();
+        if (!yearVal) {
+          return;
+        }
+
+        try {
+          makeSelect.disabled = true;
+          makeSelect.classList.add('loading');
+
+          const data = await apiGetJson('getVehicleMakes', { year: yearVal });
+          if (!data || !data.ok) {
+            console.error('Error loading makes:', data);
+            return;
+          }
+
+          populateSelect(makeSelect, data.makes || [], 'Make');
+          makeSelect.disabled = false;
+
+          if (prefillMake) {
+            makeSelect.value = prefillMake;
+            await loadModels(yearVal, prefillMake, prefillModel);
+          }
+        } catch (err) {
+          console.error('Failed to load makes:', err);
+        } finally {
+          makeSelect.classList.remove('loading');
+        }
+      };
+
+      yearSelect.addEventListener('change', async function () {
+        const yearVal = this.value;
+        await loadMakes(yearVal);
+      });
+
+      makeSelect.addEventListener('change', async function () {
+        const yearVal = yearSelect.value;
+        const makeVal = this.value;
+        await loadModels(yearVal, makeVal);
+      });
+
+      const controller = {
+        setValues: async ({ year, make, model } = {}) => {
+          if (!year) {
+            yearSelect.value = '';
+            resetMakeModel();
+            return;
+          }
+
+          yearSelect.value = year;
+          await loadMakes(year, make, model);
+
+          if (make) {
+            makeSelect.value = make;
+            if (model) {
+              await loadModels(year, make, model);
+              modelSelect.value = model;
+            }
+          }
+        }
+      };
+
+      if (initialValues && (initialValues.year || initialValues.make || initialValues.model)) {
+        controller.setValues(initialValues);
+      }
+
+      resolve(controller);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', runInit);
+    } else {
+      runInit();
     }
-  }));
+  });
 }
 
 window.initVehicleDropdowns = initVehicleDropdowns;
