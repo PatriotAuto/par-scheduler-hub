@@ -344,9 +344,9 @@
         <div class="form-row">
           <label>Vehicle</label>
           <div class="vehicle-inline">
-            <input type="text" id="lead-vehicleYear" placeholder="Year" />
-            <input type="text" id="lead-vehicleMake" placeholder="Make" />
-            <input type="text" id="lead-vehicleModel" placeholder="Model" />
+            <select id="vehicleYearSelect"></select>
+            <select id="vehicleMakeSelect" disabled></select>
+            <select id="vehicleModelSelect" disabled></select>
           </div>
         </div>
 
@@ -425,6 +425,7 @@
   </main>
 
   <script src="auth.js"></script>
+  <script src="assets/js/vehicle-dropdowns.js"></script>
   <script src="assets/js/leads.js"></script>
 </body>
 </html>

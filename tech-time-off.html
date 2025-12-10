@@ -682,15 +682,15 @@
           <div class="field-row">
             <div class="field-group">
               <label>Year</label>
-              <input id="inputVehicleYear" placeholder="YYYY" maxlength="4" />
+              <select id="vehicleYearSelect"></select>
             </div>
             <div class="field-group">
               <label>Make</label>
-              <input id="inputVehicleMake" placeholder="Manufacturer" />
+              <select id="vehicleMakeSelect" disabled></select>
             </div>
             <div class="field-group">
               <label>Model</label>
-              <input id="inputVehicleModel" placeholder="Model" />
+              <select id="vehicleModelSelect" disabled></select>
             </div>
           </div>
           <div class="field-row">
@@ -1095,6 +1095,7 @@
 </div>
 
 <script src="auth.js"></script>
+<script src="assets/js/vehicle-dropdowns.js"></script>
 <script>
   // Redirect to login if not logged in
   if (!ensureLoggedIn()) {
@@ -1230,6 +1231,8 @@ let selectedSlot=null;
 let editingJobGroupId=null;
 let appointmentLocked=false;
 let isEditingAppointmentForm=false;
+let vehicleDropdownsReady=null;
+let vehicleDropdownsController=null;
 
 // Auto-refresh + idle tracking
 let lastAutoRefreshTime=0;
@@ -1272,12 +1275,15 @@ const checkboxPaid=document.getElementById("checkboxPaid");
 const statusSummary=document.getElementById("statusSummary");
 const vinInput=document.getElementById("inputVin");
 const stockNumberInput=document.getElementById("inputStockNumber");
-const vehicleYearInput=document.getElementById("inputVehicleYear");
-const vehicleMakeInput=document.getElementById("inputVehicleMake");
-const vehicleModelInput=document.getElementById("inputVehicleModel");
+const vehicleYearSelectEl=document.getElementById("vehicleYearSelect");
+const vehicleMakeSelectEl=document.getElementById("vehicleMakeSelect");
+const vehicleModelSelectEl=document.getElementById("vehicleModelSelect");
 const vinHelperText=document.getElementById("vinHelperText");
 const btnVinScan=document.getElementById("btnVinScan");
 const defaultVinHelperText="Scan VIN to auto-fill year, make, and model.";
+
+vehicleDropdownsReady=initVehicleDropdowns();
+vehicleDropdownsReady.then((controller)=>{vehicleDropdownsController=controller;});
 
 const appointmentPopup=document.getElementById("appointmentPopup");
 const popupStatusSelect=document.getElementById("popupStatusSelect");
@@ -1417,18 +1423,22 @@ function serviceProgressMeta(status){
 function updateVinHelper(message){
   if(vinHelperText) vinHelperText.textContent=message||defaultVinHelperText;
 }
+function setVehicleDropdownValues(year,make,model){
+  if(!vehicleDropdownsReady) return;
+  vehicleDropdownsReady.then(controller=>{
+    if(controller&&typeof controller.setValues==="function"){
+      controller.setValues({year,make,model});
+    }
+  });
+}
 function applyVinDecodeAndHelper(vin){
   const cleaned=sanitizeVin(vin|| (vinInput?vinInput.value:""));
   if(vinInput) vinInput.value=cleaned;
   const decoded=decodeVinToVehicle(cleaned);
   if(decoded){
-    if(vehicleYearInput) vehicleYearInput.value=decoded.year||"";
-    if(vehicleMakeInput) vehicleMakeInput.value=decoded.make||"";
-    if(vehicleModelInput) vehicleModelInput.value=decoded.model||"";
+    setVehicleDropdownValues(decoded.year||"",decoded.make||"",decoded.model||"");
   }else if(!cleaned){
-    if(vehicleYearInput) vehicleYearInput.value="";
-    if(vehicleMakeInput) vehicleMakeInput.value="";
-    if(vehicleModelInput) vehicleModelInput.value="";
+    setVehicleDropdownValues("","","");
   }
   const len=cleaned.length;
   const vehicleSummary=decoded? [decoded.year,decoded.make,decoded.model].filter(Boolean).join(" "):"";
@@ -3442,9 +3452,9 @@ async function createOrUpdateAppointment(){
   const email=document.getElementById("inputCustomerEmail").value.trim();
   const vin=sanitizeVinInput();
   const stockNumber=(stockNumberInput?.value||"").trim();
-  const vehicleYear=(vehicleYearInput?.value||"").trim();
-  const vehicleMake=(vehicleMakeInput?.value||"").trim();
-  const vehicleModel=(vehicleModelInput?.value||"").trim();
+  const vehicleYear=(vehicleYearSelectEl?.value||"").trim();
+  const vehicleMake=(vehicleMakeSelectEl?.value||"").trim();
+  const vehicleModel=(vehicleModelSelectEl?.value||"").trim();
   const date=document.getElementById("datePicker").value;
   const dayName=getDayName(new Date(date+"T00:00"));
   const dealer=document.getElementById("checkboxDealer").checked;
@@ -3685,9 +3695,7 @@ function loadJobEventIntoForm(ev){
     applyVinDecodeAndHelper(ev.vin||"");
   }
   if(stockNumberInput) stockNumberInput.value=ev.stockNumber||"";
-  if(vehicleYearInput) vehicleYearInput.value=ev.vehicleYear||"";
-  if(vehicleMakeInput) vehicleMakeInput.value=ev.vehicleMake||"";
-  if(vehicleModelInput) vehicleModelInput.value=ev.vehicleModel||"";
+  setVehicleDropdownValues(ev.vehicleYear||"",ev.vehicleMake||"",ev.vehicleModel||"");
   document.getElementById("datePicker").value=ev.date||"";
   document.getElementById("checkboxDealer").checked=!!ev.dealer;
   document.getElementById("checkboxCustomerWaiting").checked=!!ev.customerWaiting;
@@ -4128,9 +4136,9 @@ if(typeof fillAppointmentFormFromCustomer!=="function"){
     const emailEl=document.getElementById("inputCustomerEmail");
     const vinEl=document.getElementById("inputVin");
     const stockEl=document.getElementById("inputStockNumber");
-    const yearEl=document.getElementById("inputVehicleYear");
-    const makeEl=document.getElementById("inputVehicleMake");
-    const modelEl=document.getElementById("inputVehicleModel");
+    const yearEl=document.getElementById("vehicleYearSelect");
+    const makeEl=document.getElementById("vehicleMakeSelect");
+    const modelEl=document.getElementById("vehicleModelSelect");
     const notesEl=document.getElementById("inputNotes");
 
     if(firstNameEl) firstNameEl.value=c.firstName||"";
@@ -4420,9 +4428,9 @@ function fillAppointmentFormFromAppointment(a){
   const emailEl=document.getElementById("inputCustomerEmail");
   const vinEl=document.getElementById("inputVin");
   const stockEl=document.getElementById("inputStockNumber");
-  const yearEl=document.getElementById("inputVehicleYear");
-  const makeEl=document.getElementById("inputVehicleMake");
-  const modelEl=document.getElementById("inputVehicleModel");
+  const yearEl=document.getElementById("vehicleYearSelect");
+  const makeEl=document.getElementById("vehicleMakeSelect");
+  const modelEl=document.getElementById("vehicleModelSelect");
   const notesEl=document.getElementById("inputNotes");
 
   if(firstNameEl) firstNameEl.value=a.customerFirstName||"";

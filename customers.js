@@ -8,6 +8,7 @@
     customers: [],
     filtered: [],
   };
+  let vehicleDropdownsReady = null;
 
   // --- DOM Helpers ---
 
@@ -195,6 +196,7 @@
         }
       }
 
+      vehicleDropdownsReady = initVehicleDropdowns();
       wireEvents();
       await fetchCustomers();
     } catch (err) {
