@@ -676,18 +676,26 @@
               <input id="inputStockNumber" placeholder="Inventory ID" />
             </div>
           </div>
-          <div class="field-row">
-            <div class="field-group">
-              <label>Year</label>
-              <select id="vehicleYearSelect"></select>
+          <div class="field-row vehicle-row">
+            <div class="form-group field-group">
+              <label for="vehicleYear">Year</label>
+              <select id="vehicleYear" name="vehicleYear" class="form-control">
+                <option value="">Year</option>
+              </select>
             </div>
-            <div class="field-group">
-              <label>Make</label>
-              <select id="vehicleMakeSelect" disabled></select>
+
+            <div class="form-group field-group">
+              <label for="vehicleMake">Make</label>
+              <select id="vehicleMake" name="vehicleMake" class="form-control" disabled>
+                <option value="">Make</option>
+              </select>
             </div>
-            <div class="field-group">
-              <label>Model</label>
-              <select id="vehicleModelSelect" disabled></select>
+
+            <div class="form-group field-group">
+              <label for="vehicleModel">Model</label>
+              <select id="vehicleModel" name="vehicleModel" class="form-control" disabled>
+                <option value="">Model</option>
+              </select>
             </div>
           </div>
           <div class="field-row">
@@ -1261,9 +1269,9 @@ const checkboxPaid=document.getElementById("checkboxPaid");
 const statusSummary=document.getElementById("statusSummary");
 const vinInput=document.getElementById("inputVin");
 const stockNumberInput=document.getElementById("inputStockNumber");
-const vehicleYearSelectEl=document.getElementById("vehicleYearSelect");
-const vehicleMakeSelectEl=document.getElementById("vehicleMakeSelect");
-const vehicleModelSelectEl=document.getElementById("vehicleModelSelect");
+const vehicleYearSelectEl=document.getElementById("vehicleYear")||document.getElementById("vehicleYearSelect");
+const vehicleMakeSelectEl=document.getElementById("vehicleMake")||document.getElementById("vehicleMakeSelect");
+const vehicleModelSelectEl=document.getElementById("vehicleModel")||document.getElementById("vehicleModelSelect");
 const vinHelperText=document.getElementById("vinHelperText");
 const btnVinScan=document.getElementById("btnVinScan");
 const defaultVinHelperText="Scan VIN to auto-fill year, make, and model.";
@@ -4159,9 +4167,9 @@ if(typeof fillAppointmentFormFromCustomer!=="function"){
     const emailEl=document.getElementById("inputCustomerEmail");
     const vinEl=document.getElementById("inputVin");
     const stockEl=document.getElementById("inputStockNumber");
-    const yearEl=document.getElementById("vehicleYearSelect");
-    const makeEl=document.getElementById("vehicleMakeSelect");
-    const modelEl=document.getElementById("vehicleModelSelect");
+    const yearEl=document.getElementById("vehicleYear")||document.getElementById("vehicleYearSelect");
+    const makeEl=document.getElementById("vehicleMake")||document.getElementById("vehicleMakeSelect");
+    const modelEl=document.getElementById("vehicleModel")||document.getElementById("vehicleModelSelect");
     const notesEl=document.getElementById("inputNotes");
 
     if(firstNameEl) firstNameEl.value=c.firstName||"";
@@ -4451,9 +4459,9 @@ function fillAppointmentFormFromAppointment(a){
   const emailEl=document.getElementById("inputCustomerEmail");
   const vinEl=document.getElementById("inputVin");
   const stockEl=document.getElementById("inputStockNumber");
-  const yearEl=document.getElementById("vehicleYearSelect");
-  const makeEl=document.getElementById("vehicleMakeSelect");
-  const modelEl=document.getElementById("vehicleModelSelect");
+  const yearEl=document.getElementById("vehicleYear")||document.getElementById("vehicleYearSelect");
+  const makeEl=document.getElementById("vehicleMake")||document.getElementById("vehicleMakeSelect");
+  const modelEl=document.getElementById("vehicleModel")||document.getElementById("vehicleModelSelect");
   const notesEl=document.getElementById("inputNotes");
 
   if(firstNameEl) firstNameEl.value=a.customerFirstName||"";
