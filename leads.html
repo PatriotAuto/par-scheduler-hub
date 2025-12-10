@@ -234,6 +234,41 @@
       background: #eef2ff;
     }
 
+    .leads-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .leads-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding-bottom: 8px;
+    }
+
+    .leads-table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .leads-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .leads-table th,
+    .leads-table td {
+      padding: 6px 8px;
+      white-space: nowrap;
+    }
+
+    .leads-table td.actions-cell {
+      position: sticky;
+      right: 0;
+      background: #fff;
+    }
+
     .table-btn {
       background: #0b1f33;
       color: #fff;
@@ -295,13 +330,14 @@
 
         <div class="form-row">
           <label>Status</label>
-          <select id="lead-status">
-            <option value="New">New</option>
-            <option value="Contacted">Contacted</option>
+          <select id="leadStatus">
+            <option value="">Select status...</option>
+            <option value="New Lead" selected>New Lead</option>
             <option value="Estimate Sent">Estimate Sent</option>
-            <option value="Scheduled">Scheduled</option>
-            <option value="Won">Won</option>
-            <option value="Lost">Lost</option>
+            <option value="Estimate Accepted">Estimate Accepted</option>
+            <option value="Deposit Paid">Deposit Paid</option>
+            <option value="Appointment Scheduled">Appointment Scheduled</option>
+            <option value="Closed / Lost">Closed / Lost</option>
           </select>
         </div>
 
@@ -316,7 +352,18 @@
 
         <div class="form-row">
           <label>Service Interest</label>
-          <input type="text" id="lead-serviceInterest" placeholder="Detail, Tint, PPF, etc." />
+          <select id="leadServiceInterest">
+            <option value="">Select service...</option>
+            <option value="Detail">Detail</option>
+            <option value="Window Tint">Window Tint</option>
+            <option value="PPF">PPF</option>
+            <option value="Ceramic Coating">Ceramic Coating</option>
+            <option value="Remote Start">Remote Start</option>
+            <option value="Audio">Audio</option>
+            <option value="Wraps / Graphics">Wraps / Graphics</option>
+            <option value="Accessories">Accessories</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
 
         <div class="form-row">
@@ -343,33 +390,37 @@
           <label>Status:</label>
           <select id="leads-status-filter">
             <option value="">All</option>
-            <option value="New">New</option>
-            <option value="Contacted">Contacted</option>
+            <option value="New Lead">New Lead</option>
             <option value="Estimate Sent">Estimate Sent</option>
-            <option value="Scheduled">Scheduled</option>
-            <option value="Won">Won</option>
-            <option value="Lost">Lost</option>
+            <option value="Estimate Accepted">Estimate Accepted</option>
+            <option value="Deposit Paid">Deposit Paid</option>
+            <option value="Appointment Scheduled">Appointment Scheduled</option>
+            <option value="Closed / Lost">Closed / Lost</option>
           </select>
         </div>
       </div>
 
-      <table class="data-table" id="leads-table">
-        <thead>
-          <tr>
-            <th>Contact</th>
-            <th>Phone</th>
-            <th>Source</th>
-            <th>Status</th>
-            <th>Service</th>
-            <th>Assigned To</th>
-            <th>Last Contact</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="leads-tbody">
-          <!-- rows injected by leads.js -->
-        </tbody>
-      </table>
+      <div class="leads-panel">
+        <div class="leads-list">
+          <div class="leads-table-wrapper">
+            <table class="data-table leads-table" id="leads-table">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Contact</th>
+                  <th>Phone</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="leadsTableBody">
+                <!-- rows injected by leads.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 

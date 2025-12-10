@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('lead-form');
   const resetBtn = document.getElementById('lead-reset-btn');
   const statusFilter = document.getElementById('leads-status-filter');
-  const leadsTbody = document.getElementById('leads-tbody');
 
   if (form) {
     form.addEventListener('submit', (e) => handleLeadSubmit(e));
@@ -26,12 +25,32 @@ document.addEventListener('DOMContentLoaded', () => {
     statusFilter.addEventListener('change', () => loadLeads());
   }
 
-  if (leadsTbody) {
-    leadsTbody.addEventListener('click', onLeadsTableClick);
-  }
-
   loadLeads();
 });
+
+function formatPhoneDisplay(phone) {
+  if (!phone) return '';
+  var digits = String(phone).replace(/\D+/g, '');
+  if (!digits) return '';
+
+  if (digits.length === 11 && digits.charAt(0) === '1') {
+    var cc = digits.charAt(0);
+    var area = digits.substr(1, 3);
+    var mid = digits.substr(4, 3);
+    var last = digits.substr(7, 4);
+    return cc + '-(' + area + ')-' + mid + '-' + last;
+  }
+
+  if (digits.length >= 10) {
+    digits = digits.substr(digits.length - 10);
+    var area2 = digits.substr(0, 3);
+    var mid2 = digits.substr(3, 3);
+    var last2 = digits.substr(6, 4);
+    return '(' + area2 + ')-' + mid2 + '-' + last2;
+  }
+
+  return digits;
+}
 
 async function loadLeads() {
   const statusFilter = document.getElementById('leads-status-filter');
@@ -44,7 +63,7 @@ async function loadLeads() {
 
     if (!res || res.success === false) {
       console.error('Failed to load leads', res);
-      renderLeads([]);
+      renderLeadsTable([]);
       return;
     }
 
@@ -55,56 +74,81 @@ async function loadLeads() {
       leads = leads.filter((l) => (l.status || '') === filterVal);
     }
 
-    renderLeads(leads);
+    renderLeadsTable(leads);
   } catch (err) {
     console.error('Error loading leads', err);
-    renderLeads([]);
+    renderLeadsTable([]);
   }
 }
 
-function renderLeads(leads) {
-  const tbody = document.getElementById('leads-tbody');
+function renderLeadsTable(leads) {
+  var tbody = document.querySelector('#leadsTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  leads.forEach((lead) => {
-    const tr = document.createElement('tr');
+  if (!leads || !leads.length) {
+    var emptyRow = document.createElement('tr');
+    var td = document.createElement('td');
+    td.colSpan = 6;
+    td.textContent = 'No leads found.';
+    emptyRow.appendChild(td);
+    tbody.appendChild(emptyRow);
+    return;
+  }
 
-    const lastContact = lead.lastContactAt || '';
-    const contactDisplay = lead.contactName || '';
-    const serviceDisplay = lead.serviceInterest || '';
+  leads.forEach(function(lead) {
+    var tr = document.createElement('tr');
 
-    tr.innerHTML = `
-      <td>${escapeHtml(contactDisplay)}</td>
-      <td>${escapeHtml(lead.phone || '')}</td>
-      <td>${escapeHtml(lead.source || '')}</td>
-      <td>${escapeHtml(lead.status || '')}</td>
-      <td>${escapeHtml(serviceDisplay)}</td>
-      <td>${escapeHtml(lead.assignedTo || '')}</td>
-      <td>${escapeHtml(lastContact)}</td>
-      <td>
-        <button class="table-btn" data-action="edit" data-id="${lead.id}">Edit</button>
-        <button class="table-btn danger" data-action="delete" data-id="${lead.id}">Delete</button>
-      </td>
-    `;
+    var tdService = document.createElement('td');
+    tdService.textContent = (lead.serviceInterest || '').toString();
+    tr.appendChild(tdService);
+
+    var name = (lead.contactName || '').toString().trim();
+    if (name.toLowerCase().indexOf('sales - ') === 0) {
+      name = name.substr(8).trim();
+    }
+    var tdContact = document.createElement('td');
+    tdContact.textContent = name || '(no name)';
+    tr.appendChild(tdContact);
+
+    var tdPhone = document.createElement('td');
+    tdPhone.textContent = formatPhoneDisplay(lead.phone || '');
+    tr.appendChild(tdPhone);
+
+    var tdSource = document.createElement('td');
+    tdSource.textContent = lead.source || '';
+    tr.appendChild(tdSource);
+
+    var tdStatus = document.createElement('td');
+    tdStatus.textContent = lead.status || '';
+    tr.appendChild(tdStatus);
+
+    var tdActions = document.createElement('td');
+    tdActions.className = 'actions-cell';
+
+    var editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.textContent = 'Edit';
+    editBtn.className = 'table-btn';
+    editBtn.addEventListener('click', function() {
+      startEditLead(lead.id);
+    });
+    tdActions.appendChild(editBtn);
+
+    var deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'table-btn danger';
+    deleteBtn.style.marginLeft = '4px';
+    deleteBtn.addEventListener('click', function() {
+      confirmDeleteLead(lead.id);
+    });
+    tdActions.appendChild(deleteBtn);
+
+    tr.appendChild(tdActions);
 
     tbody.appendChild(tr);
   });
-}
-
-function onLeadsTableClick(e) {
-  const btn = e.target.closest('button[data-action]');
-  if (!btn) return;
-
-  const action = btn.getAttribute('data-action');
-  const id = btn.getAttribute('data-id');
-  if (!id) return;
-
-  if (action === 'edit') {
-    startEditLead(id);
-  } else if (action === 'delete') {
-    confirmDeleteLead(id);
-  }
 }
 
 function fillFormFromLead(lead) {
@@ -113,11 +157,11 @@ function fillFormFromLead(lead) {
   document.getElementById('lead-phone').value = lead.phone || '';
   document.getElementById('lead-email').value = lead.email || '';
   document.getElementById('lead-source').value = lead.source || '';
-  document.getElementById('lead-status').value = lead.status || 'New';
+  document.getElementById('leadStatus').value = lead.status || '';
   document.getElementById('lead-vehicleYear').value = lead.vehicleYear || '';
   document.getElementById('lead-vehicleMake').value = lead.vehicleMake || '';
   document.getElementById('lead-vehicleModel').value = lead.vehicleModel || '';
-  document.getElementById('lead-serviceInterest').value = lead.serviceInterest || '';
+  document.getElementById('leadServiceInterest').value = lead.serviceInterest || '';
   document.getElementById('lead-budget').value = lead.budget || '';
   document.getElementById('lead-notes').value = lead.notes || '';
   document.getElementById('lead-form-title').textContent = 'Edit Lead';
@@ -129,11 +173,11 @@ function resetForm() {
   document.getElementById('lead-phone').value = '';
   document.getElementById('lead-email').value = '';
   document.getElementById('lead-source').value = '';
-  document.getElementById('lead-status').value = 'New';
+  document.getElementById('leadStatus').value = 'New Lead';
   document.getElementById('lead-vehicleYear').value = '';
   document.getElementById('lead-vehicleMake').value = '';
   document.getElementById('lead-vehicleModel').value = '';
-  document.getElementById('lead-serviceInterest').value = '';
+  document.getElementById('leadServiceInterest').value = '';
   document.getElementById('lead-budget').value = '';
   document.getElementById('lead-notes').value = '';
   document.getElementById('lead-form-title').textContent = 'New Lead';
@@ -153,11 +197,11 @@ async function handleLeadSubmit(e) {
   const phone = document.getElementById('lead-phone').value.trim();
   const email = document.getElementById('lead-email').value.trim();
   const source = document.getElementById('lead-source').value.trim();
-  const status = document.getElementById('lead-status').value;
+  const status = document.getElementById('leadStatus').value || 'New Lead';
   const vehicleYear = document.getElementById('lead-vehicleYear').value.trim();
   const vehicleMake = document.getElementById('lead-vehicleMake').value.trim();
   const vehicleModel = document.getElementById('lead-vehicleModel').value.trim();
-  const serviceInterest = document.getElementById('lead-serviceInterest').value.trim();
+  const serviceInterest = document.getElementById('leadServiceInterest').value.trim();
   const budget = document.getElementById('lead-budget').value.trim();
   const notes = document.getElementById('lead-notes').value.trim();
 
