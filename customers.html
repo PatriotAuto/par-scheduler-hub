@@ -702,15 +702,15 @@
           <div class="field-row">
             <div class="field-group">
               <label>Year</label>
-              <input id="inputVehicleYear" placeholder="YYYY" maxlength="4" />
+              <select id="vehicleYearSelect"></select>
             </div>
             <div class="field-group">
               <label>Make</label>
-              <input id="inputVehicleMake" placeholder="Manufacturer" />
+              <select id="vehicleMakeSelect" disabled></select>
             </div>
             <div class="field-group">
               <label>Model</label>
-              <input id="inputVehicleModel" placeholder="Model" />
+              <select id="vehicleModelSelect" disabled></select>
             </div>
           </div>
           <div class="field-row">
@@ -1115,6 +1115,7 @@
 </div>
 
 <script src="auth.js"></script>
+<script src="assets/js/vehicle-dropdowns.js"></script>
 <script src="customers.js"></script>
 </body>
 </html>

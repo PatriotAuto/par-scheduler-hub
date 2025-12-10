@@ -1,5 +1,7 @@
 let leadsCache = [];
 let authToken = null;
+let vehicleDropdownsReady = null;
+let vehicleDropdownsController = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   authToken = typeof getStoredToken === 'function' ? getStoredToken() : null;
@@ -12,6 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('lead-form');
   const resetBtn = document.getElementById('lead-reset-btn');
   const statusFilter = document.getElementById('leads-status-filter');
+
+  vehicleDropdownsReady = initVehicleDropdowns();
+  vehicleDropdownsReady.then((controller) => {
+    vehicleDropdownsController = controller;
+  });
 
   if (form) {
     form.addEventListener('submit', (e) => handleLeadSubmit(e));
@@ -158,9 +165,7 @@ function fillFormFromLead(lead) {
   document.getElementById('lead-email').value = lead.email || '';
   document.getElementById('lead-source').value = lead.source || '';
   document.getElementById('leadStatus').value = lead.status || '';
-  document.getElementById('lead-vehicleYear').value = lead.vehicleYear || '';
-  document.getElementById('lead-vehicleMake').value = lead.vehicleMake || '';
-  document.getElementById('lead-vehicleModel').value = lead.vehicleModel || '';
+  setVehicleDropdownValues(lead.vehicleYear, lead.vehicleMake, lead.vehicleModel);
   document.getElementById('leadServiceInterest').value = lead.serviceInterest || '';
   document.getElementById('lead-budget').value = lead.budget || '';
   document.getElementById('lead-notes').value = lead.notes || '';
@@ -174,13 +179,19 @@ function resetForm() {
   document.getElementById('lead-email').value = '';
   document.getElementById('lead-source').value = '';
   document.getElementById('leadStatus').value = 'New Lead';
-  document.getElementById('lead-vehicleYear').value = '';
-  document.getElementById('lead-vehicleMake').value = '';
-  document.getElementById('lead-vehicleModel').value = '';
+  setVehicleDropdownValues('', '', '');
   document.getElementById('leadServiceInterest').value = '';
   document.getElementById('lead-budget').value = '';
   document.getElementById('lead-notes').value = '';
   document.getElementById('lead-form-title').textContent = 'New Lead';
+}
+
+async function setVehicleDropdownValues(year, make, model) {
+  if (!vehicleDropdownsReady) return;
+  const controller = await vehicleDropdownsReady;
+  if (controller && typeof controller.setValues === 'function') {
+    controller.setValues({ year, make, model });
+  }
 }
 
 async function handleLeadSubmit(e) {
@@ -198,9 +209,9 @@ async function handleLeadSubmit(e) {
   const email = document.getElementById('lead-email').value.trim();
   const source = document.getElementById('lead-source').value.trim();
   const status = document.getElementById('leadStatus').value || 'New Lead';
-  const vehicleYear = document.getElementById('lead-vehicleYear').value.trim();
-  const vehicleMake = document.getElementById('lead-vehicleMake').value.trim();
-  const vehicleModel = document.getElementById('lead-vehicleModel').value.trim();
+  const vehicleYear = document.getElementById('vehicleYearSelect').value.trim();
+  const vehicleMake = document.getElementById('vehicleMakeSelect').value.trim();
+  const vehicleModel = document.getElementById('vehicleModelSelect').value.trim();
   const serviceInterest = document.getElementById('leadServiceInterest').value.trim();
   const budget = document.getElementById('lead-budget').value.trim();
   const notes = document.getElementById('lead-notes').value.trim();
