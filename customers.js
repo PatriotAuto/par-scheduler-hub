@@ -1,3 +1,10 @@
+// Legacy shim so older code doesn't crash.
+// The actual Year/Make/Model dropdowns are now initialized via DOMContentLoaded.
+function initVehicleDropdowns() {
+  console.log('[YMM] initVehicleDropdowns called (legacy no-op).');
+  // No action needed because the DOMContentLoaded handler already set up the dropdowns.
+}
+
 // customers.js
 // Clean customers page logic using apiGet() from auth.js
 // No top-level await, everything wrapped in async init function.
