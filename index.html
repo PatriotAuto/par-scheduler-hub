@@ -1220,8 +1220,6 @@ let selectedSlot=null;
 let editingJobGroupId=null;
 let appointmentLocked=false;
 let isEditingAppointmentForm=false;
-let vehicleDropdownsReady=null;
-let vehicleDropdownsController=null;
 
 // Auto-refresh + idle tracking
 let lastAutoRefreshTime=0;
@@ -1275,9 +1273,6 @@ const vehicleModelSelectEl=document.getElementById("vehicleModel")||document.get
 const vinHelperText=document.getElementById("vinHelperText");
 const btnVinScan=document.getElementById("btnVinScan");
 const defaultVinHelperText="Scan VIN to auto-fill year, make, and model.";
-
-vehicleDropdownsReady=initVehicleDropdowns();
-vehicleDropdownsReady.then((controller)=>{vehicleDropdownsController=controller;});
 
 const appointmentPopup=document.getElementById("appointmentPopup");
 const popupStatusSelect=document.getElementById("popupStatusSelect");
@@ -1417,13 +1412,58 @@ function serviceProgressMeta(status){
 function updateVinHelper(message){
   if(vinHelperText) vinHelperText.textContent=message||defaultVinHelperText;
 }
-function setVehicleDropdownValues(year,make,model){
-  if(!vehicleDropdownsReady) return;
-  vehicleDropdownsReady.then(controller=>{
-    if(controller&&typeof controller.setValues==="function"){
-      controller.setValues({year,make,model});
+async function setVehicleDropdownValues(year,make,model){
+  if(!vehicleYearSelectEl||!vehicleMakeSelectEl||!vehicleModelSelectEl){
+    return;
+  }
+
+  const yearVal=(year||"").toString();
+  vehicleYearSelectEl.value=yearVal;
+
+  populateSelect(vehicleMakeSelectEl,[],"Make");
+  vehicleMakeSelectEl.disabled=true;
+  populateSelect(vehicleModelSelectEl,[],"Model");
+  vehicleModelSelectEl.disabled=true;
+
+  if(!yearVal){
+    return;
+  }
+
+  try{
+    vehicleMakeSelectEl.classList.add("loading");
+    const makesData=await apiGetJson("getVehicleMakes",{year:yearVal});
+    if(makesData&&makesData.ok){
+      populateSelect(vehicleMakeSelectEl,makesData.makes||[],"Make");
+      vehicleMakeSelectEl.disabled=false;
+      if(make){
+        vehicleMakeSelectEl.value=make;
+      }
     }
-  });
+  }catch(err){
+    console.error("[YMM] Failed to set make options",err);
+  }finally{
+    vehicleMakeSelectEl.classList.remove("loading");
+  }
+
+  if(!make){
+    return;
+  }
+
+  try{
+    vehicleModelSelectEl.classList.add("loading");
+    const modelsData=await apiGetJson("getVehicleModels",{year:yearVal,make});
+    if(modelsData&&modelsData.ok){
+      populateSelect(vehicleModelSelectEl,modelsData.models||[],"Model");
+      vehicleModelSelectEl.disabled=false;
+      if(model){
+        vehicleModelSelectEl.value=model;
+      }
+    }
+  }catch(err){
+    console.error("[YMM] Failed to set model options",err);
+  }finally{
+    vehicleModelSelectEl.classList.remove("loading");
+  }
 }
 function applyVinDecodeAndHelper(vin){
   const cleaned=sanitizeVin(vin|| (vinInput?vinInput.value:""));
