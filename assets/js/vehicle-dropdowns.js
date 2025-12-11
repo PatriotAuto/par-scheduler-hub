@@ -1,14 +1,17 @@
-// Vehicle dropdown helpers powered by Apps Script
-const VEHICLE_BACKEND_URL = typeof BACKEND_URL !== 'undefined'
-  ? BACKEND_URL
-  : (typeof GOOGLE_BACKEND_URL !== 'undefined'
-    ? GOOGLE_BACKEND_URL
-    : (typeof API_URL !== 'undefined'
-      ? API_URL
-      : '<<REPLACE_WITH_YOUR_APPS_SCRIPT_EXEC_URL>>'));
+// === VEHICLE DROPDOWN HELPERS (Year -> Make -> Model) ===
 
+// Use your existing backend URL if you already have one.
+// If you already have something like GAS_ENDPOINT/BACKEND_URL, use that instead
+// and delete this const.
+const BACKEND_URL = typeof GAS_ENDPOINT !== 'undefined'
+  ? GAS_ENDPOINT
+  : (typeof globalThis !== 'undefined' && typeof globalThis.BACKEND_URL !== 'undefined')
+    ? globalThis.BACKEND_URL
+    : 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
+
+// Generic helper to build backend URLs
 function buildBackendUrl(action, params) {
-  const url = new URL(VEHICLE_BACKEND_URL);
+  const url = new URL(BACKEND_URL);
   url.searchParams.set('action', action);
   if (params) {
     Object.keys(params).forEach(key => {
@@ -20,16 +23,18 @@ function buildBackendUrl(action, params) {
   return url.toString();
 }
 
+// Simple GET JSON wrapper
 async function apiGetJson(action, params) {
   const url = buildBackendUrl(action, params);
-  const resp = await fetch(url, { method: 'GET', credentials: 'include' });
+  console.log('[YMM] Fetching', url);
+  const resp = await fetch(url, { method: 'GET' });
   const data = await resp.json();
+  console.log('[YMM] Response', action, data);
   return data;
 }
 
+// Populate a <select> with options
 function populateSelect(selectEl, items, placeholder) {
-  if (!selectEl) return;
-
   selectEl.innerHTML = '';
   const opt = document.createElement('option');
   opt.value = '';
@@ -44,145 +49,110 @@ function populateSelect(selectEl, items, placeholder) {
   });
 }
 
-function initVehicleDropdowns(options = {}) {
-  const {
-    yearSelectId = 'vehicleYear',
-    makeSelectId = 'vehicleMake',
-    modelSelectId = 'vehicleModel',
-    initialValues = {}
-  } = options;
+document.addEventListener('DOMContentLoaded', function () {
+  const yearSelect  = document.getElementById('vehicleYear');
+  const makeSelect  = document.getElementById('vehicleMake');
+  const modelSelect = document.getElementById('vehicleModel');
 
-  return new Promise(resolve => {
-    const runInit = () => {
-      const yearSelect = document.getElementById(yearSelectId) || document.getElementById('vehicleYearSelect');
-      const makeSelect = document.getElementById(makeSelectId) || document.getElementById('vehicleMakeSelect');
-      const modelSelect = document.getElementById(modelSelectId) || document.getElementById('vehicleModelSelect');
+  if (!yearSelect || !makeSelect || !modelSelect) {
+    console.warn('[YMM] Vehicle selects not found on this page.');
+    return;
+  }
 
-      if (!yearSelect || !makeSelect || !modelSelect) {
-        resolve(null);
+  console.log('[YMM] Initializing Year/Make/Model dropdowns');
+
+  // 1) Populate Year dropdown (e.g. 1985 -> current year)
+  const currentYear = new Date().getFullYear();
+  const startYear   = 1985;
+  const years = [];
+  for (let y = currentYear; y >= startYear; y--) {
+    years.push(y);
+  }
+  populateSelect(yearSelect, years, 'Year');
+
+  // Ensure Make/Model are in a known state
+  populateSelect(makeSelect, [], 'Make');
+  makeSelect.disabled = true;
+  populateSelect(modelSelect, [], 'Model');
+  modelSelect.disabled = true;
+
+  // 2) When Year changes -> load Makes
+  yearSelect.addEventListener('change', async function () {
+    const yearVal = this.value;
+    console.log('[YMM] Year changed to', yearVal);
+
+    // Reset Make & Model
+    populateSelect(makeSelect, [], 'Make');
+    makeSelect.disabled = true;
+    populateSelect(modelSelect, [], 'Model');
+    modelSelect.disabled = true;
+
+    if (!yearVal) {
+      console.log('[YMM] No year selected, skipping makes');
+      return;
+    }
+
+    try {
+      makeSelect.disabled = true;
+      makeSelect.classList.add('loading');
+
+      const data = await apiGetJson('getVehicleMakes', { year: yearVal });
+
+      if (!data || !data.ok) {
+        console.error('[YMM] Error loading makes', data);
+        // Still re-enable so user isn't stuck
+        makeSelect.disabled = false;
+        makeSelect.classList.remove('loading');
         return;
       }
 
-      const resetMakeModel = () => {
-        populateSelect(makeSelect, [], 'Make');
-        makeSelect.disabled = true;
-        populateSelect(modelSelect, [], 'Model');
-        modelSelect.disabled = true;
-      };
-
-      const currentYear = new Date().getFullYear();
-      const startYear = 1985;
-      const years = [];
-      for (let y = currentYear; y >= startYear; y--) {
-        years.push(y);
-      }
-      populateSelect(yearSelect, years, 'Year');
-      resetMakeModel();
-
-      const loadModels = async (yearVal, makeVal, prefillModel) => {
-        populateSelect(modelSelect, [], 'Model');
-        modelSelect.disabled = true;
-
-        if (!yearVal || !makeVal) {
-          return;
-        }
-
-        try {
-          modelSelect.classList.add('loading');
-          const data = await apiGetJson('getVehicleModels', { year: yearVal, make: makeVal });
-          if (!data || !data.ok) {
-            console.error('Error loading models:', data);
-            return;
-          }
-
-          populateSelect(modelSelect, data.models || [], 'Model');
-          modelSelect.disabled = false;
-
-          if (prefillModel) {
-            modelSelect.value = prefillModel;
-          }
-        } catch (err) {
-          console.error('Failed to load models:', err);
-        } finally {
-          modelSelect.classList.remove('loading');
-        }
-      };
-
-      const loadMakes = async (yearVal, prefillMake, prefillModel) => {
-        resetMakeModel();
-        if (!yearVal) {
-          return;
-        }
-
-        try {
-          makeSelect.disabled = true;
-          makeSelect.classList.add('loading');
-
-          const data = await apiGetJson('getVehicleMakes', { year: yearVal });
-          if (!data || !data.ok) {
-            console.error('Error loading makes:', data);
-            return;
-          }
-
-          populateSelect(makeSelect, data.makes || [], 'Make');
-          makeSelect.disabled = false;
-
-          if (prefillMake) {
-            makeSelect.value = prefillMake;
-            await loadModels(yearVal, prefillMake, prefillModel);
-          }
-        } catch (err) {
-          console.error('Failed to load makes:', err);
-        } finally {
-          makeSelect.classList.remove('loading');
-        }
-      };
-
-      yearSelect.addEventListener('change', async function () {
-        const yearVal = this.value;
-        await loadMakes(yearVal);
-      });
-
-      makeSelect.addEventListener('change', async function () {
-        const yearVal = yearSelect.value;
-        const makeVal = this.value;
-        await loadModels(yearVal, makeVal);
-      });
-
-      const controller = {
-        setValues: async ({ year, make, model } = {}) => {
-          if (!year) {
-            yearSelect.value = '';
-            resetMakeModel();
-            return;
-          }
-
-          yearSelect.value = year;
-          await loadMakes(year, make, model);
-
-          if (make) {
-            makeSelect.value = make;
-            if (model) {
-              await loadModels(year, make, model);
-              modelSelect.value = model;
-            }
-          }
-        }
-      };
-
-      if (initialValues && (initialValues.year || initialValues.make || initialValues.model)) {
-        controller.setValues(initialValues);
-      }
-
-      resolve(controller);
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', runInit);
-    } else {
-      runInit();
+      populateSelect(makeSelect, data.makes || [], 'Make');
+      makeSelect.disabled = false;
+      makeSelect.classList.remove('loading');
+    } catch (err) {
+      console.error('[YMM] Failed to load makes', err);
+      makeSelect.disabled = false;
+      makeSelect.classList.remove('loading');
     }
   });
-}
 
-window.initVehicleDropdowns = initVehicleDropdowns;
+  // 3) When Make changes -> load Models
+  makeSelect.addEventListener('change', async function () {
+    const yearVal = yearSelect.value;
+    const makeVal = this.value;
+    console.log('[YMM] Make changed to', makeVal, 'for year', yearVal);
+
+    populateSelect(modelSelect, [], 'Model');
+    modelSelect.disabled = true;
+
+    if (!yearVal || !makeVal) {
+      console.log('[YMM] Missing year or make, skipping models');
+      return;
+    }
+
+    try {
+      modelSelect.disabled = true;
+      modelSelect.classList.add('loading');
+
+      const data = await apiGetJson('getVehicleModels', {
+        year: yearVal,
+        make: makeVal
+      });
+
+      if (!data || !data.ok) {
+        console.error('[YMM] Error loading models', data);
+        modelSelect.disabled = false;
+        modelSelect.classList.remove('loading');
+        return;
+      }
+
+      populateSelect(modelSelect, data.models || [], 'Model');
+      modelSelect.disabled = false;
+      modelSelect.classList.remove('loading');
+    } catch (err) {
+      console.error('[YMM] Failed to load models', err);
+      modelSelect.disabled = false;
+      modelSelect.classList.remove('loading');
+    }
+  });
+});
