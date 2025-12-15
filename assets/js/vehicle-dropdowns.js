@@ -1,16 +1,17 @@
 // === VEHICLE DROPDOWN HELPERS (Year -> Make -> Model) ===
 
-// Use your existing backend URL if you already have one.
-// If you already have something like GAS_ENDPOINT/BACKEND_URL, use that instead
-// and delete this const.
-const BACKEND_URL = typeof GAS_ENDPOINT !== 'undefined'
-  ? GAS_ENDPOINT
+// Use shared API base URL configured in scripts/config.js
+const BACKEND_URL = (typeof window !== 'undefined' && window.API_BASE_URL)
+  ? window.API_BASE_URL
   : (typeof globalThis !== 'undefined' && typeof globalThis.BACKEND_URL !== 'undefined')
     ? globalThis.BACKEND_URL
-    : 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
+    : '';
 
 // Generic helper to build backend URLs
 function buildBackendUrl(action, params) {
+  if (!BACKEND_URL) {
+    throw new Error('API base URL is not configured for vehicle dropdowns');
+  }
   const url = new URL(BACKEND_URL);
   url.searchParams.set('action', action);
   if (params) {

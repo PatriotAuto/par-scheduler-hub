@@ -1099,7 +1099,8 @@
   </div>
 </div>
 
-<script src="auth.js"></script>
+  <script src="scripts/config.js"></script>
+  <script src="auth.js"></script>
 <script src="assets/js/vehicle-dropdowns.js"></script>
 <script>
   // Ensure the user is logged in first
@@ -1197,8 +1198,8 @@ function normalizeServicePackages(raw){
   return cleaned;
 }
 
-const GOOGLE_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
-const CUSTOMER_API_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
+const GOOGLE_BACKEND_URL = window.API_BASE_URL;
+const CUSTOMER_API_URL = window.API_BASE_URL;
 // Global shop hours (open/close per weekday) + holidays
 let officeHours = {};
 let shopHolidays = []; // array of { date: "YYYY-MM-DD", label: "New Year's Day" }

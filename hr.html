@@ -7,6 +7,8 @@
 
   <link rel="stylesheet" href="styles/hr.css" />
   <!-- Change made: employee name text is now forced to white for readability on dark backgrounds -->
+  <script src="scripts/config.js"></script>
+  <script src="auth.js"></script>
 </head>
 <body>
   <header class="hr-header">
@@ -27,8 +29,6 @@
 </div>
 
   </nav>
-
-  <script src="auth.js"></script>
   <script>
     if (!ensureLoggedIn()) {
       throw new Error('Not logged in');
@@ -532,10 +532,6 @@
       </section>
     </section>
   </main>
-
-  <script>
-  const GOOGLE_BACKEND_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
-</script>
   <script src="scripts/hr.js"></script>
 </body>
 </html>
