@@ -66,6 +66,7 @@
       min-height: 1.2em;
     }
   </style>
+  <script src="scripts/config.js"></script>
 </head>
 <body>
   <div class="login-card">
@@ -83,7 +84,7 @@
   </div>
 
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
+    const API_URL = window.API_BASE_URL;
     const PS_TOKEN_KEY = 'ps_token';
     const PS_USER_KEY  = 'ps_user';
     const LOGIN_TARGET_PAGE = 'index.html'; // change if main page is different

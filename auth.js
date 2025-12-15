@@ -1,8 +1,9 @@
 // auth.js - shared auth & API helpers for Patriot Scheduler
 
-// Main backend URL (Google Apps Script web app)
-const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbw-g4GC3jVfLUc6RVkPfC5lbNCPHAeH9k-5JkdRnOwvk_vr0Q5ErmMAuTUrZl8r70mK/exec';
-const API_URL = API_BASE_URL;
+function getApiBaseUrl() {
+  if (typeof window === 'undefined') return '';
+  return window.API_BASE_URL || '';
+}
 
 // ====== SHARED AUTH HELPERS ======
 const PS_TOKEN_KEY = 'ps_token';
@@ -113,7 +114,12 @@ function apiPost(action, body) {
     return Promise.reject('Not logged in');
   }
 
-  const url = withAuthQuery(API_URL + '?action=' + encodeURIComponent(action));
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    return Promise.reject('API base URL is not configured');
+  }
+
+  const url = withAuthQuery(baseUrl + '?action=' + encodeURIComponent(action));
 
   return fetch(url, {
     method: 'POST',
@@ -151,7 +157,12 @@ async function apiGet(paramsOrAction, maybeExtraParams = {}) {
   }
 
   const qs = new URLSearchParams(merged);
-  const url = API_BASE_URL + '?' + qs.toString();
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
+    throw new Error('API base URL is not configured');
+  }
+
+  const url = baseUrl + '?' + qs.toString();
 
   const resp = await fetch(url, {
     method: 'GET',

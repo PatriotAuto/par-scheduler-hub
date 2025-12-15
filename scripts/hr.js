@@ -31,50 +31,6 @@
   let holidays = [];
   let selectedHolidayId = null;
 
-  // ---- Fetch helpers ----
-  async function getJson(url) {
-    try {
-      const parsed = new URL(url, window.location.href);
-      const action = parsed.searchParams.get("action");
-      if (action) {
-        const params = {};
-        parsed.searchParams.forEach((value, key) => {
-          if (key !== "action") {
-            params[key] = value;
-          }
-        });
-        return apiGet(action, params);
-      }
-    } catch (err) {
-      console.warn("Falling back to direct fetch for", url, err);
-    }
-
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error("Network error: " + resp.status);
-    return resp.json();
-  }
-
-async function postJson(url, body) {
-  try {
-    const parsed = new URL(url, window.location.href);
-    const action = parsed.searchParams.get("action");
-    if (action) {
-      return apiPost(action, body);
-    }
-  } catch (err) {
-    console.warn("Falling back to direct POST for", url, err);
-  }
-
-  const resp = await fetch(url, {
-    method: "POST",
-    // IMPORTANT: no custom headers so the browser doesn't send a CORS preflight
-    body: JSON.stringify(body || {}),
-  });
-  if (!resp.ok) throw new Error("Network error: " + resp.status);
-  return resp.json();
-}
-
-
   // ---- Tabs ----
   function setupTabs() {
     qsa(".hr-tab-button").forEach((btn) => {
@@ -96,9 +52,7 @@ async function postJson(url, body) {
   // ---- Departments ----
   async function loadDepartments() {
     try {
-      const data = await getJson(
-        GOOGLE_BACKEND_URL + "?action=getDepartments"
-      );
+      const data = await apiGet('getDepartments');
       departments = (data.departments || data || []).filter(
         (d) => d.active !== false
       );
@@ -153,7 +107,7 @@ async function postJson(url, body) {
   // ---- Employees ----
   async function loadEmployees() {
     try {
-      const data = await getJson(GOOGLE_BACKEND_URL + "?action=getEmployees");
+      const data = await apiGet('getEmployees');
       employees = (data && data.employees) || [];
       filteredEmployees = employees.slice();
 
@@ -598,12 +552,7 @@ async function postJson(url, body) {
     currentScheduleEmployeeId = employeeId;
 
     try {
-      const url =
-        GOOGLE_BACKEND_URL +
-        "?action=getEmployeeSchedule&employeeId=" +
-        encodeURIComponent(employeeId);
-
-      const data = await getJson(url);
+      const data = await apiGet({ action: 'getEmployeeSchedule', employeeId });
       const schedule = (data && data.schedule) || [];
 
       // Normalize into entries for the form
@@ -689,7 +638,7 @@ async function postJson(url, body) {
       container.innerHTML = "";
     }
     try {
-      const data = await getJson(GOOGLE_BACKEND_URL + "?action=getTimeOff");
+      const data = await apiGet('getTimeOff');
       timeOffEntries = (data && data.timeOff) || [];
       filteredTimeOffEntries = timeOffEntries.slice();
       renderTimeOffList();
@@ -1025,9 +974,7 @@ async function postJson(url, body) {
     if (container) container.innerHTML = "";
 
     try {
-      const data = await getJson(
-        GOOGLE_BACKEND_URL + "?action=loadHolidays"
-      );
+      const data = await apiGet('loadHolidays');
 
       // New backend shape: { ok, holidays: [ { id, name, date, shopClosed, openTime, closeTime, notes } ] }
       if (data && Array.isArray(data.holidays)) {
