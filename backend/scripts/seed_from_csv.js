@@ -19,6 +19,42 @@ const CSV_FILES = [
   "Appointments.csv",
 ];
 
+function normalizeColName(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\uFEFF/g, "")
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function dedupeCols(cols) {
+  const seen = new Map();
+  return cols.map((c) => {
+    let col = c;
+    if (!seen.has(col)) {
+      seen.set(col, 1);
+      return col;
+    }
+    const n = seen.get(col) + 1;
+    seen.set(col, n);
+    return `${col}_${n}`;
+  });
+}
+
+const FILE_MAP = {
+  "Appointments.csv": "Patriot Scheduler – Backend - Appointments.csv",
+  "Customers.csv": "Patriot Scheduler – Backend - Customers.csv",
+  "Departments.csv": "Patriot Scheduler – Backend - Departments.csv",
+  "Employees.csv": "Patriot Scheduler – Backend - Employees.csv",
+  "EmployeeSchedule.csv": "Patriot Scheduler – Backend - EmployeeSchedule.csv",
+  "Holidays.csv": "Patriot Scheduler – Backend - Holidays.csv",
+  "Leads.csv": "Patriot Scheduler – Backend - Leads.csv",
+  "Services.csv": "Patriot Scheduler – Backend - Services.csv",
+  "TechTimeOff.csv": "Patriot Scheduler – Backend - TechTimeOff.csv",
+  "Users.csv": "Patriot Scheduler – Backend - Users.csv",
+};
+
 function qIdent(name) {
   return '"' + String(name).replace(/"/g, '""') + '"';
 }
@@ -29,19 +65,41 @@ function toTableName(fileName) {
 }
 
 async function createTable(client, tableName, headers) {
-  const columnDefs = headers.map((h) => `${qIdent(h)} text`).join(",\n  ");
-  const createSql = `CREATE TABLE IF NOT EXISTS ${qIdent(tableName)} (
-  id bigserial PRIMARY KEY,
-  ${qIdent("_imported_at")} timestamptz DEFAULT now(),
-  ${columnDefs}
-)`;
-  await client.query(createSql);
+  // Normalize headers
+  const rawHeaders = (headers || []).map((h) => String(h || "").trim()).filter(Boolean);
+  let cols = rawHeaders.map(normalizeColName).filter(Boolean);
+
+  // De-dupe any repeated header names after normalization
+  cols = dedupeCols(cols);
+
+  // If CSV already has an id column, do NOT auto-add one.
+  const hasId = cols.includes("id");
+
+  const colDefs = [];
+  if (!hasId) {
+    colDefs.push(`id BIGSERIAL PRIMARY KEY`);
+  }
+
+  // create all csv columns as TEXT (simple and safe)
+  for (const c of cols) {
+    // skip because we already added it as PK
+    if (!hasId && c === "id") continue;
+    // if CSV has id, keep it as TEXT and NOT PK for now (can evolve later)
+    colDefs.push(`"${c}" TEXT`);
+  }
+
+  const sql = `
+    CREATE TABLE IF NOT EXISTS "${tableName}" (
+      ${colDefs.join(",\n      ")}
+    );
+  `;
+  await client.query(sql);
 }
 
 function readCsv(filePath) {
   const content = fs.readFileSync(filePath);
   const headerRow = parse(content, { to_line: 1 })[0] || [];
-  const headers = headerRow.map((h) => h);
+  const headers = headerRow.map((h) => String(h || "").trim());
   const rows = parse(content, {
     columns: headers,
     from_line: 2,
@@ -50,10 +108,27 @@ function readCsv(filePath) {
   return { headers, rows };
 }
 
+function prepareColumns(headers) {
+  const prepared = [];
+  for (const h of headers || []) {
+    const raw = String(h || "").trim();
+    if (!raw) continue;
+    const normalized = normalizeColName(raw);
+    if (!normalized) continue;
+    prepared.push({ raw, normalized });
+  }
+  const normalized = dedupeCols(prepared.map((p) => p.normalized));
+  return prepared.map((p, idx) => ({
+    raw: p.raw,
+    normalized: normalized[idx],
+  }));
+}
+
 async function seedFile(client, fileName) {
-  const fullPath = path.join(DATA_DIR, fileName);
+  const mapped = FILE_MAP[fileName] || fileName;
+  const fullPath = path.join(DATA_DIR, mapped);
   if (!fs.existsSync(fullPath)) {
-    console.log(`Skipping missing file: ${fileName}`);
+    console.log(`Skipping missing file: ${mapped}`);
     return { table: toTableName(fileName), imported: 0, skipped: true };
   }
 
@@ -63,22 +138,26 @@ async function seedFile(client, fileName) {
     return { table: toTableName(fileName), imported: 0, skipped: true };
   }
 
+  const columnPairs = prepareColumns(headers);
+  const normalizedHeaders = columnPairs.map((c) => c.normalized);
+
   const tableName = toTableName(fileName);
-  await createTable(client, tableName, headers);
-  await client.query(`TRUNCATE TABLE ${qIdent(tableName)} RESTART IDENTITY`);
+  await createTable(client, tableName, normalizedHeaders);
 
   if (!rows.length) {
-    console.log(`No data rows in ${fileName}, table truncated.`);
-    return { table: tableName, imported: 0, skipped: false };
+    console.log(`No data rows in ${fileName}, skipping (no truncate).`);
+    return { table: tableName, imported: 0, skipped: true };
   }
 
-  const colList = headers.map((h) => qIdent(h)).join(", ");
-  const placeholders = headers.map((_, idx) => `$${idx + 1}`).join(", ");
+  await client.query(`TRUNCATE TABLE ${qIdent(tableName)} RESTART IDENTITY`);
+
+  const colList = columnPairs.map((c) => qIdent(c.normalized)).join(", ");
+  const placeholders = columnPairs.map((_, idx) => `$${idx + 1}`).join(", ");
   const insertSql = `INSERT INTO ${qIdent(tableName)} (${colList}) VALUES (${placeholders})`;
 
   for (const row of rows) {
-    const values = headers.map((h) => {
-      const v = row[h];
+    const values = columnPairs.map((c) => {
+      const v = row[c.raw];
       return v === undefined || v === "" ? null : String(v);
     });
     await client.query(insertSql, values);
