@@ -1,0 +1,7 @@
+EmployeeID,FirstName,LastName,Role,Status,PayType,BaseHourlyRate,SalaryAnnual,FlatRateMultiplier,DefaultCommissionType,DefaultCommissionValue,Departments,IsTechnician,Notes
+EMP-1764779936962,William,Arias,Tech,Active,FlatRate,15.5,,1,,,"Detail, Ceramic",TRUE,
+EMP-1764856814601,Limage,Temp,Tech,Active,Hourly,17.68,,1,,,Detail,TRUE,
+EMP-1764856858711,Fanexion,Temp,Tech,Active,Hourly,17.68,,1,,,Detail,TRUE,
+EMP-1764856918110,Kaiden,Schwartz,Tech,Active,FlatRate,15,,1,,,Detail,TRUE,
+EMP-1764857165639,Devynn,Neal,Service Writer,Active,Hourly,12.5,,1,,,,FALSE,
+EMP-1765033283224,Carter,Blosser,Service Writer,Active,Hourly,15,,1,,,,FALSE,Driver
