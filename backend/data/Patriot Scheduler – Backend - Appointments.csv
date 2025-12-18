@@ -1,1 +1,0 @@
-id,date,time,tech,dept,customerFirstName,customerLastName,phone,email,vin,stockNumber,vehicleYear,vehicleMake,vehicleModel,services,minutes,price,status,serviceProgress,invoiced,paid,dealer,customerWaiting,rideNeeded,rideTime,pickupDelivery,pickupTime,deliveryTime,notes,overrideClosed
