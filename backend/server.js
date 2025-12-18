@@ -33,6 +33,34 @@ app.use((req, res, next) => {
   next();
 });
 app.use(cors(corsOptions));
+// ---- CORS (bulletproof, answers preflight no matter what) ----
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || "https://parhub.patriotautorestyling.com")
+    .split(",")
+    .map(s => s.trim())
+    .filter(Boolean)
+);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  // Always vary on Origin to avoid cache poisoning
+  res.setHeader("Vary", "Origin");
+
+  // Only set ACAO when origin is allowed
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  }
+
+  // Respond to ALL preflights here, before any router can interfere
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 // Explicitly handle preflight for everything
 app.options("*", cors(corsOptions));
