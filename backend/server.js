@@ -7,15 +7,34 @@ const app = express();
 // --------------------
 // CORS
 // --------------------
-const allowedOrigin = "https://parhub.patriotautorestyling.com";
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://parhub.patriotautorestyling.com")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  origin: allowedOrigin,
+  origin: function (origin, cb) {
+    // allow non-browser tools (curl/postman) that send no Origin
+    if (!origin) return cb(null, true);
+
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+
+    // helpful for logs
+    return cb(new Error("CORS_NOT_ALLOWED: " + origin), false);
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   optionsSuccessStatus: 204,
 };
 
+// IMPORTANT: put these BEFORE routes
+app.use((req, res, next) => {
+  res.setHeader("Vary", "Origin");
+  next();
+});
 app.use(cors(corsOptions));
+
+// Explicitly handle preflight for everything
 app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -74,6 +93,8 @@ authRouter.post("/login", async (req, res) => {
   });
 });
 
+app.options("/auth/*", cors(corsOptions));
+app.options("/api/auth/*", cors(corsOptions));
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
 
