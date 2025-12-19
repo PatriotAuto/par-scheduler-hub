@@ -7,63 +7,34 @@ const app = express();
 // --------------------
 // CORS
 // --------------------
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://parhub.patriotautorestyling.com")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean);
+const allowedOrigins = new Set([
+  "https://parhub.patriotautorestyling.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000"
+]);
 
-const corsOptions = {
-  origin: function (origin, cb) {
-    // allow non-browser tools (curl/postman) that send no Origin
-    if (!origin) return cb(null, true);
-
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-
-    // helpful for logs
-    return cb(new Error("CORS_NOT_ALLOWED: " + origin), false);
-  },
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 204,
+const corsOptionsDelegate = (req, callback) => {
+  const origin = req.header("Origin");
+  // allow non-browser requests (no Origin) and allowlisted browser origins
+  if (!origin || allowedOrigins.has(origin)) {
+    callback(null, {
+      origin: origin || true,
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      optionsSuccessStatus: 204,
+      maxAge: 86400
+    });
+  } else {
+    callback(null, { origin: false });
+  }
 };
 
 // IMPORTANT: put these BEFORE routes
-app.use((req, res, next) => {
-  res.setHeader("Vary", "Origin");
-  next();
-});
-app.use(cors(corsOptions));
-// ---- CORS (bulletproof, answers preflight no matter what) ----
-const allowedOrigins = new Set(
-  (process.env.ALLOWED_ORIGINS || "https://parhub.patriotautorestyling.com")
-    .split(",")
-    .map(s => s.trim())
-    .filter(Boolean)
-);
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  // Always vary on Origin to avoid cache poisoning
-  res.setHeader("Vary", "Origin");
-
-  // Only set ACAO when origin is allowed
-  if (origin && allowedOrigins.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  }
-
-  // Respond to ALL preflights here, before any router can interfere
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
-
+app.use(cors(corsOptionsDelegate));
 // Explicitly handle preflight for everything
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptionsDelegate));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -121,8 +92,8 @@ authRouter.post("/login", async (req, res) => {
   });
 });
 
-app.options("/auth/*", cors(corsOptions));
-app.options("/api/auth/*", cors(corsOptions));
+app.options("/auth/*", cors(corsOptionsDelegate));
+app.options("/api/auth/*", cors(corsOptionsDelegate));
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
 
