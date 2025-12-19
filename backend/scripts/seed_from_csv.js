@@ -55,6 +55,17 @@ const FILE_MAP = {
   "Users.csv": "Patriot Scheduler – Backend - Users.csv",
 };
 
+function resolveCsvPath(fileName) {
+  const p1 = path.join(DATA_DIR, fileName);
+  if (fs.existsSync(p1)) return p1;
+
+  // fallback: repo root (in case someone placed CSVs there)
+  const p2 = path.join(__dirname, "..", fileName);
+  if (fs.existsSync(p2)) return p2;
+
+  return null;
+}
+
 function qIdent(name) {
   return '"' + String(name).replace(/"/g, '""') + '"';
 }
@@ -126,13 +137,15 @@ function prepareColumns(headers) {
 
 async function seedFile(client, fileName) {
   const mapped = FILE_MAP[fileName] || fileName;
-  const fullPath = path.join(DATA_DIR, mapped);
-  if (!fs.existsSync(fullPath)) {
+  const resolved = resolveCsvPath(mapped);
+  if (!resolved) {
     console.log(`Skipping missing file: ${mapped}`);
     return { table: toTableName(fileName), imported: 0, skipped: true };
   }
 
-  const { headers, rows } = readCsv(fullPath);
+  console.log("Seeding from:", resolved);
+
+  const { headers, rows } = readCsv(resolved);
   if (!headers.length) {
     console.log(`No headers found in ${fileName}, skipping.`);
     return { table: toTableName(fileName), imported: 0, skipped: true };
