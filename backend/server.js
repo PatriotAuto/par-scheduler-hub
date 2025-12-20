@@ -157,9 +157,11 @@ api.get("/services", async (req, res) => {
 api.get("/departments", async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM departments ORDER BY name ASC NULLS LAST`);
-    res.json({ ok: true, departments: r.rows });
+    const rows = Array.isArray(r && r.rows) ? r.rows : [];
+    res.json({ ok: true, departments: rows });
   } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
+    console.error("GET /departments failed:", e);
+    res.status(500).json({ ok: false, departments: [], error: String(e) });
   }
 });
 
