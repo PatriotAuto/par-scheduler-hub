@@ -41,9 +41,13 @@ app.use(express.urlencoded({ extended: true }));
 // --------------------
 // DB
 // --------------------
+const DB_URL = process.env.DATABASE_URL || process.env.DATABASE_URL || "";
+const needsSSL = DB_URL && !DB_URL.includes(".railway.internal") && !DB_URL.includes("railway.internal");
+const sslConfig = needsSSL ? { rejectUnauthorized: false } : false;
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  connectionString: DB_URL,
+  ssl: sslConfig,
+  connectionTimeoutMillis: 8000
 });
 
 // --------------------
@@ -51,12 +55,14 @@ const pool = new Pool({
 // --------------------
 app.get("/health", async (req, res) => {
   try {
+    if (!DB_URL) return res.status(500).json({ ok: false, db: false, error: "DATABASE_URL_MISSING" });
     const r = await pool.query("select now() as now");
     res.json({ ok: true, db: true, now: r.rows[0].now });
   } catch (e) {
     res.status(500).json({ ok: false, db: false, error: String(e) });
   }
 });
+app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 app.get("/", (req, res) => res.send("Patriot Backend is running"));
 
