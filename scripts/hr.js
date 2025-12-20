@@ -52,12 +52,49 @@
   // ---- Departments ----
   async function loadDepartments() {
     try {
-      const data = await apiGet('getDepartments');
-      departments = (data.departments || data || []).filter(
-        (d) => d.active !== false
-      );
+      const url = `${API_BASE_URL}/departments`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Failed to load departments:", res.status, text);
+        throw new Error(`Departments request failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log("Departments raw response:", data);
+
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.departments)
+        ? data.departments
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.rows)
+        ? data.rows
+        : Array.isArray(data?.result)
+        ? data.result
+        : [];
+
+      if (!Array.isArray(list)) {
+        console.error("Departments response invalid after normalization:", data);
+        throw new Error("Departments response shape invalid");
+      }
+
+      if (!list.length && data && Object.keys(data || {}).length) {
+        console.error("Departments response empty after normalization:", data);
+      }
+
+      departments = list
+        .filter((d) => d && (d.name || d.department_name || d.title))
+        .map((d) => ({
+          id: d.id ?? d.department_id ?? d.ID ?? null,
+          name: d.name ?? d.department_name ?? d.title ?? "",
+          active: d.active ?? d.is_active ?? d.Active ?? d.ACTIVE ?? true,
+        }))
+        .filter((d) => d.active !== false);
     } catch (err) {
-      console.error("Failed to load departments", err);
+      console.error("loadDepartments() failed:", err);
       departments = [];
     }
   }
