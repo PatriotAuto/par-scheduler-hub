@@ -150,7 +150,7 @@ api.use(requireAuth);
 // NOTE: we’ll mount this router at BOTH / and /api to reduce frontend breakage.
 
 api.get("/customers", async (req, res) => {
-  await listQuery(res, `SELECT * FROM customers ORDER BY created_at DESC NULLS LAST`);
+  await listQuery(res, `SELECT * FROM customers ORDER BY id DESC`);
 });
 
 api.get("/employees", async (req, res) => {
