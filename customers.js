@@ -7,6 +7,7 @@
   const state = {
     customers: [],
     filtered: [],
+    activeAlpha: "All",
   };
   let vehicleDropdownsReady = null;
 
@@ -145,9 +146,35 @@
 
     const id = asString(pick("id", "customerid", "customer_id", "customerId", "ID"));
 
+    const address = asString(
+      pick(
+        "address",
+        "address1",
+        "address_1",
+        "street",
+        "street1",
+        "line1",
+        "Address"
+      )
+    );
+
+    const notes = asString(pick("notes", "note", "customerNotes", "customer_notes", "Notes"));
+
     const displayName = fullName || email || "(No name)";
 
-    return { id, name: displayName, phone, email, lastService, vehicle, raw: c };
+    return {
+      id,
+      name: displayName,
+      firstName: first,
+      lastName: last,
+      phone,
+      email,
+      lastService,
+      vehicle,
+      address,
+      notes,
+      raw: c,
+    };
   }
 
   function escapeHtml(text) {
@@ -162,19 +189,32 @@
 
   // --- Rendering ---
 
-  function renderCustomers() {
+  function getLastNameInitial(c) {
+    const ln = (c.lastName || "").trim();
+    const fallback = (c.name || "").trim();
+    const source = ln || fallback;
+    if (!source) return "#";
+    const ch = source[0].toUpperCase();
+    return ch >= "A" && ch <= "Z" ? ch : "#";
+  }
+
+  function renderCustomers(list) {
     const tbody = $("customersTableBody");
     if (!tbody) {
       console.warn("customers.js: #customersTableBody not found in DOM.");
       return;
     }
 
-    const list = state.filtered.length ? state.filtered : state.customers;
+    const rows = Array.isArray(list)
+      ? list
+      : state.filtered.length
+      ? state.filtered
+      : state.customers;
 
     // Clear existing rows
     tbody.innerHTML = "";
 
-    if (!list.length) {
+    if (!rows.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
       td.colSpan = 5;
@@ -185,7 +225,7 @@
       return;
     }
 
-    list.forEach((cust) => {
+    rows.forEach((cust) => {
       const tr = document.createElement("tr");
 
       const nameCell = document.createElement("td");
@@ -214,28 +254,42 @@
       tr.appendChild(lastServiceCell);
       tr.appendChild(vehicleCell);
 
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => openProfile(cust));
+
       tbody.appendChild(tr);
     });
   }
 
   // --- Filtering ---
 
-  function applyFilter() {
+  function getAlphaFilteredList() {
+    const all = window.__customersAll || [];
+    if (state.activeAlpha && state.activeAlpha !== "All") {
+      return all.filter((cust) => getLastNameInitial(cust) === state.activeAlpha);
+    }
+    return all;
+  }
+
+  function applySearchFilter() {
     const input = $("customerSearchInput");
+    const baseList = getAlphaFilteredList();
     if (!input) {
-      state.filtered = [];
-      renderCustomers();
+      state.filtered = baseList;
+      window.__customersFiltered = baseList;
+      renderCustomers(baseList);
       return;
     }
 
     const q = normalizeText(input.value);
     if (!q) {
-      state.filtered = [];
-      renderCustomers();
+      state.filtered = baseList;
+      window.__customersFiltered = baseList;
+      renderCustomers(baseList);
       return;
     }
 
-    state.filtered = state.customers.filter((cust) => {
+    const filtered = baseList.filter((cust) => {
       const name = normalizeText(cust.name);
       const phone = normalizeText(cust.phone);
       const email = normalizeText(cust.email);
@@ -247,16 +301,141 @@
       );
     });
 
-    renderCustomers();
+    state.filtered = filtered;
+    window.__customersFiltered = filtered;
+    renderCustomers(filtered);
   }
 
   function wireEvents() {
     const searchInput = $("customerSearchInput");
     if (searchInput) {
       searchInput.addEventListener("input", () => {
-        applyFilter();
+        applySearchFilter();
       });
     }
+  }
+
+  function buildAlphaBar(customers) {
+    const el = document.getElementById("alphaBar");
+    if (!el) return;
+
+    const counts = { "#": 0 };
+    for (let i = 65; i <= 90; i++) counts[String.fromCharCode(i)] = 0;
+
+    customers.forEach((c) => counts[getLastNameInitial(c)]++);
+
+    const tabs = ["All", ...Object.keys(counts).filter((k) => k !== "#"), "#"];
+    el.innerHTML = "";
+
+    tabs.forEach((letter) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "alpha-btn";
+      btn.dataset.letter = letter;
+
+      const count = letter === "All" ? customers.length : counts[letter] || 0;
+
+      btn.textContent = letter;
+      const span = document.createElement("span");
+      span.className = "alpha-count";
+      span.textContent = `(${count})`;
+      btn.appendChild(span);
+
+      btn.addEventListener("click", () => {
+        setActiveAlpha(letter);
+        applyAlphaFilter(letter);
+      });
+
+      el.appendChild(btn);
+    });
+
+    setActiveAlpha("All");
+  }
+
+  function setActiveAlpha(letter) {
+    document.querySelectorAll(".alpha-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.letter === letter);
+    });
+    state.activeAlpha = letter || "All";
+  }
+
+  function applyAlphaFilter(letter) {
+    state.activeAlpha = letter || "All";
+    const all = window.__customersAll || [];
+    let list = all;
+
+    if (letter && letter !== "All") {
+      list = all.filter((c) => getLastNameInitial(c) === letter);
+    }
+
+    window.__customersFiltered = list;
+    state.filtered = list;
+
+    const input = $("customerSearchInput");
+    if (input && input.value && input.value.trim()) {
+      applySearchFilter();
+      return;
+    }
+
+    renderCustomers(list);
+  }
+
+  function openProfile(c) {
+    const drawer = document.getElementById("profileDrawer");
+    const nameEl = document.getElementById("profileName");
+    const subEl = document.getElementById("profileSub");
+    const bodyEl = document.getElementById("profileBody");
+
+    if (!drawer || !nameEl || !subEl || !bodyEl) return;
+
+    nameEl.textContent = c.name || "(No name)";
+    subEl.textContent = [c.phone, c.email].filter(Boolean).join(" • ");
+
+    const rows = [
+      ["Customer ID", c.id],
+      ["First Name", c.firstName],
+      ["Last Name", c.lastName],
+      ["Phone", c.phone],
+      ["Email", c.email],
+      ["Address", c.address],
+      ["Vehicle", c.vehicle],
+      ["Last Service", c.lastService],
+      ["Notes", c.notes],
+    ];
+
+    bodyEl.innerHTML = rows
+      .filter(([_, v]) => v && String(v).trim() !== "")
+      .map(
+        ([k, v]) => `
+      <div class="profile-row">
+        <div class="profile-label">${escapeHtml(k)}</div>
+        <div>${escapeHtml(String(v))}</div>
+      </div>
+    `
+      )
+      .join("");
+
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+
+    const copyPhone = document.getElementById("profileCopyPhone");
+    const copyEmail = document.getElementById("profileCopyEmail");
+
+    if (copyPhone)
+      copyPhone.onclick = async () => {
+        if (c.phone) await navigator.clipboard.writeText(c.phone);
+      };
+    if (copyEmail)
+      copyEmail.onclick = async () => {
+        if (c.email) await navigator.clipboard.writeText(c.email);
+      };
+  }
+
+  function closeProfile() {
+    const drawer = document.getElementById("profileDrawer");
+    if (!drawer) return;
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
   }
 
   // --- API ---
@@ -274,6 +453,8 @@
       const list = Array.isArray(rawList) ? rawList : [];
       const customers = list.map(normalizeCustomer).filter(Boolean);
       window.__customers = customers;
+      window.__customersAll = customers;
+      window.__customersFiltered = customers;
       if (!Array.isArray(customers) || !customers.length) {
         console.warn(
           "Normalized empty list for customers:",
@@ -289,7 +470,8 @@
         customers[0]?.raw ? Object.keys(customers[0].raw) : []
       );
       state.filtered = [];
-      renderCustomers();
+      buildAlphaBar(customers);
+      applyAlphaFilter(state.activeAlpha);
       setStatus(`${state.customers.length} customer(s) loaded.`);
     } catch (err) {
       console.error("Failed to load customers:", err);
@@ -327,6 +509,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("profileClose")?.addEventListener("click", closeProfile);
+    document.getElementById("profileBackToList")?.addEventListener("click", closeProfile);
+    document.getElementById("profileDrawer")?.addEventListener("click", (e) => {
+      if (e.target && e.target.id === "profileDrawer") closeProfile();
+    });
     initCustomersPage();
   });
 })();
