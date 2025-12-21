@@ -540,6 +540,36 @@
     max-height: 85vh;
   }
 }
+
+.customer-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.customer-table th,
+.customer-table td {
+  padding: 10px 12px;
+  vertical-align: top;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-table th {
+  font-weight: 700;
+}
+
+.customer-table .col-name { width: 22%; white-space: normal; word-break: break-word; }
+.customer-table .col-phone { width: 14%; }
+.customer-table .col-email { width: 26%; }
+.customer-table .col-lastservice { width: 18%; }
+.customer-table .col-vehicle { width: 20%; }
+
+@media (max-width: 900px) {
+  .customer-table th, .customer-table td { font-size: 14px; }
+  .customer-table .col-email { width: 30%; }
+}
 </style>
 </head>
 <body>
@@ -586,14 +616,14 @@
     <div id="customersError" class="error-text" style="padding: 4px 24px;"></div>
 
     <div style="padding: 0 24px 16px;">
-      <table class="customers-table" style="width: 100%; border-collapse: collapse;">
+      <table class="customer-table customers-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Email</th>
-            <th>Last Service</th>
-            <th>Vehicle</th>
+            <th class="col-name">Name</th>
+            <th class="col-phone">Phone</th>
+            <th class="col-email">Email</th>
+            <th class="col-lastservice">Last Service</th>
+            <th class="col-vehicle">Vehicle</th>
           </tr>
         </thead>
         <tbody id="customersTableBody"></tbody>

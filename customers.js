@@ -38,6 +38,112 @@
     return (value || "").toString().trim().toLowerCase();
   }
 
+  function normalizeCustomer(c) {
+    if (!c || typeof c !== "object") return null;
+
+    const pick = (...keys) => {
+      for (const k of keys) {
+        const v = c[k];
+        if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+      }
+      return "";
+    };
+
+    const asString = (v) =>
+      v === undefined || v === null ? "" : String(v).trim();
+
+    const first = asString(
+      pick(
+        "firstname",
+        "first_name",
+        "firstName",
+        "first",
+        "FirstName",
+        "First Name"
+      )
+    );
+    const last = asString(
+      pick(
+        "lastname",
+        "last_name",
+        "lastName",
+        "last",
+        "LastName",
+        "Last Name"
+      )
+    );
+    const fullName =
+      asString(pick("name", "fullname", "full_name", "fullName")) ||
+      `${first} ${last}`.trim();
+
+    const phoneRaw = asString(
+      pick(
+        "phone",
+        "phonenumber",
+        "phone_number",
+        "phoneNumber",
+        "mobile",
+        "cell",
+        "primaryphone",
+        "primary_phone"
+      )
+    );
+    const email = asString(
+      pick("email", "emailaddress", "email_address", "emailAddress")
+    );
+
+    const year = asString(
+      pick("vehicleyear", "vehicle_year", "year", "lastVehicleYear")
+    );
+    const make = asString(
+      pick("vehiclemake", "vehicle_make", "make", "lastVehicleMake")
+    );
+    const model = asString(
+      pick("vehiclemodel", "vehicle_model", "model", "lastVehicleModel")
+    );
+    const trim = asString(
+      pick("vehicletrim", "vehicle_trim", "trim", "lastVehicleTrim")
+    );
+    const vehicle = [year, make, model, trim].filter(Boolean).join(" ");
+
+    const lastServiceValue = asString(
+      pick("lastservice", "last_service", "lastService")
+    );
+    const lastServiceDate = asString(
+      pick("lastservicedate", "last_service_date", "lastServiceDate")
+    );
+    const lastServiceType = asString(
+      pick("lastservicetype", "last_service_type", "lastServiceType")
+    );
+    const lastService =
+      lastServiceValue ||
+      [lastServiceDate, lastServiceType].filter(Boolean).join(" – ");
+
+    const id = asString(pick("id", "customerid", "customer_id", "customerId", "ID"));
+
+    const digits = phoneRaw.replace(/\D/g, "");
+    let phone = phoneRaw;
+    if (digits.length === 10) {
+      phone = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    } else if (digits.length === 11 && digits.startsWith("1")) {
+      phone = `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+
+    const displayName = fullName || email || "(No name)";
+
+    return { id, name: displayName, phone, email, lastService, vehicle, raw: c };
+  }
+
+  function escapeHtml(text) {
+    if (text === null || text === undefined) return "";
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // --- Rendering ---
 
   function renderCustomers() {
@@ -67,32 +173,24 @@
       const tr = document.createElement("tr");
 
       const nameCell = document.createElement("td");
-      nameCell.textContent = `${cust.firstName || ""} ${cust.lastName || ""}`.trim();
+      nameCell.className = "col-name";
+      nameCell.innerHTML = escapeHtml(cust.name);
 
       const phoneCell = document.createElement("td");
-      phoneCell.textContent = cust.phone || "";
+      phoneCell.className = "col-phone";
+      phoneCell.innerHTML = escapeHtml(cust.phone);
 
       const emailCell = document.createElement("td");
-      emailCell.textContent = cust.email || "";
+      emailCell.className = "col-email";
+      emailCell.innerHTML = escapeHtml(cust.email);
 
       const lastServiceCell = document.createElement("td");
-      const lastServiceDate = cust.lastServiceDate || "";
-      const lastServiceType = cust.lastServiceType || "";
-      if (lastServiceDate || lastServiceType) {
-        lastServiceCell.textContent = [lastServiceDate, lastServiceType]
-          .filter(Boolean)
-          .join(" – ");
-      } else {
-        lastServiceCell.textContent = "";
-      }
+      lastServiceCell.className = "col-lastservice";
+      lastServiceCell.innerHTML = escapeHtml(cust.lastService);
 
       const vehicleCell = document.createElement("td");
-      const parts = [
-        cust.lastVehicleYear,
-        cust.lastVehicleMake,
-        cust.lastVehicleModel,
-      ].filter(Boolean);
-      vehicleCell.textContent = parts.join(" ");
+      vehicleCell.className = "col-vehicle";
+      vehicleCell.innerHTML = escapeHtml(cust.vehicle);
 
       tr.appendChild(nameCell);
       tr.appendChild(phoneCell);
@@ -122,9 +220,7 @@
     }
 
     state.filtered = state.customers.filter((cust) => {
-      const name = normalizeText(
-        `${cust.firstName || ""} ${cust.lastName || ""}`
-      );
+      const name = normalizeText(cust.name);
       const phone = normalizeText(cust.phone);
       const email = normalizeText(cust.email);
 
@@ -158,7 +254,10 @@
       const payload = await fetchJsonDebug(url);
       console.log("Customers raw response:", payload);
 
-      const customers = normalizeList(payload, ["customers"]);
+      const rawList = normalizeList(payload, ["customers"]) || [];
+      const list = Array.isArray(rawList) ? rawList : [];
+      const customers = list.map(normalizeCustomer).filter(Boolean);
+      window.__customers = customers;
       if (!Array.isArray(customers) || !customers.length) {
         console.warn(
           "Normalized empty list for customers:",
@@ -167,6 +266,11 @@
       }
 
       state.customers = customers;
+      console.log("Normalized customer sample:", customers[0]);
+      console.log(
+        "Raw keys sample:",
+        customers[0]?.raw ? Object.keys(customers[0].raw) : []
+      );
       state.filtered = [];
       renderCustomers();
       setStatus(`${state.customers.length} customer(s) loaded.`);
