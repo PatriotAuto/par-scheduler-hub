@@ -56,7 +56,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const modelSelect = document.getElementById('vehicleModel');
 
   if (!yearSelect || !makeSelect || !modelSelect) {
-    console.warn('[YMM] Vehicle selects not found on this page.');
     return;
   }
 

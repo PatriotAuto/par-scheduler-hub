@@ -162,21 +162,24 @@ function initVehicleDropdowns() {
 
     try {
       // apiGet is defined in auth.js and automatically attaches token, etc.
-      const res = await apiGet({ action: "crm.listCustomers" });
+      const payload = await apiGet({ action: "crm.listCustomers" });
+      console.log("Customers raw response:", payload);
 
-      // Backend returns either:
-      //   [ {...}, {...} ]
-      // or { customers: [ ... ] }
-      let customers = [];
-      if (Array.isArray(res)) {
-        customers = res;
-      } else if (res && Array.isArray(res.customers)) {
-        customers = res.customers;
-      } else {
-        console.warn("Unexpected customers payload:", res);
+      const list =
+        Array.isArray(payload) ? payload :
+        Array.isArray(payload?.customers) ? payload.customers :
+        Array.isArray(payload?.data) ? payload.data :
+        Array.isArray(payload?.rows) ? payload.rows :
+        Array.isArray(payload?.result) ? payload.result :
+        [];
+
+      if (!Array.isArray(list)) {
+        console.error("Customers response invalid after normalization:", payload);
       }
 
-      state.customers = customers || [];
+      const customers = Array.isArray(list) ? list : [];
+
+      state.customers = customers;
       state.filtered = [];
       renderCustomers();
       setStatus(`${state.customers.length} customer(s) loaded.`);
@@ -216,4 +219,3 @@ function initVehicleDropdowns() {
     initCustomersPage();
   });
 })();
-
