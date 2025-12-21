@@ -64,18 +64,21 @@ async function loadLeads() {
   const filterVal = statusFilter ? statusFilter.value : '';
 
   try {
-    const res = await apiGet({
-      action: 'leads.list'
-    });
+    const query = filterVal ? `?status=${encodeURIComponent(filterVal)}` : '';
+    const url = `${API_BASE_URL}/leads${query}`;
+    const payload = await fetchJsonDebug(url);
+    console.log("Leads raw payload:", payload);
 
-    if (!res || res.success === false) {
-      console.error('Failed to load leads', res);
-      renderLeadsTable([]);
-      return;
+    const leadsList = normalizeList(payload, ["leads"]);
+    if (!leadsList.length) {
+      console.warn(
+        "Normalized empty list for leads:",
+        payload && typeof payload === "object" ? Object.keys(payload) : payload
+      );
     }
 
-    leadsCache = res.leads || [];
-    let leads = leadsCache;
+    leadsCache = leadsList;
+    let leads = leadsCache.slice();
 
     if (filterVal) {
       leads = leads.filter((l) => (l.status || '') === filterVal);
@@ -237,17 +240,14 @@ async function handleLeadSubmit(e) {
   };
 
   try {
-    const res = await apiGet({
-      action: 'leads.save',
-      token: token,
-      payload: JSON.stringify(payload)
+    const baseUrl = `${API_BASE_URL}/leads`;
+    const targetUrl = id ? `${baseUrl}/${encodeURIComponent(id)}` : baseUrl;
+    const method = id ? 'PUT' : 'POST';
+    await fetchJsonDebug(targetUrl, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-
-    if (!res || res.success === false) {
-      console.error('Failed to save lead', res);
-      alert('Failed to save lead.');
-      return;
-    }
 
     resetForm();
     loadLeads();
@@ -267,13 +267,13 @@ function startEditLead(id) {
   const token = authToken || (typeof getStoredToken === 'function' ? getStoredToken() : null);
   if (!token) return;
 
-  apiGet({ action: 'leads.list', token: token })
-    .then((res) => {
-      if (!res || res.success === false) return;
-      const leads = res.leads || [];
-      const lead = leads.find((l) => String(l.id) === String(id));
-      if (lead) {
-        fillFormFromLead(lead);
+  const url = `${API_BASE_URL}/leads/${encodeURIComponent(id)}`;
+  fetchJsonDebug(url)
+    .then((payload) => {
+      const leadObj = normalizeObject(payload, ["lead"]) ||
+        (Array.isArray(payload) ? payload.find((l) => String(l.id) === String(id)) : null);
+      if (leadObj) {
+        fillFormFromLead(leadObj);
       }
     })
     .catch((err) => console.error('Error loading single lead', err));
@@ -285,17 +285,9 @@ function confirmDeleteLead(id) {
   const token = authToken || (typeof getStoredToken === 'function' ? getStoredToken() : null);
   if (!token) return;
 
-  apiGet({
-    action: 'leads.delete',
-    token: token,
-    id: id
-  })
-    .then((res) => {
-      if (!res || res.success === false) {
-        console.error('Failed to delete lead', res);
-        alert('Failed to delete lead.');
-        return;
-      }
+  const url = `${API_BASE_URL}/leads/${encodeURIComponent(id)}`;
+  fetchJsonDebug(url, { method: 'DELETE' })
+    .then(() => {
       loadLeads();
     })
     .catch((err) => {

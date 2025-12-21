@@ -1100,6 +1100,7 @@
 </div>
 
   <script src="scripts/config.js"></script>
+  <script src="assets/js/api-client.js"></script>
   <script src="auth.js"></script>
 <script src="assets/js/vehicle-dropdowns.js"></script>
 <script>
@@ -3037,29 +3038,27 @@ function deleteTimeOff(){
 }
 
 async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
-  if (!GOOGLE_BACKEND_URL) return;
-
+  console.log("loadAppointmentsFromBackend: fetching from backend...");
   try {
-    console.log("loadAppointmentsFromBackend: fetching from backend...");
+    const url = `${API_BASE_URL}/appointments`;
+    const payload = await fetchJsonDebug(url);
 
-    const data = await apiGet('loadAppointments', { ts: Date.now() });
-    console.log("Backend raw payload:", data);
+    console.log("Backend raw payload:", payload);
 
-    if (!data || !data.ok || !Array.isArray(data.rows)) {
-      console.error("Unexpected backend payload shape", data);
-      return;
+    const appts = normalizeList(payload, ["appointments"]);
+    if (!Array.isArray(appts) || appts.length === 0) {
+      console.warn(
+        "Appointments normalized empty. Payload keys:",
+        payload && typeof payload === "object" ? Object.keys(payload) : payload
+      );
     }
 
     const newEvents = [];
 
-    data.rows.forEach(row => {
-      // row.id, row.date, row.time, row.tech, row.customerName, row.vehicle, row.services, row.status, row.notes, row.overrideClosed
+    safeArray(appts).forEach(row => {
       let dateStr = row.date;
-      if (typeof dateStr === "string") {
-        // If it's like "2025-01-13T00:00:00.000Z", keep only the first 10 chars
-        if (dateStr.length >= 10) {
-          dateStr = dateStr.slice(0, 10);
-        }
+      if (typeof dateStr === "string" && dateStr.length >= 10) {
+        dateStr = dateStr.slice(0, 10);
       }
 
       let timeStr = row.time;
@@ -3067,7 +3066,6 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
         if (/^\d{2}:\d{2}$/.test(timeStr)) {
           // already HH:MM, leave as is
         } else {
-          // Try to parse as a Date and extract HH:MM
           const dt = new Date(timeStr);
           if (!isNaN(dt.getTime())) {
             const hh = String(dt.getHours()).padStart(2, "0");
@@ -3134,39 +3132,45 @@ async function loadAppointmentsFromBackend(options = { replaceLocal: true }) {
     });
 
     console.log("Loaded from backend:", newEvents.length, "events");
-    if (newEvents.length > 0) {
-      // Only replace local events if we actually have some from backend
+    if (newEvents.length > 0 && options.replaceLocal !== false) {
       events = newEvents;
       if (typeof renderCalendar === "function") {
         renderCalendar();
       }
-    } else {
+    } else if (newEvents.length === 0) {
       console.warn("Backend returned no valid events. Keeping local events unchanged.");
     }
 
+    return newEvents;
   } catch (err) {
-    console.error("Error loading appointments from backend", err);
+    console.error("loadAppointmentsFromBackend failed:", err);
+    return [];
   }
 }
 
 async function loadTechSchedulesFromBackend() {
-  if (!GOOGLE_BACKEND_URL) return;
   try {
-    const data = await apiGet('loadTechSchedules', { ts: Date.now() });
-    if (!data.ok || !Array.isArray(data.rows)) return;
+    const payload = await fetchJsonDebug(`${API_BASE_URL}/employee_schedule`);
+    const rows = normalizeList(payload, ["employee_schedule", "schedules"]);
+    if (!rows.length) {
+      console.warn(
+        "Normalized empty list for tech schedules:",
+        payload && typeof payload === "object" ? Object.keys(payload) : payload
+      );
+    }
 
     const mergedSchedules = JSON.parse(JSON.stringify(techSchedules || {}));
-    data.rows.forEach(function(row) {
-      var tech = row.tech;
-      var weekday = row.weekday;
+    safeArray(rows).forEach(function(row) {
+      var tech = row.tech || row.technician || row.employee || row.employeeId || row.employeeID || row.employeeid || row.employee_name || row.employeename;
+      var weekday = row.weekday || row.dayOfWeek || row.dayofweek || row.day || row.week_day;
       if (!tech || !weekday) return;
 
       if (!mergedSchedules[tech]) mergedSchedules[tech] = {};
 
-      var off = (row.off === "YES");
+      var off = (row.off === "YES") || row.off === true || row.off === 1 || row.isWorking === false || row.isworking === false;
       mergedSchedules[tech][weekday] = {
-        start: row.startTime || "",
-        end: row.endTime || "",
+        start: row.startTime || row.start_time || row.start || row.starttime || "",
+        end: row.endTime || row.end_time || row.end || row.endtime || "",
         off: off
       };
     });
@@ -3184,54 +3188,69 @@ async function loadTechSchedulesFromBackend() {
 }
 
 async function loadTechTimeOffFromBackend() {
-  if (!GOOGLE_BACKEND_URL) return;
   try {
-    const data = await apiGet('loadTechTimeOff', { ts: Date.now() });
-    if (!data.ok || !Array.isArray(data.rows)) return;
+    const payload = await fetchJsonDebug(`${API_BASE_URL}/tech_time_off`);
+    const rows = normalizeList(payload, ["tech_time_off", "time_off"]);
+    if (!rows.length) {
+      console.warn(
+        "Normalized empty list for tech time off:",
+        payload && typeof payload === "object" ? Object.keys(payload) : payload
+      );
+    }
 
     events = events.filter(ev => ev.type !== "timeoff");
     let idBase = Date.now();
 
-    data.rows.forEach(function(row) {
-      const tech = row.tech || "";
-      const date = row.date || "";
-      if (!tech || !date) return;
+    safeArray(rows).forEach(function(row) {
+      const tech = row.tech || row.technician || row.employee || row.employeeName || row.employeename || row.employeeid || row.employee_id || "";
+      const startDate = row.date || row.startDate || row.startdate || "";
+      const endDate = row.endDate || row.enddate || startDate;
+      if (!tech || !startDate) return;
 
-      const dow = getDayName(new Date(date + "T00:00"));
-      const allDay = row.allDay === "YES";
-      const cfg = techSchedules[tech]?.[dow];
+      const allDay = row.allDay === "YES" || row.allDay === true || row.allday === true || row.allday === "TRUE";
+      const startTimeVal = row.startTime || row.starttime || "";
+      const endTimeVal = row.endTime || row.endtime || "";
+      const reason = row.reason || "";
 
-      let start = row.startTime || "";
-      let end = row.endTime || "";
+      const startObj = new Date(startDate + "T00:00:00");
+      const endObj = new Date(endDate + "T00:00:00");
+      for (let cursor = new Date(startObj); cursor <= endObj; cursor.setDate(cursor.getDate() + 1)) {
+        const dateIso = cursor.toISOString().slice(0, 10);
+        const dow = getDayName(cursor);
+        const cfg = techSchedules[tech]?.[dow];
 
-      if (allDay && cfg && !cfg.off) {
-        start = cfg.start || start;
-        end = cfg.end || end;
-      }
+        let start = startTimeVal;
+        let end = endTimeVal;
 
-      if (!start) start = (cfg && cfg.start) ? cfg.start : "09:00";
-      if (!end) end = (cfg && cfg.end) ? cfg.end : "17:00";
-      if (cfg && cfg.off) return;
-      if (!start || !end) return;
+        if (allDay && cfg && !cfg.off) {
+          start = cfg.start || start;
+          end = cfg.end || end;
+        }
 
-      const times = workTimes.filter(t => {
-        const m = timeToMinutes(t);
-        return m >= timeToMinutes(start) && m < timeToMinutes(end);
-      });
+        if (!start) start = (cfg && cfg.start) ? cfg.start : "09:00";
+        if (!end) end = (cfg && cfg.end) ? cfg.end : "17:00";
+        if (cfg && cfg.off) continue;
+        if (!start || !end) continue;
 
-      times.forEach(t => {
-        events.push({
-          id: "to-" + (idBase++),
-          type: "timeoff",
-          tech,
-          dept: null,
-          label: "Time Off",
-          date,
-          time: t,
-          dealer: false,
-          notes: row.reason || ""
+        const times = workTimes.filter(t => {
+          const m = timeToMinutes(t);
+          return m >= timeToMinutes(start) && m < timeToMinutes(end);
         });
-      });
+
+        times.forEach(t => {
+          events.push({
+            id: "to-" + (idBase++),
+            type: "timeoff",
+            tech,
+            dept: null,
+            label: "Time Off",
+            date: dateIso,
+            time: t,
+            dealer: false,
+            notes: reason
+          });
+        });
+      }
     });
 
     renderCalendar();
@@ -3241,18 +3260,24 @@ async function loadTechTimeOffFromBackend() {
 }
 
 async function loadHolidaysFromBackend() {
-  if (!GOOGLE_BACKEND_URL) return;
   try {
-    const data = await apiGet('loadHolidays', { ts: Date.now() });
-    if (!data.ok || !Array.isArray(data.rows)) return;
+    const payload = await fetchJsonDebug(`${API_BASE_URL}/holidays`);
+    const rows = normalizeList(payload, ["holidays"]);
+    if (!rows.length) {
+      console.warn(
+        "Normalized empty list for holidays:",
+        payload && typeof payload === "object" ? Object.keys(payload) : payload
+      );
+    }
 
-    shopHolidays = data.rows.map(function(row) {
+    shopHolidays = safeArray(rows).map(function(row) {
+      const closedAllDay = (row.closedAllDay === "YES") || row.closedAllDay === true || row.closed === true || row.shopClosed === true || row.shopclosed === true;
       return {
-        date: row.date,
-        label: row.name || "",
-        closedAllDay: (row.closedAllDay === "YES"),
-        openTime: row.openTime || "",
-        closeTime: row.closeTime || ""
+        date: row.date || row.holidayDate || row.holiday_date || row.Date,
+        label: row.name || row.holidayName || row.Holiday || "",
+        closedAllDay,
+        openTime: row.openTime || row.opentime || row.OpenTime || "",
+        closeTime: row.closeTime || row.closetime || row.CloseTime || ""
       };
     });
 
@@ -3264,21 +3289,29 @@ async function loadHolidaysFromBackend() {
 }
 
 async function loadServicesFromBackend() {
-  if (!GOOGLE_BACKEND_URL) return;
   try {
-    const data = await apiGet('loadServices', { ts: Date.now() });
-    if (!data.ok || !Array.isArray(data.rows)) return;
+    const payload = await fetchJsonDebug(`${API_BASE_URL}/services`);
+    const rows = normalizeList(payload, ["services"]);
+    if (!rows.length) {
+      console.warn(
+        "Normalized empty list for services:",
+        payload && typeof payload === "object" ? Object.keys(payload) : payload
+      );
+    }
 
     const rebuilt = {};
 
-    data.rows.forEach(function(row) {
-      if (row.active !== "YES") return;
-      var cat = row.category || "General";
+    safeArray(rows).forEach(function(row) {
+      const isActive = row.active === true || row.active === "YES" || row.active === 1 || row.is_active === true || row.is_active === 1 || row.Active === "TRUE" || row.Active === "Yes";
+      if (isActive === false) return;
+      var cat = row.category || row.department || "General";
       if (!rebuilt[cat]) rebuilt[cat] = [];
+      const minutesVal = row.defaultMinutes || row.minutes || row.duration || row.duration_minutes || row.Duration || 0;
+      const priceVal = row.defaultPrice || row.price || row.Price || 0;
       rebuilt[cat].push({
-        name: row.serviceName || "",
-        minutes: row.defaultMinutes ? Math.max(15, parseInt(row.defaultMinutes, 10) || 0) : 0,
-        price: row.defaultPrice ? parseFloat(row.defaultPrice) || 0 : 0
+        name: row.serviceName || row.servicename || row.name || row.ServiceName || "",
+        minutes: minutesVal ? Math.max(15, parseInt(minutesVal, 10) || 0) : 0,
+        price: priceVal ? parseFloat(priceVal) || 0 : 0
       });
     });
 
@@ -3297,20 +3330,25 @@ let techs = [];
 
 async function loadTechsFromCloud() {
   try {
-    const json = await apiGet('getEmployees');
-    const employees = json.employees || json;
+    const url = `${API_BASE_URL}/employees`;
+    const payload = await fetchJsonDebug(url);
+    console.log("Employees raw payload:", payload);
 
-    techs = (employees || [])
-      .filter(e => {
-        const isTech = e.isTechnician;
-        const status = String(e.status || '').toLowerCase();
-        return isTech && status === 'active';
-      })
+    const employees = normalizeList(payload, ["employees", "techs"]);
+    if (!Array.isArray(employees)) {
+      console.error("Employees normalization failed:", payload);
+      return [];
+    }
+
+    const activeEmployees = employees.filter(e => e && (e.active === true || e.active === 1 || e.is_active === true || e.is_active === 1 || String(e.status || '').toLowerCase() === "active" || e.status === undefined));
+
+    techs = activeEmployees
+      .filter(e => e && (e.isTechnician === true || e.isTechnician === "true" || e.role === "Tech" || e.role === "Technician" || e.istechnician === true))
       .map(e => {
-        const first = e.firstName || '';
-        const last  = e.lastName || '';
+        const first = e.firstName || e.FirstName || e.firstname || '';
+        const last  = e.lastName || e.LastName || e.lastname || '';
         const full  = (first + ' ' + last).trim();
-        return e.displayName || full || e.employeeId;
+        return e.displayName || e.DisplayName || full || e.employeeId || e.EmployeeID || e.employeeid;
       });
 
     document.documentElement.style.setProperty('--tech-count', techs.length);

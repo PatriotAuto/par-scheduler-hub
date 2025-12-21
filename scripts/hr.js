@@ -52,38 +52,7 @@
   // ---- Departments ----
   async function loadDepartments() {
     try {
-      const url = `${API_BASE_URL}/departments`;
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Failed to load departments:", res.status, text);
-        throw new Error(`Departments request failed: ${res.status}`);
-      }
-
-      const data = await res.json();
-      console.log("Departments raw response:", data);
-
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.departments)
-        ? data.departments
-        : Array.isArray(data?.data)
-        ? data.data
-        : Array.isArray(data?.rows)
-        ? data.rows
-        : Array.isArray(data?.result)
-        ? data.result
-        : [];
-
-      if (!Array.isArray(list)) {
-        console.error("Departments response invalid after normalization:", data);
-        throw new Error("Departments response shape invalid");
-      }
-
-      if (!list.length && data && Object.keys(data || {}).length) {
-        console.error("Departments response empty after normalization:", data);
-      }
+      const list = await fetchListResource("/departments", "departments", ["departments"]);
 
       departments = list
         .filter((d) => d && (d.name || d.department_name || d.title))
@@ -144,8 +113,25 @@
   // ---- Employees ----
   async function loadEmployees() {
     try {
-      const data = await apiGet('getEmployees');
-      employees = (data && data.employees) || [];
+      const list = await fetchListResource("/employees", "employees", ["employees", "techs"]);
+      employees = list.map((e) => {
+        const departmentsRaw = e.departments || e.Departments || "";
+        const departments = Array.isArray(departmentsRaw)
+          ? departmentsRaw
+          : typeof departmentsRaw === "string"
+          ? departmentsRaw.split(",").map((d) => d.trim()).filter(Boolean)
+          : [];
+
+        return {
+          employeeId: e.employeeId || e.employeeid || e.EmployeeID || e.id,
+          firstName: e.firstName || e.firstname || e.FirstName || "",
+          lastName: e.lastName || e.lastname || e.LastName || "",
+          role: e.role || e.Role || "",
+          status: e.status || e.Status || "",
+          departments,
+          isTechnician: e.isTechnician ?? e.istechnician ?? e.IsTechnician ?? false,
+        };
+      });
       filteredEmployees = employees.slice();
 
       renderEmployeeList();
@@ -589,17 +575,24 @@
     currentScheduleEmployeeId = employeeId;
 
     try {
-      const data = await apiGet({ action: 'getEmployeeSchedule', employeeId });
-      const schedule = (data && data.schedule) || [];
+      const url = `${API_BASE_URL}/employee_schedule?employee_id=${encodeURIComponent(employeeId)}`;
+      const payload = await fetchJsonDebug(url);
+      const schedule = normalizeList(payload, ["employee_schedule", "schedules"]);
+      if (!schedule.length) {
+        console.warn(
+          "Normalized empty list for employee schedule:",
+          payload && typeof payload === "object" ? Object.keys(payload) : payload
+        );
+      }
 
       // Normalize into entries for the form
       const entries = schedule.map((row) => ({
-        dayOfWeek: row.dayOfWeek,
-        isWorking: row.isWorking,
-        startTime: row.startTime,
-        endTime: row.endTime,
-        location: row.location,
-        bay: row.bay,
+        dayOfWeek: row.dayOfWeek || row.dayofweek || row.day || row.weekday,
+        isWorking: row.isWorking ?? row.isworking ?? (row.off === "YES" ? false : true),
+        startTime: row.startTime || row.starttime || row.start || row.start_time || "",
+        endTime: row.endTime || row.endtime || row.end || row.end_time || "",
+        location: row.location || row.Location || "",
+        bay: row.bay || row.Bay || "",
       }));
 
       fillScheduleForm(entries);
@@ -675,8 +668,26 @@
       container.innerHTML = "";
     }
     try {
-      const data = await apiGet('getTimeOff');
-      timeOffEntries = (data && data.timeOff) || [];
+      const payload = await fetchJsonDebug(`${API_BASE_URL}/tech_time_off`);
+      const list = normalizeList(payload, ["tech_time_off", "time_off"]);
+      if (!list.length) {
+        console.warn(
+          "Normalized empty list for tech time off:",
+          payload && typeof payload === "object" ? Object.keys(payload) : payload
+        );
+      }
+      timeOffEntries = list.map((row, idx) => ({
+        timeOffId: row.timeOffId || row.timeoffid || row.TimeOffID || row.id || idx + 1,
+        employeeName: row.employeeName || row.employeename || row.employee || row.tech || "",
+        employeeId: row.employeeId || row.employeeid || row.EmployeeID || "",
+        startDate: row.startDate || row.startdate || row.date || "",
+        endDate: row.endDate || row.enddate || row.date || "",
+        startTime: row.startTime || row.starttime || "",
+        endTime: row.endTime || row.endtime || "",
+        allDay: row.allDay === true || row.allDay === "YES" || row.allday === true || row.allday === "TRUE",
+        status: row.status || "",
+        reason: row.reason || "",
+      }));
       filteredTimeOffEntries = timeOffEntries.slice();
       renderTimeOffList();
     } catch (err) {
@@ -1011,32 +1022,24 @@
     if (container) container.innerHTML = "";
 
     try {
-      const data = await apiGet('loadHolidays');
-
-      // New backend shape: { ok, holidays: [ { id, name, date, shopClosed, openTime, closeTime, notes } ] }
-      if (data && Array.isArray(data.holidays)) {
-        holidays = data.holidays.map((row) => ({
-          id: String(row.id || row.holidayId || ""),
-          name: row.name || row.holidayName || row.Name || "",
-          date: row.date || row.Date || "",
-          shopClosed: !!(row.shopClosed ?? row.ShopClosed ?? row.closed),
-          openTime: row.openTime || row.OpenTime || "",
-          closeTime: row.closeTime || row.CloseTime || "",
-          notes: row.notes || row.Notes || "",
-        }));
-      } else {
-        // Fallback if something older ever calls it
-        const rows = (data && data.rows) || [];
-        holidays = rows.map((row, idx) => ({
-          id: String(row.id || row.holidayId || row.rowNumber || idx + 1),
-          name: row.Name || row.Holiday || row.holidayName || "",
-          date: row.Date || row.date || "",
-          shopClosed: !!(row.ShopClosed || row.closed),
-          openTime: row.OpenTime || row.openTime || "",
-          closeTime: row.CloseTime || row.closeTime || "",
-          notes: row.Notes || row.notes || "",
-        }));
+      const payload = await fetchJsonDebug(`${API_BASE_URL}/holidays`);
+      const holidayRows = normalizeList(payload, ["holidays"]);
+      if (!holidayRows.length) {
+        console.warn(
+          "Normalized empty list for holidays:",
+          payload && typeof payload === "object" ? Object.keys(payload) : payload
+        );
       }
+
+      holidays = holidayRows.map((row, idx) => ({
+        id: String(row.id || row.holidayId || row.rowNumber || idx + 1),
+        name: row.name || row.holidayName || row.Name || "",
+        date: row.date || row.Date || "",
+        shopClosed: !!(row.shopClosed ?? row.ShopClosed ?? row.closed),
+        openTime: row.openTime || row.OpenTime || "",
+        closeTime: row.closeTime || row.CloseTime || "",
+        notes: row.notes || row.Notes || "",
+      }));
 
       renderHolidayList();
     } catch (err) {

@@ -1,9 +1,11 @@
-// Legacy shim so older code doesn't crash.
-// The actual Year/Make/Model dropdowns are now initialized via DOMContentLoaded.
-function initVehicleDropdowns() {
-  console.log('[YMM] initVehicleDropdowns called (legacy no-op).');
-  // No action needed because the DOMContentLoaded handler already set up the dropdowns.
+// Ensure initVehicleDropdowns exists even if vehicle-dropdowns.js isn't loaded.
+if (typeof window !== "undefined" && typeof window.initVehicleDropdowns !== "function") {
+  window.initVehicleDropdowns = function () {
+    console.log('[YMM] initVehicleDropdowns called (legacy no-op).');
+    return Promise.resolve(null);
+  };
 }
+const initVehicleDropdowns = (typeof window !== "undefined" && window.initVehicleDropdowns) ? window.initVehicleDropdowns : function () { return Promise.resolve(null); };
 
 // customers.js
 // Clean customers page logic using apiGet() from auth.js
@@ -161,23 +163,17 @@ function initVehicleDropdowns() {
     setError("");
 
     try {
-      // apiGet is defined in auth.js and automatically attaches token, etc.
-      const payload = await apiGet({ action: "crm.listCustomers" });
+      const url = `${API_BASE_URL}/customers`;
+      const payload = await fetchJsonDebug(url);
       console.log("Customers raw response:", payload);
 
-      const list =
-        Array.isArray(payload) ? payload :
-        Array.isArray(payload?.customers) ? payload.customers :
-        Array.isArray(payload?.data) ? payload.data :
-        Array.isArray(payload?.rows) ? payload.rows :
-        Array.isArray(payload?.result) ? payload.result :
-        [];
-
-      if (!Array.isArray(list)) {
-        console.error("Customers response invalid after normalization:", payload);
+      const customers = normalizeList(payload, ["customers"]);
+      if (!Array.isArray(customers) || !customers.length) {
+        console.warn(
+          "Normalized empty list for customers:",
+          payload && typeof payload === "object" ? Object.keys(payload) : payload
+        );
       }
-
-      const customers = Array.isArray(list) ? list : [];
 
       state.customers = customers;
       state.filtered = [];
@@ -196,6 +192,9 @@ function initVehicleDropdowns() {
 
   async function initCustomersPage() {
     try {
+      if (typeof ensureLoggedIn === "function" && !ensureLoggedIn()) {
+        return;
+      }
       // Require login using auth.js helper if present
       if (typeof getStoredUser === "function") {
         const user = getStoredUser();

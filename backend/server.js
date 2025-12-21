@@ -49,17 +49,21 @@ const pool = new Pool({
   ssl: sslConfig,
   connectionTimeoutMillis: 8000
 });
+console.log("DB:", DB_URL ? "DATABASE_URL set" : "DATABASE_URL MISSING");
 
 // --------------------
 // Health
 // --------------------
 app.get("/health", async (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+app.get("/debug/db", async (req, res) => {
   try {
-    if (!DB_URL) return res.status(500).json({ ok: false, db: false, error: "DATABASE_URL_MISSING" });
-    const r = await pool.query("select now() as now");
-    res.json({ ok: true, db: true, now: r.rows[0].now });
+    const r = await pool.query("SELECT now() as now, (select count(*)::int from customers) as customers");
+    res.json(r.rows || []);
   } catch (e) {
-    res.status(500).json({ ok: false, db: false, error: String(e) });
+    console.error("GET /debug/db failed:", e);
+    res.status(500).json({ error: "Internal server error", detail: e.message });
   }
 });
 app.get("/favicon.ico", (req, res) => res.status(204).end());
@@ -111,12 +115,30 @@ app.use("/api/auth", authRouter);
 function requireAuth(req, res, next) {
   const h = req.headers.authorization || "";
   const parts = h.split(" ");
-  if (parts.length !== 2 || parts[0] !== "Bearer" || !parts[1]) {
-    return res.status(401).json({ ok: false, error: "UNAUTHORIZED" });
+  const queryToken = req.query.token;
+  const bearerToken = (parts.length === 2 && parts[0] === "Bearer" && parts[1]) ? parts[1] : null;
+  const token = bearerToken || queryToken;
+
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
   // We are NOT validating token server-side yet (temporary)
-  req.user = { token: parts[1] };
+  req.user = { token };
   next();
+}
+
+function handleError(res, err, status = 500) {
+  console.error(err);
+  res.status(status).json({ error: "Internal server error", detail: err.message || String(err) });
+}
+
+async function listQuery(res, sql, params = []) {
+  try {
+    const r = await pool.query(sql, params);
+    return res.json(r.rows || []);
+  } catch (e) {
+    handleError(res, e);
+  }
 }
 
 // --------------------
@@ -128,40 +150,125 @@ api.use(requireAuth);
 // NOTE: we’ll mount this router at BOTH / and /api to reduce frontend breakage.
 
 api.get("/customers", async (req, res) => {
-  try {
-    const r = await pool.query(`SELECT * FROM customers ORDER BY created_at DESC NULLS LAST`);
-    res.json({ ok: true, customers: r.rows });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  await listQuery(res, `SELECT * FROM customers ORDER BY created_at DESC NULLS LAST`);
 });
 
 api.get("/employees", async (req, res) => {
-  try {
-    const r = await pool.query(`SELECT * FROM employees ORDER BY last_name ASC NULLS LAST, first_name ASC NULLS LAST`);
-    res.json({ ok: true, employees: r.rows });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  await listQuery(res, `SELECT * FROM employees ORDER BY last_name ASC NULLS LAST, first_name ASC NULLS LAST`);
 });
 
 api.get("/services", async (req, res) => {
-  try {
-    const r = await pool.query(`SELECT * FROM services ORDER BY name ASC NULLS LAST`);
-    res.json({ ok: true, services: r.rows });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+  await listQuery(res, `SELECT * FROM services`);
 });
 
 api.get("/departments", async (req, res) => {
+  await listQuery(res, `SELECT * FROM departments ORDER BY name ASC NULLS LAST`);
+});
+
+api.get("/appointments", async (req, res) => {
+  await listQuery(res, `SELECT * FROM appointments ORDER BY date ASC NULLS LAST, time ASC NULLS LAST`);
+});
+
+api.get("/employee_schedule", async (req, res) => {
+  const employeeId = req.query.employee_id || req.query.employeeId;
+  const sql = employeeId
+    ? `SELECT * FROM employee_schedule WHERE employeeid = $1 OR employee_id = $1 ORDER BY dayofweek ASC NULLS LAST`
+    : `SELECT * FROM employee_schedule ORDER BY employeeid ASC NULLS LAST, dayofweek ASC NULLS LAST`;
+  await listQuery(res, sql, employeeId ? [employeeId] : []);
+});
+
+api.get("/tech_time_off", async (req, res) => {
+  await listQuery(res, `SELECT * FROM tech_time_off ORDER BY startdate ASC NULLS LAST`);
+});
+
+api.get("/holidays", async (req, res) => {
+  await listQuery(res, `SELECT * FROM holidays ORDER BY date ASC NULLS LAST`);
+});
+
+api.get("/leads", async (req, res) => {
+  const status = req.query.status;
+  if (status) {
+    await listQuery(res, `SELECT * FROM leads WHERE LOWER(status) = LOWER($1) ORDER BY createdat DESC NULLS LAST`, [status]);
+  } else {
+    await listQuery(res, `SELECT * FROM leads ORDER BY createdat DESC NULLS LAST`);
+  }
+});
+
+api.post("/leads", async (req, res) => {
   try {
-    const r = await pool.query(`SELECT * FROM departments ORDER BY name ASC NULLS LAST`);
-    const rows = Array.isArray(r && r.rows) ? r.rows : [];
-    res.json({ ok: true, departments: rows });
+    const lead = req.body || {};
+    const values = [
+      lead.contactName || lead.contactname || "",
+      lead.phone || "",
+      lead.email || "",
+      lead.source || "",
+      lead.status || "",
+      lead.vehicleYear || lead.vehicleyear || "",
+      lead.vehicleMake || lead.vehiclemake || "",
+      lead.vehicleModel || lead.vehiclemodel || "",
+      lead.serviceInterest || lead.serviceinterest || "",
+      lead.budget || "",
+      lead.notes || ""
+    ];
+    const insertSql = `
+      INSERT INTO leads (contactname, phone, email, source, status, vehicleyear, vehiclemake, vehiclemodel, serviceinterest, budget, notes, createdat, updatedat)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), now())
+      RETURNING *`;
+    const result = await pool.query(insertSql, values);
+    res.status(201).json(result.rows || []);
   } catch (e) {
-    console.error("GET /departments failed:", e);
-    res.status(500).json({ ok: false, departments: [], error: String(e) });
+    handleError(res, e);
+  }
+});
+
+api.put("/leads/:id", async (req, res) => {
+  try {
+    const lead = req.body || {};
+    const id = req.params.id;
+    const values = [
+      lead.contactName || lead.contactname || "",
+      lead.phone || "",
+      lead.email || "",
+      lead.source || "",
+      lead.status || "",
+      lead.vehicleYear || lead.vehicleyear || "",
+      lead.vehicleMake || lead.vehiclemake || "",
+      lead.vehicleModel || lead.vehiclemodel || "",
+      lead.serviceInterest || lead.serviceinterest || "",
+      lead.budget || "",
+      lead.notes || "",
+      id
+    ];
+    const updateSql = `
+      UPDATE leads
+         SET contactname=$1,
+             phone=$2,
+             email=$3,
+             source=$4,
+             status=$5,
+             vehicleyear=$6,
+             vehiclemake=$7,
+             vehiclemodel=$8,
+             serviceinterest=$9,
+             budget=$10,
+             notes=$11,
+             updatedat=now()
+       WHERE id=$12
+       RETURNING *`;
+    const result = await pool.query(updateSql, values);
+    res.json(result.rows || []);
+  } catch (e) {
+    handleError(res, e);
+  }
+});
+
+api.delete("/leads/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    await pool.query(`DELETE FROM leads WHERE id=$1`, [id]);
+    res.json({ ok: true });
+  } catch (e) {
+    handleError(res, e);
   }
 });
 

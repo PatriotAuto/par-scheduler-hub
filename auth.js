@@ -121,23 +121,28 @@ function apiPost(action, body) {
 
   const url = withAuthQuery(baseUrl + '?action=' + encodeURIComponent(action));
 
-  return fetch(url, {
+  return fetchJsonDebug(url, {
     method: 'POST',
     headers: buildAuthHeaders(),
     body: JSON.stringify(body || {})
   })
-    .then(async function (res) {
-      const json = await res.json().catch(function () { return {}; });
-
-      if (!res.ok || json.success === false || json.ok === false) {
-        const handled = handleAuthFailure(json, res.status);
+    .then(function (json) {
+      if (!json || json.success === false || json.ok === false) {
+        const handled = handleAuthFailure(json, 400);
         if (!handled) {
           console.error('API POST error:', action, json);
         }
-        throw json;
+        throw json || new Error('API POST failed');
       }
 
       return json;
+    })
+    .catch(function (err) {
+      const handled = handleAuthFailure({}, err && err.status);
+      if (!handled) {
+        console.error('API POST error:', action, err);
+      }
+      throw err;
     });
 }
 
@@ -164,21 +169,25 @@ async function apiGet(paramsOrAction, maybeExtraParams = {}) {
 
   const url = baseUrl + '?' + qs.toString();
 
-  const resp = await fetch(url, {
-    method: 'GET',
-    // IMPORTANT: do NOT set Content-Type to application/json here,
-    // keep it simple so the browser does not send a CORS preflight
-  });
+  try {
+    const json = await fetchJsonDebug(url, {
+      method: 'GET'
+    });
 
-  const json = await resp.json().catch(function () { return {}; });
-
-  if (!resp.ok || json.success === false || json.ok === false) {
-    const handled = handleAuthFailure(json, resp.status);
-    if (!handled) {
-      console.error('API GET error:', url, json);
+    if (!json || json.success === false || json.ok === false) {
+      const handled = handleAuthFailure(json, 400);
+      if (!handled) {
+        console.error('API GET error:', url, json);
+      }
+      throw json || new Error('API GET failed');
     }
-    throw json;
-  }
 
-  return json;
+    return json;
+  } catch (err) {
+    const handled = handleAuthFailure({}, err && err.status);
+    if (!handled) {
+      console.error('API GET error:', url, err);
+    }
+    throw err;
+  }
 }

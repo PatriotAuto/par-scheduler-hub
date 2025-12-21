@@ -68,6 +68,7 @@
     }
   </style>
   <script src="scripts/config.js"></script>
+  <script src="assets/js/api-client.js"></script>
 </head>
 <body>
   <div class="login-card">
@@ -113,42 +114,34 @@
 
       const url = `${API_BASE_URL}/auth/login`;
 
-      fetch(url, {
+      fetchJsonDebug(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ email, password })
       })
-      .then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (data) {
-          return { ok: res.ok, status: res.status, data: data };
-        });
-      })
-      .then(function (result) {
-        const data = result.data || {};
+        .then(function (data) {
+          const payload = data || {};
 
-        if (!result.ok || !data.success) {
-          if (result.status === 401 || result.status === 403) {
-            showError('Invalid email or password.');
-          } else {
-            showError(data.message || 'Login failed.');
+          if (!payload.success) {
+            showError(payload.message || 'Login failed.');
+            loginBtn.disabled = false;
+            return;
           }
+
+          // Save token + user to localStorage
+          localStorage.setItem(PS_TOKEN_KEY, payload.token);
+          localStorage.setItem(PS_USER_KEY, JSON.stringify(payload.user || {}));
+
+          window.location.href = LOGIN_TARGET_PAGE;
+        })
+        .catch(function (err) {
+          console.error('Login error:', err);
+          const message = (err && err.status === 401) ? 'Invalid email or password.' : ((err && err.body) ? 'Login failed: ' + err.body.slice(0, 120) : 'Error contacting server.');
+          showError(message);
           loginBtn.disabled = false;
-          return;
-        }
-
-        // Save token + user to localStorage
-        localStorage.setItem(PS_TOKEN_KEY, data.token);
-        localStorage.setItem(PS_USER_KEY, JSON.stringify(data.user || {}));
-
-        window.location.href = LOGIN_TARGET_PAGE;
-      })
-      .catch(function (err) {
-        console.error('Login error:', err);
-        showError('Error contacting server.');
-        loginBtn.disabled = false;
-      });
+        });
     }
 
     loginForm.addEventListener('submit', handleLogin);
