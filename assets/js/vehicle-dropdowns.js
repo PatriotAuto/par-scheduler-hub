@@ -7,6 +7,15 @@ const BACKEND_URL = (typeof window !== 'undefined' && window.API_BASE_URL)
     ? globalThis.BACKEND_URL
     : '';
 
+let vehicleDropdownsReadyResolver;
+const vehicleDropdownsReadyPromise = new Promise((resolve) => {
+  vehicleDropdownsReadyResolver = resolve;
+});
+
+function initVehicleDropdowns() {
+  return vehicleDropdownsReadyPromise;
+}
+
 // Generic helper to build backend URLs
 function buildBackendUrl(action, params) {
   if (!BACKEND_URL) {
@@ -28,8 +37,7 @@ function buildBackendUrl(action, params) {
 async function apiGetJson(action, params) {
   const url = buildBackendUrl(action, params);
   console.log('[YMM] Fetching', url);
-  const resp = await fetch(url, { method: 'GET' });
-  const data = await resp.json();
+  const data = await fetchJsonDebug(url, { method: 'GET' });
   console.log('[YMM] Response', action, data);
   return data;
 }
@@ -56,6 +64,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const modelSelect = document.getElementById('vehicleModel');
 
   if (!yearSelect || !makeSelect || !modelSelect) {
+    if (typeof vehicleDropdownsReadyResolver === 'function') {
+      vehicleDropdownsReadyResolver(null);
+    }
     return;
   }
 
@@ -155,4 +166,24 @@ document.addEventListener('DOMContentLoaded', function () {
       modelSelect.classList.remove('loading');
     }
   });
+
+  const controller = {
+    setValues({ year, make, model }) {
+      if (yearSelect) {
+        yearSelect.value = year || '';
+        yearSelect.dispatchEvent(new Event('change'));
+      }
+      if (makeSelect && make) {
+        makeSelect.value = make;
+        makeSelect.dispatchEvent(new Event('change'));
+      }
+      if (modelSelect && model) {
+        modelSelect.value = model;
+      }
+    }
+  };
+
+  if (typeof vehicleDropdownsReadyResolver === 'function') {
+    vehicleDropdownsReadyResolver(controller);
+  }
 });
