@@ -1284,7 +1284,7 @@ const vinHelperText=document.getElementById("vinHelperText");
 const btnVinScan=document.getElementById("btnVinScan");
 const defaultVinHelperText="Scan VIN to auto-fill year, make, and model.";
 
-vehicleDropdownsReady=initVehicleDropdowns();
+vehicleDropdownsReady=(window.initVehicleDropdowns&&window.initVehicleDropdowns())||Promise.resolve(null);
 vehicleDropdownsReady.then((controller)=>{vehicleDropdownsController=controller;});
 
 const appointmentPopup=document.getElementById("appointmentPopup");

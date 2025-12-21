@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetBtn = document.getElementById('lead-reset-btn');
   const statusFilter = document.getElementById('leads-status-filter');
 
-  vehicleDropdownsReady = initVehicleDropdowns();
+  vehicleDropdownsReady = (window.initVehicleDropdowns && window.initVehicleDropdowns()) || Promise.resolve(null);
   vehicleDropdownsReady.then((controller) => {
     vehicleDropdownsController = controller;
   });
