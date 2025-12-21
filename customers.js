@@ -1,12 +1,3 @@
-// Ensure initVehicleDropdowns exists even if vehicle-dropdowns.js isn't loaded.
-if (typeof window !== "undefined" && typeof window.initVehicleDropdowns !== "function") {
-  window.initVehicleDropdowns = function () {
-    console.log('[YMM] initVehicleDropdowns called (legacy no-op).');
-    return Promise.resolve(null);
-  };
-}
-const initVehicleDropdowns = (typeof window !== "undefined" && window.initVehicleDropdowns) ? window.initVehicleDropdowns : function () { return Promise.resolve(null); };
-
 // customers.js
 // Clean customers page logic using apiGet() from auth.js
 // No top-level await, everything wrapped in async init function.
@@ -205,7 +196,7 @@ const initVehicleDropdowns = (typeof window !== "undefined" && window.initVehicl
         }
       }
 
-      vehicleDropdownsReady = initVehicleDropdowns();
+      vehicleDropdownsReady = window.initVehicleDropdowns && window.initVehicleDropdowns();
       wireEvents();
       await fetchCustomers();
     } catch (err) {
