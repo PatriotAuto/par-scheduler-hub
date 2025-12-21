@@ -200,7 +200,7 @@
 
   function renderCustomers(list) {
     const tbody = $("customersTableBody");
-    const cardsContainer = document.getElementById("customersCards");
+    const cardsContainer = $("customersCards");
     if (!tbody) {
       console.warn("customers.js: #customersTableBody not found in DOM.");
       return;
@@ -272,18 +272,24 @@
         const card = document.createElement("div");
         card.className = "customer-card";
         card.innerHTML = `
-          <div class="customer-card__top">
-            <div>
-              <div class="customer-card__name">${escapeHtml(cust.name)}</div>
-              <div class="customer-card__sub">${escapeHtml([cust.phone, cust.email].filter(Boolean).join(" • "))}</div>
-            </div>
+          <div class="customer-card__name">${escapeHtml(cust.name)}</div>
+          <div class="customer-card__meta">
+            ${escapeHtml([cust.phone, cust.email].filter(Boolean).join(" • "))}
           </div>
-          ${cust.vehicle ? `<div class="customer-card__sub">Vehicle: ${escapeHtml(cust.vehicle)}</div>` : ""}
-          <div class="customer-card__cta">
+          ${
+            cust.vehicle
+              ? `<div class="customer-card__meta">Vehicle: ${escapeHtml(cust.vehicle)}</div>`
+              : ""
+          }
+          <div class="customer-card__actions">
             <button class="customer-card__btn" type="button">View Profile</button>
           </div>
         `;
-        card.querySelector("button")?.addEventListener("click", () => openProfile(cust));
+        card.addEventListener("click", () => openProfile(cust));
+        card.querySelector("button")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openProfile(cust);
+        });
         cardsContainer.appendChild(card);
       }
     });
