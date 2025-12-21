@@ -200,6 +200,7 @@
 
   function renderCustomers(list) {
     const tbody = $("customersTableBody");
+    const cardsContainer = document.getElementById("customersCards");
     if (!tbody) {
       console.warn("customers.js: #customersTableBody not found in DOM.");
       return;
@@ -211,8 +212,9 @@
       ? state.filtered
       : state.customers;
 
-    // Clear existing rows
+    // Clear existing rows/cards
     tbody.innerHTML = "";
+    if (cardsContainer) cardsContainer.innerHTML = "";
 
     if (!rows.length) {
       const tr = document.createElement("tr");
@@ -222,6 +224,13 @@
       td.style.textAlign = "center";
       tr.appendChild(td);
       tbody.appendChild(tr);
+
+      if (cardsContainer) {
+        const empty = document.createElement("div");
+        empty.className = "customer-card";
+        empty.textContent = "No customers found.";
+        cardsContainer.appendChild(empty);
+      }
       return;
     }
 
@@ -258,6 +267,25 @@
       tr.addEventListener("click", () => openProfile(cust));
 
       tbody.appendChild(tr);
+
+      if (cardsContainer) {
+        const card = document.createElement("div");
+        card.className = "customer-card";
+        card.innerHTML = `
+          <div class="customer-card__top">
+            <div>
+              <div class="customer-card__name">${escapeHtml(cust.name)}</div>
+              <div class="customer-card__sub">${escapeHtml([cust.phone, cust.email].filter(Boolean).join(" • "))}</div>
+            </div>
+          </div>
+          ${cust.vehicle ? `<div class="customer-card__sub">Vehicle: ${escapeHtml(cust.vehicle)}</div>` : ""}
+          <div class="customer-card__cta">
+            <button class="customer-card__btn" type="button">View Profile</button>
+          </div>
+        `;
+        card.querySelector("button")?.addEventListener("click", () => openProfile(cust));
+        cardsContainer.appendChild(card);
+      }
     });
   }
 
@@ -513,6 +541,9 @@
     document.getElementById("profileBackToList")?.addEventListener("click", closeProfile);
     document.getElementById("profileDrawer")?.addEventListener("click", (e) => {
       if (e.target && e.target.id === "profileDrawer") closeProfile();
+    });
+    document.getElementById("alphaToggle")?.addEventListener("click", () => {
+      document.getElementById("alphaBar")?.classList.toggle("open");
     });
     initCustomersPage();
   });
