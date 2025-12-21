@@ -570,6 +570,76 @@
   .customer-table th, .customer-table td { font-size: 14px; }
   .customer-table .col-email { width: 30%; }
 }
+
+.alpha-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.alpha-btn {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+}
+.alpha-btn.active {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.35);
+}
+.alpha-count {
+  opacity: 0.75;
+  margin-left: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.profile-drawer {
+  position: fixed;
+  inset: 0;
+  display: none;
+  background: rgba(0,0,0,0.45);
+  z-index: 9999;
+}
+.profile-drawer.open { display: block; }
+.profile-drawer__panel {
+  position: absolute;
+  top: 0; right: 0;
+  height: 100%;
+  width: min(520px, 92vw);
+  background: rgba(12,18,32,0.98);
+  border-left: 1px solid rgba(255,255,255,0.12);
+  padding: 16px;
+  overflow: auto;
+}
+.profile-drawer__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.profile-title { font-size: 20px; font-weight: 800; }
+.profile-sub { opacity: 0.75; margin-top: 4px; }
+.profile-close {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  color: #fff;
+}
+.profile-body { padding: 12px 0; }
+.profile-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; padding: 8px 0; }
+.profile-label { opacity: 0.7; font-weight: 700; }
+.profile-actions { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.12); }
 </style>
 </head>
 <body>
@@ -614,6 +684,10 @@
     </div>
 
     <div id="customersError" class="error-text" style="padding: 4px 24px;"></div>
+
+    <div style="padding: 0 24px;">
+      <div class="alpha-bar" id="alphaBar"></div>
+    </div>
 
     <div style="padding: 0 24px 16px;">
       <table class="customer-table customers-table">
@@ -1140,6 +1214,26 @@
         </div>
         <ul id="globalSearchInvoicesList" class="lookup-list"></ul>
       </section>
+    </div>
+  </div>
+</div>
+
+<div class="profile-drawer" id="profileDrawer" aria-hidden="true">
+  <div class="profile-drawer__panel">
+    <div class="profile-drawer__header">
+      <div>
+        <div class="profile-title" id="profileName"></div>
+        <div class="profile-sub" id="profileSub"></div>
+      </div>
+      <button type="button" class="profile-close" id="profileClose">✕</button>
+    </div>
+
+    <div class="profile-body" id="profileBody"></div>
+
+    <div class="profile-actions">
+      <button type="button" id="profileCopyPhone">Copy Phone</button>
+      <button type="button" id="profileCopyEmail">Copy Email</button>
+      <button type="button" id="profileBackToList">Back to List</button>
     </div>
   </div>
 </div>
