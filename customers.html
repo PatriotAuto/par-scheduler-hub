@@ -626,28 +626,35 @@
 }
 
 .customer-cards { display: none; }
+
 .customer-card {
   border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.05);
   border-radius: 14px;
-  padding: 12px;
-  margin: 10px 0;
+  padding: 14px;
+  margin-bottom: 12px;
 }
-.customer-card__top {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
+
+.customer-card__name {
+  font-weight: 900;
+  font-size: 17px;
 }
-.customer-card__name { font-weight: 900; font-size: 16px; }
-.customer-card__meta { opacity: 0.85; font-weight: 700; }
-.customer-card__sub { opacity: 0.8; margin-top: 6px; font-size: 14px; }
-.customer-card__cta { margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap; }
+
+.customer-card__meta {
+  margin-top: 6px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.customer-card__actions {
+  margin-top: 10px;
+}
+
 .customer-card__btn {
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.08);
   font-weight: 800;
 }
 
@@ -775,6 +782,7 @@
     </div>
 
     <div style="padding: 0 24px 16px;">
+      <div id="customersCards" class="customer-cards"></div>
       <table class="customer-table customers-table">
         <thead>
           <tr>
@@ -787,7 +795,6 @@
         </thead>
         <tbody id="customersTableBody"></tbody>
       </table>
-      <div id="customersCards" class="customer-cards"></div>
     </div>
 
     <div class="main">
