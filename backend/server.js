@@ -154,7 +154,26 @@ api.get("/customers", async (req, res) => {
 });
 
 api.get("/employees", async (req, res) => {
-  await listQuery(res, `SELECT * FROM employees ORDER BY last_name ASC NULLS LAST, first_name ASC NULLS LAST`);
+  const search = req.query.search || req.query.q;
+  const technicianFilter = req.query.isTechnician || req.query.technician || req.query.tech;
+
+  const whereParts = [];
+  const params = [];
+
+  if (search) {
+    const start = params.length + 1;
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    whereParts.push(`(lastname ILIKE $${start} OR firstname ILIKE $${start + 1} OR employeeid ILIKE $${start + 2})`);
+  }
+
+  const truthyValues = new Set(["true", "1", "yes", "y", "on"]);
+  if (typeof technicianFilter === "string" && truthyValues.has(technicianFilter.toLowerCase())) {
+    whereParts.push(`LOWER(istechnician) IN ('true','1','yes','y')`);
+  }
+
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+  const sql = `SELECT * FROM employees ${whereClause} ORDER BY lastname NULLS LAST, firstname NULLS LAST`;
+  await listQuery(res, sql, params);
 });
 
 api.get("/services", async (req, res) => {
