@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const queryUtils = require("./db/query_utils");
+const schemaCache = require("./db/schema_cache");
 
 const app = express();
 
@@ -16,7 +18,6 @@ const allowedOrigins = new Set([
 
 const corsOptionsDelegate = (req, callback) => {
   const origin = req.header("Origin");
-  // allow non-browser requests (no Origin) and allowlisted browser origins
   if (!origin || allowedOrigins.has(origin)) {
     callback(null, {
       origin: origin || true,
@@ -31,9 +32,7 @@ const corsOptionsDelegate = (req, callback) => {
   }
 };
 
-// IMPORTANT: put these BEFORE routes
 app.use(cors(corsOptionsDelegate));
-// Explicitly handle preflight for everything
 app.options("*", cors(corsOptionsDelegate));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -41,7 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 // --------------------
 // DB
 // --------------------
-const DB_URL = process.env.DATABASE_URL || process.env.DATABASE_URL || "";
+const DB_URL = process.env.DATABASE_URL || "";
 const needsSSL = DB_URL && !DB_URL.includes(".railway.internal") && !DB_URL.includes("railway.internal");
 const sslConfig = needsSSL ? { rejectUnauthorized: false } : false;
 const pool = new Pool({
@@ -52,23 +51,59 @@ const pool = new Pool({
 console.log("DB:", DB_URL ? "DATABASE_URL set" : "DATABASE_URL MISSING");
 
 // --------------------
-// Health
+// Helpers
+// --------------------
+function handleError(res, err, status = 500) {
+  console.error(err);
+  res.status(status).json({ error: "Internal server error", detail: err.message || String(err) });
+}
+
+async function listQuery(res, sql, params = []) {
+  try {
+    const r = await pool.query(sql, params);
+    return res.json(r.rows || []);
+  } catch (e) {
+    handleError(res, e);
+  }
+}
+
+function truthy(value) {
+  return typeof value === "string" && ["true", "1", "yes", "y", "on"].includes(value.toLowerCase());
+}
+
+function orderClause(table, preferred, direction = "ASC") {
+  return queryUtils.safeOrderBy(table, preferred, schemaCache.getSchema(), direction);
+}
+
+// --------------------
+// Health + Debug
 // --------------------
 app.get("/health", async (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
+
 app.get("/debug/db", async (req, res) => {
   try {
-    const r = await pool.query("SELECT now() as now, (select count(*)::int from customers) as customers");
-    res.json(r.rows || []);
+    const ping = await pool.query("SELECT 1 as ok");
+    const schema = schemaCache.getSchema();
+    const tables = ["customers", "employees", "departments", "services", "appointments"];
+    const counts = {};
+
+    for (const table of tables) {
+      if (schema[table] && schema[table].length) {
+        const result = await pool.query(`SELECT COUNT(*)::int AS count FROM ${table}`);
+        counts[table] = result.rows?.[0]?.count ?? 0;
+      }
+    }
+
+    res.json({ ok: true, db: ping.rows?.[0]?.ok === 1 || ping.rows?.[0]?.ok === "1", counts });
   } catch (e) {
-    console.error("GET /debug/db failed:", e);
-    res.status(500).json({ error: "Internal server error", detail: e.message });
+    handleError(res, e);
   }
 });
-app.get("/favicon.ico", (req, res) => res.status(204).end());
 
-app.get("/", (req, res) => res.send("Patriot Backend is running"));
+app.get("/favicon.ico", (req, res) => res.status(204).end());
+app.get("/", (req, res) => res.json({ ok: true }));
 
 // --------------------
 // TEMP AUTH (same behavior you already have)
@@ -91,7 +126,6 @@ authRouter.post("/login", async (req, res) => {
     });
   }
 
-  // Temporary token generation until real auth is wired up
   const token = Buffer.from(`${email}:${Date.now()}`).toString("base64");
 
   res.json({
@@ -109,8 +143,6 @@ app.use("/api/auth", authRouter);
 
 // --------------------
 // Simple token guard (TEMP)
-// Expects: Authorization: Bearer <token>
-// Token is whatever /auth/login returned.
 // --------------------
 function requireAuth(req, res, next) {
   const h = req.headers.authorization || "";
@@ -122,23 +154,8 @@ function requireAuth(req, res, next) {
   if (!token) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  // We are NOT validating token server-side yet (temporary)
   req.user = { token };
   next();
-}
-
-function handleError(res, err, status = 500) {
-  console.error(err);
-  res.status(status).json({ error: "Internal server error", detail: err.message || String(err) });
-}
-
-async function listQuery(res, sql, params = []) {
-  try {
-    const r = await pool.query(sql, params);
-    return res.json(r.rows || []);
-  } catch (e) {
-    handleError(res, e);
-  }
 }
 
 // --------------------
@@ -147,70 +164,140 @@ async function listQuery(res, sql, params = []) {
 const api = express.Router();
 api.use(requireAuth);
 
-// NOTE: we’ll mount this router at BOTH / and /api to reduce frontend breakage.
-
 api.get("/customers", async (req, res) => {
-  await listQuery(res, `SELECT * FROM customers ORDER BY id DESC`);
+  const schema = schemaCache.getSchema();
+  const search = req.query.search || req.query.q;
+  let whereClause = "";
+  let params = [];
+
+  if (search) {
+    const { clause, params: searchParams } = queryUtils.safeSearchWhere(
+      "customers",
+      ["name", "firstname", "lastname", "phone", "email", "vehiclemake", "vehiclemodel", "vehicle_year", "vehicleyear", "lastvehiclemake", "lastvehiclemodel", "lastvehicleyear"],
+      search,
+      1,
+      schema
+    );
+    if (clause) {
+      whereClause = ` WHERE ${clause}`;
+      params = searchParams;
+    }
+  }
+
+  const sql = `${queryUtils.safeSelectAll("customers")}${whereClause}${orderClause(
+    "customers",
+    ["created_at", "createdat", "created", "id"],
+    "DESC"
+  )}`;
+  await listQuery(res, sql, params);
 });
 
 api.get("/employees", async (req, res) => {
+  const schema = schemaCache.getSchema();
   const search = req.query.search || req.query.q;
   const technicianFilter = req.query.isTechnician || req.query.technician || req.query.tech;
+  const columns = queryUtils.getTableColumns(schema, "employees");
 
   const whereParts = [];
-  const params = [];
+  let params = [];
+  let nextIndex = 1;
 
   if (search) {
-    const start = params.length + 1;
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    whereParts.push(`(lastname ILIKE $${start} OR firstname ILIKE $${start + 1} OR employeeid ILIKE $${start + 2})`);
+    const { clause, params: searchParams, nextIndex: updatedIndex } = queryUtils.safeSearchWhere(
+      "employees",
+      ["firstname", "lastname", "employeeid", "role"],
+      search,
+      nextIndex,
+      schema
+    );
+    if (clause) {
+      whereParts.push(clause);
+      params = params.concat(searchParams);
+      nextIndex = updatedIndex;
+    }
   }
 
-  const truthyValues = new Set(["true", "1", "yes", "y", "on"]);
-  if (typeof technicianFilter === "string" && truthyValues.has(technicianFilter.toLowerCase())) {
-    whereParts.push(`LOWER(istechnician) IN ('true','1','yes','y')`);
+  if (truthy(String(technicianFilter || "")) && columns.has("istechnician")) {
+    whereParts.push("LOWER(istechnician) IN ('true','1','yes','y','on')");
   }
 
-  const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
-  const sql = `SELECT * FROM employees ${whereClause} ORDER BY lastname NULLS LAST, firstname NULLS LAST`;
+  const whereClause = whereParts.length ? ` WHERE ${whereParts.join(" AND ")}` : "";
+  const sql = `${queryUtils.safeSelectAll("employees")}${whereClause}${orderClause(
+    "employees",
+    ["lastname", "last_name", "firstname", "first_name", "id"]
+  )}`;
   await listQuery(res, sql, params);
 });
 
 api.get("/services", async (req, res) => {
-  await listQuery(res, `SELECT * FROM services`);
+  const sql = `${queryUtils.safeSelectAll("services")}${orderClause("services", ["name", "servicename", "id"])}`;
+  await listQuery(res, sql);
 });
 
 api.get("/departments", async (req, res) => {
-  await listQuery(res, `SELECT * FROM departments ORDER BY name ASC NULLS LAST`);
+  const sql = `${queryUtils.safeSelectAll("departments")}${orderClause("departments", ["name", "departmentname", "id"])}`;
+  await listQuery(res, sql);
 });
 
 api.get("/appointments", async (req, res) => {
-  await listQuery(res, `SELECT * FROM appointments ORDER BY date ASC NULLS LAST, time ASC NULLS LAST`);
+  const sql = `${queryUtils.safeSelectAll("appointments")}${orderClause(
+    "appointments",
+    ["start", "starttime", "start_time", "date", "time", "id"]
+  )}`;
+  await listQuery(res, sql);
 });
 
 api.get("/employee_schedule", async (req, res) => {
   const employeeId = req.query.employee_id || req.query.employeeId;
-  const sql = employeeId
-    ? `SELECT * FROM employee_schedule WHERE employeeid = $1 OR employee_id = $1 ORDER BY dayofweek ASC NULLS LAST`
-    : `SELECT * FROM employee_schedule ORDER BY employeeid ASC NULLS LAST, dayofweek ASC NULLS LAST`;
-  await listQuery(res, sql, employeeId ? [employeeId] : []);
+  const schema = schemaCache.getSchema();
+  const columns = queryUtils.getTableColumns(schema, "employee_schedule");
+  const params = [];
+  let whereClause = "";
+
+  if (employeeId && columns.has("employeeid")) {
+    params.push(employeeId);
+    whereClause = ` WHERE employeeid = $${params.length}`;
+  } else if (employeeId && columns.has("employee_id")) {
+    params.push(employeeId);
+    whereClause = ` WHERE employee_id = $${params.length}`;
+  }
+
+  const sql = `${queryUtils.safeSelectAll("employee_schedule")}${whereClause}${orderClause(
+    "employee_schedule",
+    ["employeeid", "dayofweek", "id"]
+  )}`;
+  await listQuery(res, sql, params);
 });
 
 api.get("/tech_time_off", async (req, res) => {
-  await listQuery(res, `SELECT * FROM tech_time_off ORDER BY startdate ASC NULLS LAST`);
+  const sql = `${queryUtils.safeSelectAll("tech_time_off")}${orderClause("tech_time_off", ["startdate", "start_date", "id"])}`;
+  await listQuery(res, sql);
 });
 
 api.get("/holidays", async (req, res) => {
-  await listQuery(res, `SELECT * FROM holidays ORDER BY date ASC NULLS LAST`);
+  const sql = `${queryUtils.safeSelectAll("holidays")}${orderClause("holidays", ["date", "name", "id"])}`;
+  await listQuery(res, sql);
 });
 
 api.get("/leads", async (req, res) => {
+  const schema = schemaCache.getSchema();
+  const columns = queryUtils.getTableColumns(schema, "leads");
   const status = req.query.status;
-  if (status) {
-    await listQuery(res, `SELECT * FROM leads WHERE LOWER(status) = LOWER($1) ORDER BY createdat DESC NULLS LAST`, [status]);
-  } else {
-    await listQuery(res, `SELECT * FROM leads ORDER BY createdat DESC NULLS LAST`);
+
+  const params = [];
+  let whereClause = "";
+
+  if (status && columns.has("status")) {
+    params.push(status);
+    whereClause = ` WHERE LOWER(status) = LOWER($${params.length})`;
   }
+
+  const sql = `${queryUtils.safeSelectAll("leads")}${whereClause}${orderClause(
+    "leads",
+    ["created_at", "createdat", "created", "updatedat", "id"],
+    "DESC"
+  )}`;
+  await listQuery(res, sql, params);
 });
 
 api.post("/leads", async (req, res) => {
@@ -291,30 +378,80 @@ api.delete("/leads/:id", async (req, res) => {
   }
 });
 
+api.get("/users", async (req, res) => {
+  const schema = schemaCache.getSchema();
+  const search = req.query.search || req.query.q;
+  let whereClause = "";
+  let params = [];
+
+  if (search) {
+    const { clause, params: searchParams } = queryUtils.safeSearchWhere(
+      "users",
+      ["email", "name", "role"],
+      search,
+      1,
+      schema
+    );
+    if (clause) {
+      whereClause = ` WHERE ${clause}`;
+      params = searchParams;
+    }
+  }
+
+  const sql = `${queryUtils.safeSelectAll("users")}${whereClause}${orderClause(
+    "users",
+    ["created_at", "createdat", "name", "id"],
+    "DESC"
+  )}`;
+  await listQuery(res, sql, params);
+});
+
 // route sanity check
 app.get("/__routes", (req, res) => {
   res.json({
     ok: true,
     mounts: [
       "/health",
+      "/debug/db",
       "/auth/login",
       "/api/auth/login",
       "/customers (auth)",
       "/employees (auth)",
       "/services (auth)",
       "/departments (auth)",
+      "/appointments (auth)",
+      "/employee_schedule (auth)",
+      "/tech_time_off (auth)",
+      "/holidays (auth)",
+      "/leads (auth)",
+      "/users (auth)",
       "/api/customers (auth)",
       "/api/employees (auth)",
       "/api/services (auth)",
       "/api/departments (auth)",
+      "/api/appointments (auth)",
+      "/api/employee_schedule (auth)",
+      "/api/tech_time_off (auth)",
+      "/api/holidays (auth)",
+      "/api/leads (auth)",
+      "/api/users (auth)",
     ],
   });
 });
 
-// Mount API at BOTH root and /api so frontend can use either style:
 app.use("/", api);
 app.use("/api", api);
 
-// --------------------
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log("Listening on", port));
+async function startServer() {
+  try {
+    await schemaCache.loadSchemaCache(pool);
+    console.log("Schema cache loaded.");
+  } catch (err) {
+    console.error("Failed to load schema cache:", err);
+  }
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log("Listening on", port));
+}
+
+startServer();
