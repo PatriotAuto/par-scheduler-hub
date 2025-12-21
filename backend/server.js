@@ -169,6 +169,15 @@ api.get("/customers", async (req, res) => {
   const search = req.query.search || req.query.q;
   let whereClause = "";
   let params = [];
+  const columns = queryUtils.getTableColumns(schema, "customers");
+
+  const phoneColumn = Array.from(columns).find((col) => {
+    const normalized = typeof col === "string" ? col.toLowerCase() : col;
+    return ["phone", "phonenumber", "phone_number", "mobile", "cell", "primaryphone", "primary_phone"].includes(normalized);
+  });
+  const selectClause = phoneColumn
+    ? `SELECT *, "${String(phoneColumn).replace(/"/g, '""')}"::text AS phone FROM customers`
+    : queryUtils.safeSelectAll("customers");
 
   if (search) {
     const { clause, params: searchParams } = queryUtils.safeSearchWhere(
@@ -184,7 +193,7 @@ api.get("/customers", async (req, res) => {
     }
   }
 
-  const sql = `${queryUtils.safeSelectAll("customers")}${whereClause}${orderClause(
+  const sql = `${selectClause}${whereClause}${orderClause(
     "customers",
     ["created_at", "createdat", "created", "id"],
     "DESC"
