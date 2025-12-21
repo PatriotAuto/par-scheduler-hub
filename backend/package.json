@@ -5,7 +5,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "seed": "node scripts/seed_from_csv.js"
+    "seed": "node scripts/seed_from_csv.js",
+    "db:schema": "node scripts/db_schema_report.js",
+    "db:schema:json": "node scripts/db_schema_json.js",
+    "smoke:test": "node scripts/smoke_test_endpoints.js"
   },
   "dependencies": {
     "csv-parse": "^5.5.6",
