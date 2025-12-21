@@ -38,6 +38,31 @@
     return (value || "").toString().trim().toLowerCase();
   }
 
+  function normalizePhone(value) {
+    if (value === undefined || value === null) return "";
+
+    let s = String(value).trim();
+    if (!s) return "";
+
+    if (/e\+?/i.test(s)) {
+      const n = Number(s);
+      if (!Number.isNaN(n)) {
+        s = n.toFixed(0);
+      }
+    }
+
+    const digits = s.replace(/\D/g, "");
+
+    if (digits.length === 11 && digits.startsWith("1")) {
+      return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7, 11)}`;
+    }
+    if (digits.length === 10) {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    }
+
+    return digits || s;
+  }
+
   function normalizeCustomer(c) {
     if (!c || typeof c !== "object") return null;
 
@@ -76,18 +101,17 @@
       asString(pick("name", "fullname", "full_name", "fullName")) ||
       `${first} ${last}`.trim();
 
-    const phoneRaw = asString(
-      pick(
-        "phone",
-        "phonenumber",
-        "phone_number",
-        "phoneNumber",
-        "mobile",
-        "cell",
-        "primaryphone",
-        "primary_phone"
-      )
+    const phoneRaw = pick(
+      "phone",
+      "phonenumber",
+      "phone_number",
+      "phoneNumber",
+      "mobile",
+      "cell",
+      "primaryphone",
+      "primary_phone"
     );
+    const phone = normalizePhone(phoneRaw);
     const email = asString(
       pick("email", "emailaddress", "email_address", "emailAddress")
     );
@@ -120,14 +144,6 @@
       [lastServiceDate, lastServiceType].filter(Boolean).join(" – ");
 
     const id = asString(pick("id", "customerid", "customer_id", "customerId", "ID"));
-
-    const digits = phoneRaw.replace(/\D/g, "");
-    let phone = phoneRaw;
-    if (digits.length === 10) {
-      phone = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-    } else if (digits.length === 11 && digits.startsWith("1")) {
-      phone = `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
-    }
 
     const displayName = fullName || email || "(No name)";
 
@@ -265,6 +281,7 @@
         );
       }
 
+      console.log("Phone sample raw -> normalized:", rawList[0]?.phone, customers[0]?.phone);
       state.customers = customers;
       console.log("Normalized customer sample:", customers[0]);
       console.log(
