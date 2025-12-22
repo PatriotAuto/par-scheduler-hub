@@ -8,6 +8,8 @@
     customers: [],
     filtered: [],
     activeAlpha: "All",
+    activeCustomerId: null,
+    vehicles: [],
   };
   let vehicleDropdownsReady = null;
 
@@ -187,6 +189,102 @@
       .replace(/'/g, "&#039;");
   }
 
+  function normalizeVinInput(value) {
+    return (value || "").toString().trim().toUpperCase();
+  }
+
+  function setVehiclesStatus(message) {
+    const el = $("vehiclesStatus");
+    if (el) el.textContent = message || "";
+  }
+
+  function setVehicleFormStatus(message) {
+    const el = $("vehicleFormStatus");
+    if (el) el.textContent = message || "";
+  }
+
+  function renderVehiclesList(list) {
+    const container = $("vehiclesList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const vehicles = Array.isArray(list) ? list : state.vehicles || [];
+    if (!vehicles.length) {
+      const empty = document.createElement("div");
+      empty.className = "vehicles-status";
+      empty.textContent = "No vehicles on file.";
+      container.appendChild(empty);
+      return;
+    }
+
+    vehicles.forEach((v) => {
+      const card = document.createElement("div");
+      card.className = "vehicle-card";
+
+      const title = document.createElement("div");
+      title.className = "vehicle-card-title";
+      const name = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ").trim();
+      title.textContent = name || "Vehicle";
+
+      const meta = document.createElement("div");
+      meta.className = "vehicle-card-meta";
+      const vin = v.vin ? `VIN: ${v.vin}` : "VIN: Not provided";
+      const plate = v.plate ? `Plate: ${v.plate}` : null;
+      const color = v.color ? `Color: ${v.color}` : null;
+      const mileage = v.mileage ? `Mileage: ${v.mileage}` : null;
+      [vin, plate, color, mileage].filter(Boolean).forEach((item) => {
+        const span = document.createElement("span");
+        span.textContent = item;
+        meta.appendChild(span);
+      });
+
+      card.appendChild(title);
+      card.appendChild(meta);
+      if (v.notes) {
+        const notes = document.createElement("div");
+        notes.className = "vehicles-status";
+        notes.textContent = v.notes;
+        card.appendChild(notes);
+      }
+      container.appendChild(card);
+    });
+  }
+
+  function applyDecodedFields(fields) {
+    if (!fields || typeof fields !== "object") return;
+    const yearInput = $("vehicleYearInput");
+    const makeInput = $("vehicleMakeInput");
+    const modelInput = $("vehicleModelInput");
+    const trimInput = $("vehicleTrimInput");
+
+    if (yearInput && !yearInput.value && fields.year) yearInput.value = fields.year;
+    if (makeInput && !makeInput.value && fields.make) makeInput.value = fields.make;
+    if (modelInput && !modelInput.value && fields.model) modelInput.value = fields.model;
+    if (trimInput && !trimInput.value && fields.trim) trimInput.value = fields.trim;
+  }
+
+  function getVehicleFormPayload() {
+    const vin = normalizeVinInput($("vehicleVinInput")?.value || "");
+    return {
+      vin,
+      year: $("vehicleYearInput")?.value || "",
+      make: $("vehicleMakeInput")?.value || "",
+      model: $("vehicleModelInput")?.value || "",
+      trim: $("vehicleTrimInput")?.value || "",
+      color: $("vehicleColorInput")?.value || "",
+      plate: $("vehiclePlateInput")?.value || "",
+      mileage: $("vehicleMileageInput")?.value || "",
+      notes: $("vehicleNotesInput")?.value || "",
+    };
+  }
+
+  function clearVehicleForm() {
+    ["vehicleVinInput","vehicleYearInput","vehicleMakeInput","vehicleModelInput","vehicleTrimInput","vehicleColorInput","vehiclePlateInput","vehicleMileageInput","vehicleNotesInput"].forEach((id) => {
+      const el = $(id);
+      if (el) el.value = "";
+    });
+  }
+
   // --- Rendering ---
 
   function getLastNameInitial(c) {
@@ -347,6 +445,24 @@
         applySearchFilter();
       });
     }
+
+    ["vehicleDecodeBtn", "vehicleDecodeInline"].forEach((id) => {
+      const btn = $(id);
+      if (btn) btn.addEventListener("click", decodeVinInput);
+    });
+
+    ["vehicleScanBtn", "vehicleScanInline"].forEach((id) => {
+      const btn = $(id);
+      if (btn) btn.addEventListener("click", startVinScanner);
+    });
+
+    const vehicleForm = $("vehicleForm");
+    if (vehicleForm) {
+      vehicleForm.addEventListener("submit", saveVehicle);
+    }
+
+    $("vinScannerClose")?.addEventListener("click", stopVinScanner);
+    $("vinScannerStop")?.addEventListener("click", stopVinScanner);
   }
 
   function buildAlphaBar(customers) {
@@ -414,7 +530,30 @@
     renderCustomers(list);
   }
 
-  function openProfile(c) {
+  async function loadVehiclesForCustomer(customerId) {
+    if (!customerId) {
+      setVehiclesStatus("Select a customer to view vehicles.");
+      renderVehiclesList([]);
+      return;
+    }
+
+    setVehiclesStatus("Loading vehicles...");
+    try {
+      const url = buildApiUrl(`/api/v2/customers/${encodeURIComponent(customerId)}`);
+      const payload = await fetchJsonDebug(url);
+      const data = payload?.data || payload || {};
+      const vehicles = Array.isArray(data.vehicles) ? data.vehicles : [];
+      state.vehicles = vehicles;
+      renderVehiclesList(vehicles);
+      setVehiclesStatus(`${vehicles.length} vehicle(s) found`);
+    } catch (err) {
+      console.error("Failed to load vehicles:", err);
+      setVehiclesStatus("Could not load vehicles for this customer.");
+      renderVehiclesList([]);
+    }
+  }
+
+  async function openProfile(c) {
     const drawer = document.getElementById("profileDrawer");
     const nameEl = document.getElementById("profileName");
     const subEl = document.getElementById("profileSub");
@@ -451,6 +590,8 @@
 
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden", "false");
+    state.activeCustomerId = c.id || null;
+    await loadVehiclesForCustomer(state.activeCustomerId);
 
     const copyPhone = document.getElementById("profileCopyPhone");
     const copyEmail = document.getElementById("profileCopyEmail");
@@ -470,6 +611,140 @@
     if (!drawer) return;
     drawer.classList.remove("open");
     drawer.setAttribute("aria-hidden", "true");
+    state.activeCustomerId = null;
+    state.vehicles = [];
+    renderVehiclesList([]);
+    setVehiclesStatus("Load a customer to view vehicles.");
+    stopVinScanner();
+  }
+
+  async function decodeVinInput() {
+    const vin = normalizeVinInput($("vehicleVinInput")?.value || "");
+    if (!vin) {
+      setVehicleFormStatus("Enter a VIN to decode.");
+      return;
+    }
+
+    setVehicleFormStatus("Decoding VIN...");
+    try {
+      const url = buildApiUrl(`/api/v2/vin/${encodeURIComponent(vin)}/decode`);
+      const payload = await fetchJsonDebug(url);
+      const parsed = payload?.data?.parsed || {};
+      applyDecodedFields(parsed);
+      setVehicleFormStatus("VIN decoded. Fields auto-filled when available.");
+    } catch (err) {
+      console.error("VIN decode failed:", err);
+      setVehicleFormStatus("VIN decode failed. Check the VIN or try again.");
+    }
+  }
+
+  async function saveVehicle(event) {
+    if (event) event.preventDefault();
+    if (!state.activeCustomerId) {
+      setVehicleFormStatus("Select a customer before adding a vehicle.");
+      return;
+    }
+
+    const payload = getVehicleFormPayload();
+    if (!payload.vin) {
+      setVehicleFormStatus("VIN is required.");
+      return;
+    }
+
+    const url = buildApiUrl(`/api/v2/customers/${encodeURIComponent(state.activeCustomerId)}/vehicles`);
+    setVehicleFormStatus("Saving vehicle...");
+    try {
+      const response = await fetchJsonDebug(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const vehicle = response?.data || response;
+      if (vehicle) {
+        state.vehicles = [vehicle, ...(state.vehicles || [])];
+        renderVehiclesList(state.vehicles);
+      }
+      setVehicleFormStatus("Vehicle saved.");
+      clearVehicleForm();
+    } catch (err) {
+      console.error("Failed to save vehicle:", err);
+      const message = err?.status === 400 ? "Invalid VIN or missing data." : "Unable to save vehicle.";
+      setVehicleFormStatus(message);
+    }
+  }
+
+  let vinScanner = null;
+  async function startVinScanner() {
+    const modal = $("vinScannerModal");
+    const viewportId = "vinScannerViewport";
+    const statusEl = $("vinScannerStatus");
+    if (!modal || !statusEl) return;
+
+    if (typeof Html5Qrcode === "undefined") {
+      statusEl.textContent = "VIN scanning is not supported on this device.";
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      return;
+    }
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    statusEl.textContent = "Starting camera...";
+
+    try {
+      const formats =
+        typeof Html5QrcodeSupportedFormats !== "undefined"
+          ? [
+              Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.QR_CODE,
+            ]
+          : null;
+
+      vinScanner = new Html5Qrcode(
+        viewportId,
+        formats ? { formatsToSupport: formats } : undefined
+      );
+
+      await vinScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          const vinValue = normalizeVinInput(decodedText);
+          if (vinValue && vinValue.length >= 11) {
+            const vinInput = $("vehicleVinInput");
+            if (vinInput) {
+              vinInput.value = vinValue;
+            }
+            stopVinScanner();
+            decodeVinInput();
+          }
+        },
+        () => {}
+      );
+      statusEl.textContent = "Scanning... align the VIN barcode.";
+    } catch (err) {
+      console.error("VIN scanner failed:", err);
+      statusEl.textContent = "Could not start camera. Use manual entry instead.";
+    }
+  }
+
+  async function stopVinScanner() {
+    const modal = $("vinScannerModal");
+    const statusEl = $("vinScannerStatus");
+    if (vinScanner) {
+      try {
+        await vinScanner.stop();
+        await vinScanner.clear();
+      } catch (e) {
+        console.warn("Failed to stop scanner", e);
+      }
+      vinScanner = null;
+    }
+    if (modal) {
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+    }
+    if (statusEl) statusEl.textContent = "";
   }
 
   // --- API ---

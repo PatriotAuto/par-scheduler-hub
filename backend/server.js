@@ -51,6 +51,7 @@ const pool = new Pool({
 });
 console.log("DB:", DB_URL ? "DATABASE_URL set" : "DATABASE_URL MISSING");
 const DEALER_THRESHOLD = 10;
+const VIN_CACHE_MAX_AGE_DAYS = 180;
 
 // --------------------
 // Helpers
@@ -101,8 +102,119 @@ function toIntOrNull(value) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function normalizeVinInput(vin) {
+  if (!vin) return null;
+  return String(vin).trim().toUpperCase();
+}
+
+function isVinValid(vin) {
+  if (!vin) return false;
+  if (vin.length !== 17) return false;
+  return !/[IOQ]/i.test(vin);
+}
+
+function validateVinOrRespond(res, vinInput) {
+  const vin = normalizeVinInput(vinInput);
+  if (!vin) {
+    respondError(res, 400, "VIN_REQUIRED");
+    return null;
+  }
+  if (!isVinValid(vin)) {
+    respondError(res, 400, "INVALID_VIN");
+    return null;
+  }
+  return vin;
+}
+
+function parseVinDecodeResult(resultJson) {
+  const firstResult = Array.isArray(resultJson?.Results) ? resultJson.Results[0] : null;
+  if (!firstResult) return {};
+
+  const safeText = (value) => {
+    if (!value && value !== 0) return null;
+    const trimmed = String(value).trim();
+    return trimmed.length ? trimmed : null;
+  };
+
+  return {
+    year: toIntOrNull(firstResult.ModelYear),
+    make: safeText(firstResult.Make),
+    model: safeText(firstResult.Model),
+    trim: safeText(firstResult.Trim),
+  };
+}
+
+function isCacheFresh(decodedAt) {
+  if (!decodedAt) return false;
+  const decodedDate = new Date(decodedAt);
+  const ageMs = Date.now() - decodedDate.getTime();
+  const days = ageMs / (1000 * 60 * 60 * 24);
+  return days <= VIN_CACHE_MAX_AGE_DAYS;
+}
+
 function orderClause(table, preferred, direction = "ASC") {
   return queryUtils.safeOrderBy(table, preferred, schemaCache.getSchema(), direction);
+}
+
+async function getCachedVinDecode(vin) {
+  const { rows } = await pool.query(
+    "SELECT vin, decoded_at, decoded_source, result_json FROM par.vin_decode_cache WHERE vin = $1",
+    [vin]
+  );
+  if (!rows.length) return null;
+  const row = rows[0];
+  return {
+    vin: row.vin,
+    decodedAt: row.decoded_at,
+    decoded_source: row.decoded_source,
+    raw: row.result_json,
+    parsed: parseVinDecodeResult(row.result_json),
+  };
+}
+
+async function storeVinDecodeResult(vin, resultJson, source = "nhtsa_vpic") {
+  const { rows } = await pool.query(
+    `
+    INSERT INTO par.vin_decode_cache (vin, decoded_at, decoded_source, result_json)
+    VALUES ($1, NOW(), $2, $3)
+    ON CONFLICT (vin)
+    DO UPDATE SET decoded_at = NOW(), decoded_source = $2, result_json = $3
+    RETURNING vin, decoded_at, decoded_source, result_json
+  `,
+    [vin, source, resultJson]
+  );
+
+  const row = rows[0];
+  return {
+    vin: row.vin,
+    decodedAt: row.decoded_at,
+    decoded_source: row.decoded_source,
+    raw: row.result_json,
+    parsed: parseVinDecodeResult(row.result_json),
+  };
+}
+
+async function decodeVinWithCache(vin) {
+  const cached = await getCachedVinDecode(vin);
+  if (cached && isCacheFresh(cached.decodedAt)) {
+    return { ...cached, cached: true };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  let response;
+  try {
+    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json`;
+    response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`NHTSA decode failed: ${response.status} ${response.statusText}`);
+    }
+    const json = await response.json();
+    const stored = await storeVinDecodeResult(vin, json, "nhtsa_vpic");
+    return { ...stored, cached: false };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // --------------------
@@ -209,6 +321,68 @@ function requireAdminForWrite(req, res, next) {
 const apiV2 = express.Router();
 apiV2.use(requireAuth);
 apiV2.use(requireAdminForWrite);
+
+apiV2.get("/vin/:vin/decode", async (req, res) => {
+  const vin = validateVinOrRespond(res, req.params.vin);
+  if (!vin) return;
+
+  let cached = null;
+  try {
+    cached = await getCachedVinDecode(vin);
+    if (cached && isCacheFresh(cached.decodedAt)) {
+      return res.json({
+        ok: true,
+        data: {
+          vin,
+          decoded_at: cached.decodedAt,
+          decoded_source: cached.decoded_source,
+          parsed: cached.parsed,
+          raw: cached.raw,
+          cached: true,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("VIN cache lookup failed:", err);
+  }
+
+  try {
+    const decoded = await decodeVinWithCache(vin);
+    return res.json({
+      ok: true,
+      data: {
+        vin,
+        decoded_at: decoded.decodedAt,
+        decoded_source: decoded.decoded_source,
+        parsed: decoded.parsed,
+        raw: decoded.raw,
+        cached: decoded.cached || false,
+      },
+    });
+  } catch (err) {
+    console.error("VIN decode failed:", err);
+    if (cached) {
+      return res.json({
+        ok: true,
+        data: {
+          vin,
+          decoded_at: cached.decodedAt,
+          decoded_source: cached.decoded_source,
+          parsed: cached.parsed,
+          raw: cached.raw,
+          cached: true,
+          stale: true,
+        },
+        warning: "VIN decode unavailable, using cached result.",
+      });
+    }
+    return res.status(502).json({
+      ok: false,
+      error: "VIN_DECODE_FAILED",
+      detail: err.message || "VIN decoder unavailable",
+    });
+  }
+});
 
 apiV2.get("/customers", async (req, res) => {
   try {
@@ -399,41 +573,112 @@ apiV2.post("/customers/:id/vehicles", async (req, res) => {
       return respondError(res, 404, "CUSTOMER_NOT_FOUND");
     }
 
-    const insertResult = await pool.query(
-      `
-      INSERT INTO par.vehicles
-        (customer_id, legacy_vehicle_id, year, make, model, trim, color, plate, vin, mileage, notes)
-      VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-      RETURNING *
-    `,
-      [
-        customerId,
-        pickFirst(body, ["legacy_vehicle_id", "legacyVehicleId"]),
-        toIntOrNull(pickFirst(body, ["year"])),
-        pickFirst(body, ["make"]),
-        pickFirst(body, ["model"]),
-        pickFirst(body, ["trim"]),
-        pickFirst(body, ["color"]),
-        pickFirst(body, ["plate", "licensePlate"]),
-        pickFirst(body, ["vin"]),
-        toIntOrNull(pickFirst(body, ["mileage"])),
-        pickFirst(body, ["notes", "note"]),
-      ]
-    );
+    const vin = validateVinOrRespond(res, pickFirst(body, ["vin"]));
+    if (!vin) return;
 
-    return res.status(201).json({ ok: true, data: insertResult.rows[0] });
+    const manualYear = toIntOrNull(pickFirst(body, ["year"]));
+    const manualMake = pickFirst(body, ["make"]);
+    const manualModel = pickFirst(body, ["model"]);
+    const manualTrim = pickFirst(body, ["trim"]);
+    const manualOverrides = {};
+    if (manualYear !== null && manualYear !== undefined) manualOverrides.year = manualYear;
+    if (manualMake !== undefined) manualOverrides.make = manualMake;
+    if (manualModel !== undefined) manualOverrides.model = manualModel;
+    if (manualTrim !== undefined) manualOverrides.trim = manualTrim;
+
+    let decodeData = null;
+    let cachedDecode = null;
+    try {
+      cachedDecode = await getCachedVinDecode(vin);
+    } catch (err) {
+      console.warn("VIN cache lookup failed during create:", err.message || err);
+    }
+
+    try {
+      decodeData = await decodeVinWithCache(vin);
+    } catch (err) {
+      console.warn("VIN decode unavailable for create:", err.message || err);
+      decodeData = cachedDecode || null;
+    }
+
+    const decodedFields = decodeData?.parsed || {};
+
+    const finalYear = manualYear ?? decodedFields.year ?? null;
+    const finalMake = manualMake ?? decodedFields.make ?? null;
+    const finalModel = manualModel ?? decodedFields.model ?? null;
+    const finalTrim = manualTrim ?? decodedFields.trim ?? null;
+
+    const rawDecode = decodeData?.raw || null;
+    const decodedSource = decodeData?.decoded_source || null;
+    const decodedAt = decodeData?.decodedAt || null;
+    const manualOverridesValue =
+      Object.keys(manualOverrides).length > 0 ? manualOverrides : null;
+
+    try {
+      const insertResult = await pool.query(
+        `
+        INSERT INTO par.vehicles
+          (vin, customer_id, year, make, model, trim, color, plate, mileage, notes, decoded_source, decoded_at, raw_decode, manual_overrides)
+        VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        RETURNING *
+      `,
+        [
+          vin,
+          customerId,
+          finalYear,
+          finalMake,
+          finalModel,
+          finalTrim,
+          pickFirst(body, ["color"]),
+          pickFirst(body, ["plate", "licensePlate"]),
+          toIntOrNull(pickFirst(body, ["mileage"])),
+          pickFirst(body, ["notes", "note"]),
+          decodedSource,
+          decodedAt,
+          rawDecode,
+          manualOverridesValue,
+        ]
+      );
+
+      return res.status(201).json({
+        ok: true,
+        data: insertResult.rows[0],
+        decode_used: Boolean(decodeData),
+      });
+    } catch (err) {
+      if (err.code === "23505") {
+        return respondError(res, 409, "VIN_ALREADY_EXISTS");
+      }
+      throw err;
+    }
   } catch (err) {
     handleError(res, err);
   }
 });
 
-apiV2.patch("/vehicles/:vehicleId", async (req, res) => {
+apiV2.patch("/vehicles/:vin", async (req, res) => {
   try {
-    const vehicleId = req.params.vehicleId;
+    const vin = validateVinOrRespond(res, req.params.vin);
+    if (!vin) return;
     const body = req.body || {};
     const updates = [];
     const params = [];
+    const manualUpdates = {};
+
+    const newVinInput = pickFirst(body, ["vin"]);
+    if (newVinInput && normalizeVinInput(newVinInput) !== vin) {
+      return respondError(res, 400, "VIN_IMMUTABLE");
+    }
+
+    const { rows: existingRows } = await pool.query(
+      "SELECT manual_overrides FROM par.vehicles WHERE vin = $1",
+      [vin]
+    );
+    if (!existingRows.length) {
+      return respondError(res, 404, "NOT_FOUND");
+    }
+    const existingManual = existingRows[0]?.manual_overrides || {};
 
     const addUpdate = (column, value) => {
       if (value !== undefined) {
@@ -442,23 +687,37 @@ apiV2.patch("/vehicles/:vehicleId", async (req, res) => {
       }
     };
 
-    addUpdate("year", toIntOrNull(pickFirst(body, ["year"])));
-    addUpdate("make", pickFirst(body, ["make"]));
-    addUpdate("model", pickFirst(body, ["model"]));
-    addUpdate("trim", pickFirst(body, ["trim"]));
+    const updatedYear = toIntOrNull(pickFirst(body, ["year"]));
+    const updatedMake = pickFirst(body, ["make"]);
+    const updatedModel = pickFirst(body, ["model"]);
+    const updatedTrim = pickFirst(body, ["trim"]);
+
+    if (updatedYear !== undefined) manualUpdates.year = updatedYear;
+    if (updatedMake !== undefined) manualUpdates.make = updatedMake;
+    if (updatedModel !== undefined) manualUpdates.model = updatedModel;
+    if (updatedTrim !== undefined) manualUpdates.trim = updatedTrim;
+
+    addUpdate("year", updatedYear);
+    addUpdate("make", updatedMake);
+    addUpdate("model", updatedModel);
+    addUpdate("trim", updatedTrim);
     addUpdate("color", pickFirst(body, ["color"]));
     addUpdate("plate", pickFirst(body, ["plate", "licensePlate"]));
-    addUpdate("vin", pickFirst(body, ["vin"]));
     addUpdate("mileage", toIntOrNull(pickFirst(body, ["mileage"])));
     addUpdate("notes", pickFirst(body, ["notes", "note"]));
+
+    if (Object.keys(manualUpdates).length) {
+      const mergedManual = { ...existingManual, ...manualUpdates };
+      addUpdate("manual_overrides", mergedManual);
+    }
 
     if (!updates.length) {
       return respondError(res, 400, "NO_FIELDS_PROVIDED");
     }
 
     updates.push(`updated_at = NOW()`);
-    const sql = `UPDATE par.vehicles SET ${updates.join(", ")} WHERE id = $${params.length + 1} RETURNING *`;
-    params.push(vehicleId);
+    const sql = `UPDATE par.vehicles SET ${updates.join(", ")} WHERE vin = $${params.length + 1} RETURNING *`;
+    params.push(vin);
 
     const result = await pool.query(sql, params);
     if (!result.rowCount) {
@@ -471,16 +730,18 @@ apiV2.patch("/vehicles/:vehicleId", async (req, res) => {
   }
 });
 
-apiV2.delete("/vehicles/:vehicleId", async (req, res) => {
+apiV2.delete("/vehicles/:vin", async (req, res) => {
   try {
-    const vehicleId = req.params.vehicleId;
-    const result = await pool.query("DELETE FROM par.vehicles WHERE id = $1 RETURNING id", [vehicleId]);
+    const vin = validateVinOrRespond(res, req.params.vin);
+    if (!vin) return;
+
+    const result = await pool.query("DELETE FROM par.vehicles WHERE vin = $1 RETURNING vin", [vin]);
 
     if (!result.rowCount) {
       return respondError(res, 404, "NOT_FOUND");
     }
 
-    return res.json({ ok: true, data: { id: vehicleId } });
+    return res.json({ ok: true, data: { vin } });
   } catch (err) {
     handleError(res, err);
   }
@@ -778,7 +1039,8 @@ app.get("/__routes", (req, res) => {
       "/api/v2/customers/:id (auth)",
       "/api/v2/customers/:id/vehicles (auth)",
       "/api/v2/customers/:id/dealer-suggest (auth)",
-      "/api/v2/vehicles/:vehicleId (auth)",
+      "/api/v2/vehicles/:vin (auth)",
+      "/api/v2/vin/:vin/decode (auth)",
     ],
   });
 });
