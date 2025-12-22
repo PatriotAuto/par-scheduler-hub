@@ -167,6 +167,28 @@
     .week-row-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--par-muted);}
     .week-row select{background:rgba(10,18,38,.95);border-radius:6px;border:1px solid var(--par-border);color:var(--par-text);font-size:12px;padding:4px 6px;}
     .week-row-off{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--par-muted);}
+    .vehicles-panel{margin-top:16px;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(6,12,24,.94);display:flex;flex-direction:column;gap:12px;}
+    .vehicles-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .vehicles-title{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--par-muted);}
+    .vehicles-status{font-size:11px;color:var(--par-muted);}
+    .vehicle-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .vehicle-actions button{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-weight:600;}
+    .vehicle-actions button:hover{background:rgba(227,6,19,.18);border-color:rgba(227,6,19,.6);}
+    .vehicles-list{display:flex;flex-direction:column;gap:8px;}
+    .vehicle-card{border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;background:rgba(4,10,22,.9);}
+    .vehicle-card-title{font-weight:700;font-size:13px;margin-bottom:4px;}
+    .vehicle-card-meta{font-size:12px;color:var(--par-muted);display:flex;flex-wrap:wrap;gap:10px;}
+    .vehicle-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;}
+    .vehicle-form-grid .field-group{margin:0;}
+    .vehicle-form-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .decode-row{display:flex;gap:8px;align-items:center;}
+    .decode-row input{flex:1;}
+    .vin-scanner-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:20;padding:14px;}
+    .vin-scanner-modal.open{display:flex;}
+    .vin-scanner-panel{background:#0b1324;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;width:min(520px,100%);box-shadow:0 10px 28px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:10px;}
+    .vin-scanner-header{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+    .vin-scanner-body{min-height:260px;background:#02040a;border:1px dashed rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--par-muted);padding:8px;}
+    .vin-scanner-actions{display:flex;justify-content:flex-end;gap:10px;}
     @media(max-width:1000px){
       .main{flex-direction:column;}
       .left{border-right:none;border-bottom:1px solid rgba(255,255,255,.08);}
@@ -1323,6 +1345,74 @@
 
     <div class="profile-body" id="profileBody"></div>
 
+    <div class="vehicles-panel">
+      <div class="vehicles-header">
+        <div>
+          <div class="vehicles-title">Vehicles</div>
+          <div class="vehicles-status" id="vehiclesStatus">Load a customer to view vehicles.</div>
+        </div>
+        <div class="vehicle-actions">
+          <button type="button" id="vehicleScanBtn">Scan VIN</button>
+          <button type="button" id="vehicleDecodeBtn">Decode VIN</button>
+        </div>
+      </div>
+
+      <div class="vehicles-list" id="vehiclesList"></div>
+
+      <form id="vehicleForm">
+        <div class="field-group">
+          <label for="vehicleVinInput">VIN</label>
+          <div class="decode-row">
+            <input type="text" id="vehicleVinInput" placeholder="17-character VIN" required />
+            <button type="button" id="vehicleDecodeInline" class="icon-button subtle">Decode</button>
+            <button type="button" id="vehicleScanInline" class="icon-button subtle">Scan</button>
+          </div>
+          <div class="field-note">VINs are stored uppercase with no spaces. Length must be 17 characters.</div>
+        </div>
+
+        <div class="vehicle-form-grid">
+          <div class="field-group">
+            <label for="vehicleYearInput">Year</label>
+            <input type="number" id="vehicleYearInput" placeholder="Year" />
+          </div>
+          <div class="field-group">
+            <label for="vehicleMakeInput">Make</label>
+            <input type="text" id="vehicleMakeInput" placeholder="Make" />
+          </div>
+          <div class="field-group">
+            <label for="vehicleModelInput">Model</label>
+            <input type="text" id="vehicleModelInput" placeholder="Model" />
+          </div>
+          <div class="field-group">
+            <label for="vehicleTrimInput">Trim</label>
+            <input type="text" id="vehicleTrimInput" placeholder="Trim" />
+          </div>
+          <div class="field-group">
+            <label for="vehicleColorInput">Color</label>
+            <input type="text" id="vehicleColorInput" placeholder="Color" />
+          </div>
+          <div class="field-group">
+            <label for="vehiclePlateInput">Plate</label>
+            <input type="text" id="vehiclePlateInput" placeholder="Plate" />
+          </div>
+          <div class="field-group">
+            <label for="vehicleMileageInput">Mileage</label>
+            <input type="number" id="vehicleMileageInput" placeholder="Mileage" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="vehicleNotesInput">Notes</label>
+          <textarea id="vehicleNotesInput" placeholder="Notes about this vehicle"></textarea>
+        </div>
+
+        <div class="vehicle-form-actions">
+          <button type="submit" class="btn btn-primary">Save Vehicle</button>
+          <div class="vehicles-status" id="vehicleFormStatus"></div>
+        </div>
+      </form>
+    </div>
+
     <div class="profile-actions">
       <button type="button" id="profileCopyPhone">Copy Phone</button>
       <button type="button" id="profileCopyEmail">Copy Email</button>
@@ -1331,9 +1421,28 @@
   </div>
 </div>
 
+<div class="vin-scanner-modal" id="vinScannerModal" aria-hidden="true">
+  <div class="vin-scanner-panel">
+    <div class="vin-scanner-header">
+      <div>
+        <div class="vehicles-title">Scan VIN</div>
+        <div class="vehicles-status" id="vinScannerStatus">Allow camera access to scan the barcode.</div>
+      </div>
+      <button type="button" class="profile-close" id="vinScannerClose">✕</button>
+    </div>
+    <div class="vin-scanner-body">
+      <div id="vinScannerViewport">Preparing camera...</div>
+    </div>
+    <div class="vin-scanner-actions">
+      <button type="button" class="btn-clear" id="vinScannerStop">Stop</button>
+    </div>
+  </div>
+</div>
+
 <script src="scripts/config.js"></script>
 <script src="assets/js/api-client.js"></script>
 <script src="auth.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 <script src="assets/js/vehicle-dropdowns.js"></script>
 <script src="customers.js"></script>
 </body>
