@@ -5,6 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
+    "migrate": "node-pg-migrate up --dir migrations --database-url $DATABASE_URL --no-lock",
+    "migrate:down": "node-pg-migrate down --dir migrations --database-url $DATABASE_URL --no-lock",
+    "db:verify": "node scripts/verify_migration.js",
     "seed": "node scripts/seed_from_csv.js",
     "db:schema": "node scripts/db_schema_report.js",
     "db:schema:json": "node scripts/db_schema_json.js",
@@ -14,6 +17,7 @@
     "csv-parse": "^5.5.6",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "node-pg-migrate": "^7.6.2",
     "pg": "^8.12.0"
   }
 }
