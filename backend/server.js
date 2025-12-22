@@ -6,35 +6,31 @@ const schemaCache = require("./db/schema_cache");
 const { runMigrations } = require("./db/run_migrations");
 
 const app = express();
+app.set("trust proxy", 1);
 
 // --------------------
 // CORS
 // --------------------
-const allowedOrigins = new Set([
+const ALLOWED_ORIGINS = [
   "https://parhub.patriotautorestyling.com",
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000"
-]);
+  "https://patriotautorestyling.com",
+  "https://www.patriotautorestyling.com",
+];
 
-const corsOptionsDelegate = (req, callback) => {
-  const origin = req.header("Origin");
-  if (!origin || allowedOrigins.has(origin)) {
-    callback(null, {
-      origin: origin || true,
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "x-admin-key"],
-      optionsSuccessStatus: 204,
-      maxAge: 86400
-    });
-  } else {
-    callback(null, { origin: false });
-  }
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-admin-key"],
+  credentials: false,
+  maxAge: 86400,
 };
 
-app.use(cors(corsOptionsDelegate));
-app.options("*", cors(corsOptionsDelegate));
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
