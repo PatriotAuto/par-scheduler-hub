@@ -17,21 +17,24 @@ const ALLOWED_ORIGINS = [
   "https://www.patriotautorestyling.com",
 ];
 
-app.use(cors({
+const corsMiddleware = cors({
   origin: (origin, cb) => {
     // Allow non-browser clients (curl, server-to-server) with no Origin header
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
     return cb(null, false);
   },
-  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization","x-admin-key"],
-  credentials: false
-}));
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-admin-key"],
+  credentials: false,
+  maxAge: 86400,
+});
+
+app.use(corsMiddleware);
 
 // Handle preflight for ALL routes
-app.options("*", cors());
-app.use(express.json());
+app.options("*", corsMiddleware);
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // --------------------
@@ -238,6 +241,10 @@ app.get("/debug/db", async (req, res) => {
   } catch (e) {
     handleError(res, e);
   }
+});
+
+app.get("/debug/cors", (req, res) => {
+  res.json({ ok: true, origin: req.get("origin") || null });
 });
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
