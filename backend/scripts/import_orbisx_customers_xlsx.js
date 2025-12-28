@@ -154,12 +154,12 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
 
   const updateAssignments = columns
-    .map((col, idx) => {
-      const placeholder = `$${idx + 1}`;
+    .filter((col) => col !== "legacy_client_id")
+    .map((col) => {
       if (col === "phone_raw") {
-        return `${col} = COALESCE(${placeholder}, ${col})`;
+        return `"${col}" = COALESCE(EXCLUDED."${col}", par.customers."${col}")`;
       }
-      return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
+      return `"${col}" = COALESCE(NULLIF(EXCLUDED."${col}", ''), par.customers."${col}")`;
     })
     .concat(["updated_at = NOW()"]);
 
