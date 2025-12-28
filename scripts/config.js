@@ -10,7 +10,22 @@
   }
 })();
 
-const API_BASE_URL = "https://api.patriotautorestyling.com";
+function resolveApiBaseUrl() {
+  if (typeof window === "undefined") return "https://api.patriotautorestyling.com";
+
+  const hostname = window.location.hostname;
+  const isLocal = ["localhost", "127.0.0.1"].includes(hostname);
+
+  // When served from the production domain, use a same-origin "/api" path so we
+  // avoid cross-origin requests that are blocked by CORS policy.
+  if (!isLocal && hostname.endsWith("patriotautorestyling.com")) {
+    return `${window.location.origin}/api`;
+  }
+
+  return "https://api.patriotautorestyling.com";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 window.API_BASE_URL = API_BASE_URL;
 
 console.log("API_BASE_URL =", API_BASE_URL);
