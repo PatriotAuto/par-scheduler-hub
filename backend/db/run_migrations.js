@@ -27,7 +27,9 @@ async function runMigrations(databaseUrl) {
     child.on("error", reject);
     child.on("exit", (code) => {
       if (code === 0) return resolve();
-      reject(new Error(`node-pg-migrate exited with code ${code}`));
+      const err = new Error(`node-pg-migrate exited with code ${code}`);
+      console.error(err.message);
+      reject(err);
     });
   });
 }
