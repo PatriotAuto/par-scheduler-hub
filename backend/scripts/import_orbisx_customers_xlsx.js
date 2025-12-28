@@ -1,7 +1,3 @@
-// FILE: backend/scripts/import_orbisx_customers_xlsx.js
-// Full copy/paste version with (1) unambiguous UPSERT (alias + EXCLUDED) and (2) debug output
-// so if anything is still ambiguous, it will print the exact SQL that Postgres is choking on.
-
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
@@ -20,11 +16,9 @@ const pool = new Pool({
 
 function usage() {
   console.log("Usage:");
-  console.log(
-    '  node scripts/import_orbisx_customers_xlsx.js "/local/path/Patriot Auto Restyling Clients Dec 28th 2025.xlsx"'
-  );
-  console.log('  DATABASE_URL=... npm run db:import:orbisx -- "/local/path/file.xlsx"');
-  console.log('  (On Railway one-off) npm run db:import:orbisx -- "/app/file.xlsx"');
+  console.log("  node scripts/import_orbisx_customers_xlsx.js \"/local/path/Patriot Auto Restyling Clients Dec 28th 2025.xlsx\"");
+  console.log("  DATABASE_URL=... npm run db:import:orbisx -- \"/local/path/file.xlsx\"");
+  console.log("  (On Railway one-off) npm run db:import:orbisx -- \"/app/file.xlsx\"");
 }
 
 function sanitizeText(value) {
@@ -90,12 +84,9 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const notes = sanitizeText(row["Notes"]);
   const phoneRaw = row["Phone"] === undefined ? null : String(row["Phone"]);
 
-  const normalizedPhone = phoneRaw
-    ? normalizeUSPhone(phoneRaw)
-    : { valid: false, raw: phoneRaw, display: phoneRaw || null };
-
+  const normalizedPhone = phoneRaw ? normalizeUSPhone(phoneRaw) : { valid: false, raw: phoneRaw, display: phoneRaw || null };
   const phone_e164 = normalizedPhone.valid ? normalizedPhone.e164 : null;
-  const phone_display = normalizedPhone.valid ? normalizedPhone.display : (normalizedPhone.display || null);
+  const phone_display = normalizedPhone.valid ? normalizedPhone.display : normalizedPhone.display;
 
   const payload = {
     legacy_client_id: legacyClientId,
@@ -105,8 +96,7 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     website,
     company,
     business_name: company || sanitizeText(row["Business Name"]),
-    unsubscribed_email:
-      row["Unsubscribed Email"] === true || String(row["Unsubscribed Email"] || "").toLowerCase() === "true",
+    unsubscribed_email: row["Unsubscribed Email"] === true || String(row["Unsubscribed Email"] || "").toLowerCase() === "true",
     primary_user_assigned: primaryUserAssigned,
     last_appointment: parseDate(row["Last Appointment"]),
     last_service: parseDate(row["Last Service"]),
@@ -126,7 +116,6 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     phone_raw: phoneRaw,
     phone_e164,
     phone_display,
-    // only write legacy phone as canonical e164 when valid; otherwise null (so we don't overwrite)
     legacy_phone: phone_e164,
   };
 
@@ -164,11 +153,10 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const values = columns.map((col) => payload[col] ?? null);
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
 
-  // UNAMBIGUOUS UPSERT:
-  // - Target table aliased as c
-  // - Existing values referenced as c."col"
-  // - Incoming values referenced as EXCLUDED."col"
-  // - Never updates legacy_client_id (conflict key)
+    // IMPORTANT FIX:
+  // - Never update legacy_client_id (conflict key)
+  // - Always refer to incoming values via EXCLUDED."col"
+  // - Always refer to existing values via c."col" (table alias)
   const updateAssignments = columns
     .filter((col) => String(col) !== "legacy_client_id")
     .map((col) => {
@@ -179,16 +167,17 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     })
     .concat(["updated_at = NOW()"]);
 
+
   const sql = `
     INSERT INTO par.customers AS c (${columns.map((c) => `"${c}"`).join(", ")})
     VALUES (${placeholders.join(", ")})
     ON CONFLICT (legacy_client_id) DO UPDATE SET
       ${updateAssignments.join(", ")}
     RETURNING c.id;
+
   `;
 
-  // DEBUG WRAP: if anything still errors, we print the exact SQL + columns to identify the true culprit.
-  try {
+   try {
     const { rows } = await pool.query(sql, values);
     return { skipped: false, customerId: rows[0].id, phoneValid: normalizedPhone.valid };
   } catch (e) {
@@ -198,6 +187,7 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     console.error("Customer UPSERT columns:", columns);
     throw e;
   }
+
 }
 
 async function upsertVehicle(row, customerId) {
@@ -248,14 +238,11 @@ async function upsertVehicle(row, customerId) {
   ];
 
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
-  const updateAssignments = columns
-    .map((col, idx) => {
-      const placeholder = `$${idx + 1}`;
-      if (col === "vin" || col === "customer_id") return null;
-      return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
-    })
-    .filter(Boolean);
-
+  const updateAssignments = columns.map((col, idx) => {
+    const placeholder = `$${idx + 1}`;
+    if (col === "vin" || col === "customer_id") return null;
+    return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
+  }).filter(Boolean);
   updateAssignments.push("updated_at = NOW()");
 
   const sql = `
