@@ -15,11 +15,21 @@ Patriot Scheduler Backend
 
 - Migrations use [`node-pg-migrate`](https://github.com/salsita/node-pg-migrate) and run automatically before the server starts. If a migration fails, the server will exit instead of booting with a partial schema.
 - New tables live in the `par` schema (`par.customers`, `par.vehicles`) and legacy tables are left untouched. Customer and vehicle rows are copied, not moved or deleted.
-- Scripts:
-  - `npm run migrate` – run migrations up (uses `DATABASE_URL`).
-  - `npm run migrate:down` – roll back the last migration.
-  - `npm run db:verify` – print legacy vs. new customer/vehicle counts and exit non-zero on mismatch.
-- On Railway, run a one-off `npm run migrate` (or rely on app start) to apply migrations safely.
+ - Scripts:
+   - `npm run migrate` – run migrations up (uses `DATABASE_URL`).
+   - `npm run migrate:down` – roll back the last migration.
+   - `npm run db:verify` – print legacy vs. new customer/vehicle counts and exit non-zero on mismatch.
+   - `npm run db:fix:phones` – normalize customer phone fields (safe, does not drop/truncate).
+   - `npm run db:schema` – print the current database schema.
+   - `npm run db:schema:json` – output schema as JSON.
+ - On Railway, run a one-off `npm run migrate` (or rely on app start) to apply migrations safely.
+
+### Phone number cleanup (one-time)
+- Deploy the changes, then run the one-off cleanup on Railway or locally:
+  ```bash
+  npm run db:fix:phones
+  ```
+- The script normalizes parseable phone numbers into `phone_e164`, `phone_display`, and the legacy `phone` column while preserving the original value in `phone_raw`.
 
 ### Admin access for write operations
 - When `ADMIN_API_KEY` is set, POST/PATCH/DELETE requests to `/api/v2` require the `x-admin-key` header to match. In local/dev (no key set), writes remain open.

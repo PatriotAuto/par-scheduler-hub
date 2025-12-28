@@ -11,6 +11,7 @@
     "seed": "node scripts/seed_from_csv.js",
     "db:schema": "node scripts/db_schema_report.js",
     "db:schema:json": "node scripts/db_schema_json.js",
+    "db:fix:phones": "node scripts/fix_customer_phones.js",
     "smoke:test": "node scripts/smoke_test_endpoints.js"
   },
   "dependencies": {

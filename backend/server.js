@@ -4,6 +4,7 @@ const { Pool } = require("pg");
 const queryUtils = require("./db/query_utils");
 const schemaCache = require("./db/schema_cache");
 const { runMigrations } = require("./db/run_migrations");
+const { normalizeUSPhone, formatE164ToDisplay } = require("./utils/phone");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -99,6 +100,53 @@ function toIntOrNull(value) {
   if (value === undefined || value === null || value === "") return null;
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function preparePhoneForWrite(input) {
+  if (input === undefined) {
+    return { provided: false };
+  }
+
+  const raw = input === null ? null : String(input).trim();
+  const normalized = normalizeUSPhone(raw);
+
+  if (normalized.valid) {
+    return {
+      provided: true,
+      valid: true,
+      raw,
+      e164: normalized.e164,
+      display: normalized.display,
+    };
+  }
+
+  return {
+    provided: true,
+    valid: false,
+    raw,
+    e164: null,
+    display: raw || null,
+  };
+}
+
+function derivePhoneDisplay(customer = {}) {
+  if (customer.phone_display && String(customer.phone_display).trim()) {
+    return customer.phone_display;
+  }
+
+  const displayFromE164 = formatE164ToDisplay(customer.phone_e164);
+  if (displayFromE164) {
+    return displayFromE164;
+  }
+
+  return customer.phone || null;
+}
+
+function formatCustomerPhones(customer = {}) {
+  return {
+    ...customer,
+    phone_display: derivePhoneDisplay(customer),
+  };
 }
 
 function normalizeVinInput(vin) {
@@ -409,7 +457,8 @@ apiV2.get("/customers", async (req, res) => {
     const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
     const sql = `SELECT * FROM par.customers ${whereClause} ORDER BY created_at DESC`;
     const { rows } = await pool.query(sql, params);
-    return res.json({ ok: true, data: rows });
+    const formatted = rows.map(formatCustomerPhones);
+    return res.json({ ok: true, data: formatted });
   } catch (err) {
     handleError(res, err);
   }
@@ -456,7 +505,8 @@ apiV2.get("/customers/:id", async (req, res) => {
       [id]
     );
 
-    return res.json({ ok: true, data: { ...customerRows[0], vehicles } });
+    const customer = formatCustomerPhones(customerRows[0]);
+    return res.json({ ok: true, data: { ...customer, vehicles } });
   } catch (err) {
     handleError(res, err);
   }
@@ -468,7 +518,8 @@ apiV2.post("/customers", async (req, res) => {
     const firstName = pickFirst(body, ["first_name", "firstName"]) || null;
     const lastName = pickFirst(body, ["last_name", "lastName"]) || null;
     const businessName = pickFirst(body, ["business_name", "businessName", "company"]) || null;
-    const phone = pickFirst(body, ["phone", "phone_number", "phoneNumber"]) || null;
+    const phoneInput = pickFirst(body, ["phone", "phone_number", "phoneNumber"]);
+    const phone = preparePhoneForWrite(phoneInput);
     const email = pickFirst(body, ["email", "email_address", "emailAddress"]) || null;
     const address1 = pickFirst(body, ["address1", "address_1", "street1"]) || null;
     const address2 = pickFirst(body, ["address2", "address_2", "street2"]) || null;
@@ -483,9 +534,9 @@ apiV2.post("/customers", async (req, res) => {
     const { rows } = await pool.query(
       `
       INSERT INTO par.customers
-        (legacy_customer_id, first_name, last_name, business_name, phone, email, address1, address2, city, state, zip, notes, is_dealer, dealer_level)
+        (legacy_customer_id, first_name, last_name, business_name, phone, phone_e164, phone_display, phone_raw, email, address1, address2, city, state, zip, notes, is_dealer, dealer_level)
       VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       RETURNING *
     `,
       [
@@ -493,7 +544,10 @@ apiV2.post("/customers", async (req, res) => {
         firstName,
         lastName,
         businessName,
-        phone,
+        phone.valid ? phone.e164 : null,
+        phone.valid ? phone.e164 : null,
+        phone.display,
+        phone.provided ? phone.raw : null,
         email,
         address1,
         address2,
@@ -506,7 +560,7 @@ apiV2.post("/customers", async (req, res) => {
       ]
     );
 
-    return res.status(201).json({ ok: true, data: rows[0] });
+    return res.status(201).json({ ok: true, data: formatCustomerPhones(rows[0]) });
   } catch (err) {
     handleError(res, err);
   }
@@ -529,7 +583,6 @@ apiV2.patch("/customers/:id", async (req, res) => {
     addUpdate("first_name", pickFirst(body, ["first_name", "firstName"]));
     addUpdate("last_name", pickFirst(body, ["last_name", "lastName"]));
     addUpdate("business_name", pickFirst(body, ["business_name", "businessName", "company"]));
-    addUpdate("phone", pickFirst(body, ["phone", "phone_number", "phoneNumber"]));
     addUpdate("email", pickFirst(body, ["email", "email_address", "emailAddress"]));
     addUpdate("address1", pickFirst(body, ["address1", "address_1", "street1"]));
     addUpdate("address2", pickFirst(body, ["address2", "address_2", "street2"]));
@@ -541,6 +594,19 @@ apiV2.patch("/customers/:id", async (req, res) => {
     addUpdate("is_dealer", isDealerInput !== undefined ? toBoolean(isDealerInput) : undefined);
     addUpdate("dealer_level", pickFirst(body, ["dealer_level", "dealerLevel"]));
     addUpdate("legacy_customer_id", pickFirst(body, ["legacy_customer_id", "legacyCustomerId"]));
+
+    const phoneInput = pickFirst(body, ["phone", "phone_number", "phoneNumber"]);
+    const phone = preparePhoneForWrite(phoneInput);
+    if (phone.provided) {
+      addUpdate("phone_raw", phone.raw);
+      if (phone.valid) {
+        addUpdate("phone", phone.e164);
+        addUpdate("phone_e164", phone.e164);
+        addUpdate("phone_display", phone.display);
+      } else if (phone.display !== undefined) {
+        addUpdate("phone_display", phone.display);
+      }
+    }
 
     if (!updates.length) {
       return respondError(res, 400, "NO_FIELDS_PROVIDED");
@@ -555,7 +621,7 @@ apiV2.patch("/customers/:id", async (req, res) => {
       return respondError(res, 404, "NOT_FOUND");
     }
 
-    return res.json({ ok: true, data: result.rows[0] });
+    return res.json({ ok: true, data: formatCustomerPhones(result.rows[0]) });
   } catch (err) {
     handleError(res, err);
   }
@@ -790,7 +856,13 @@ api.get("/customers", async (req, res) => {
     ["created_at", "createdat", "created", "id"],
     "DESC"
   )}`;
-  await listQuery(res, sql, params);
+  try {
+    const { rows } = await pool.query(sql, params);
+    const formatted = rows.map(formatCustomerPhones);
+    return res.json(formatted);
+  } catch (err) {
+    handleError(res, err);
+  }
 });
 
 api.get("/employees", async (req, res) => {
