@@ -17,20 +17,20 @@ const ALLOWED_ORIGINS = [
   "https://www.patriotautorestyling.com",
 ];
 
-const corsOptions = {
-  origin(origin, cb) {
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow non-browser clients (curl, server-to-server) with no Origin header
     if (!origin) return cb(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS blocked for origin: ${origin}`));
+    return cb(null, false);
   },
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-admin-key"],
-  credentials: false,
-  maxAge: 86400,
-};
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization","x-admin-key"],
+  credentials: false
+}));
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Handle preflight for ALL routes
+app.options("*", cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -274,8 +274,6 @@ authRouter.post("/login", async (req, res) => {
   });
 });
 
-app.options("/auth/*", cors(corsOptionsDelegate));
-app.options("/api/auth/*", cors(corsOptionsDelegate));
 app.use("/auth", authRouter);
 app.use("/api/auth", authRouter);
 
