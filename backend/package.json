@@ -12,13 +12,17 @@
     "db:schema": "node scripts/db_schema_report.js",
     "db:schema:json": "node scripts/db_schema_json.js",
     "db:fix:phones": "node scripts/fix_customer_phones.js",
-    "smoke:test": "node scripts/smoke_test_endpoints.js"
+    "smoke:test": "node scripts/smoke_test_endpoints.js",
+    "db:import:orbisx": "node scripts/import_orbisx_customers_xlsx.js",
+    "db:import:calendar": "node scripts/import_calendar_events_xlsx.js",
+    "db:import:all": "node scripts/import_orbisx_customers_xlsx.js \"$ORBISX_XLSX\" && node scripts/import_calendar_events_xlsx.js \"$CALENDAR_XLSX\""
   },
   "dependencies": {
     "csv-parse": "^5.5.6",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "node-pg-migrate": "^7.6.2",
-    "pg": "^8.12.0"
+    "pg": "^8.12.0",
+    "xlsx": "^0.18.5"
   }
 }
