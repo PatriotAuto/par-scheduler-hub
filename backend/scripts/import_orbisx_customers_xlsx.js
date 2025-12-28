@@ -155,8 +155,12 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     legacyPhoneColumn,
   ];
 
-  const values = columns.map((col) => payload[col] ?? null);
-  const placeholders = columns.map((_, idx) => `$${idx + 1}`);
+let values = columns.map((col) => payload[col] ?? null);
+// Bulletproof: never send "" to Postgres (fixes timestamptz "" errors)
+values = values.map((v) => (typeof v === "string" && v.trim() === "" ? null : v));
+
+const placeholders = columns.map((_, idx) => `$${idx + 1}`);
+
 
     // IMPORTANT FIX:
   // - Never update legacy_client_id (conflict key)
