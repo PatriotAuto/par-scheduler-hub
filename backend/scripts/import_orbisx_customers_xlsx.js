@@ -1,3 +1,7 @@
+// FILE: backend/scripts/import_orbisx_customers_xlsx.js
+// Full copy/paste version with (1) unambiguous UPSERT (alias + EXCLUDED) and (2) debug output
+// so if anything is still ambiguous, it will print the exact SQL that Postgres is choking on.
+
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
@@ -89,8 +93,9 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const normalizedPhone = phoneRaw
     ? normalizeUSPhone(phoneRaw)
     : { valid: false, raw: phoneRaw, display: phoneRaw || null };
+
   const phone_e164 = normalizedPhone.valid ? normalizedPhone.e164 : null;
-  const phone_display = normalizedPhone.valid ? normalizedPhone.display : normalizedPhone.display;
+  const phone_display = normalizedPhone.valid ? normalizedPhone.display : (normalizedPhone.display || null);
 
   const payload = {
     legacy_client_id: legacyClientId,
@@ -121,6 +126,7 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     phone_raw: phoneRaw,
     phone_e164,
     phone_display,
+    // only write legacy phone as canonical e164 when valid; otherwise null (so we don't overwrite)
     legacy_phone: phone_e164,
   };
 
@@ -158,18 +164,17 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const values = columns.map((col) => payload[col] ?? null);
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
 
-  // IMPORTANT FIX:
-  // - Alias target table as "c" so column references are never ambiguous.
-  // - Always refer to existing values as c."col"
-  // - Always refer to incoming values as EXCLUDED."col"
+  // UNAMBIGUOUS UPSERT:
+  // - Target table aliased as c
+  // - Existing values referenced as c."col"
+  // - Incoming values referenced as EXCLUDED."col"
+  // - Never updates legacy_client_id (conflict key)
   const updateAssignments = columns
-    .filter((col) => col !== "legacy_client_id") // never update the conflict key
+    .filter((col) => String(col) !== "legacy_client_id")
     .map((col) => {
       if (col === "phone_raw") {
-        // allow null/empty handling (keep existing if excluded is null)
         return `"${col}" = COALESCE(EXCLUDED."${col}", c."${col}")`;
       }
-      // avoid wiping good data with empty strings
       return `"${col}" = COALESCE(NULLIF(EXCLUDED."${col}", ''), c."${col}")`;
     })
     .concat(["updated_at = NOW()"]);
@@ -182,8 +187,17 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     RETURNING c.id;
   `;
 
-  const { rows } = await pool.query(sql, values);
-  return { skipped: false, customerId: rows[0].id, phoneValid: normalizedPhone.valid };
+  // DEBUG WRAP: if anything still errors, we print the exact SQL + columns to identify the true culprit.
+  try {
+    const { rows } = await pool.query(sql, values);
+    return { skipped: false, customerId: rows[0].id, phoneValid: normalizedPhone.valid };
+  } catch (e) {
+    console.error("Customer UPSERT FAILED.");
+    console.error("Postgres message:", e.message || e);
+    console.error("Customer UPSERT SQL:\n", sql);
+    console.error("Customer UPSERT columns:", columns);
+    throw e;
+  }
 }
 
 async function upsertVehicle(row, customerId) {
@@ -241,6 +255,7 @@ async function upsertVehicle(row, customerId) {
       return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
     })
     .filter(Boolean);
+
   updateAssignments.push("updated_at = NOW()");
 
   const sql = `
