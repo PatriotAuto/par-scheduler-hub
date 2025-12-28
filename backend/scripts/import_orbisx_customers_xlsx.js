@@ -166,15 +166,26 @@ const placeholders = columns.map((_, idx) => `$${idx + 1}`);
   // - Never update legacy_client_id (conflict key)
   // - Always refer to incoming values via EXCLUDED."col"
   // - Always refer to existing values via c."col" (table alias)
+  const dateCols = new Set(["lead_created_at", "date_added", "last_appointment", "last_service"]);
+  const boolCols = new Set(["unsubscribed_email"]);
+
   const updateAssignments = columns
     .filter((col) => String(col) !== "legacy_client_id")
     .map((col) => {
+      // For non-text types, DO NOT use NULLIF(..., '') because it forces '' to be cast to that type.
+      if (dateCols.has(col) || boolCols.has(col)) {
+        return `"${col}" = COALESCE(EXCLUDED."${col}", c."${col}")`;
+      }
+
       if (col === "phone_raw") {
         return `"${col}" = COALESCE(EXCLUDED."${col}", c."${col}")`;
       }
+
+      // Text-ish columns: protect against empty-string overwriting good data
       return `"${col}" = COALESCE(NULLIF(EXCLUDED."${col}", ''), c."${col}")`;
     })
     .concat(["updated_at = NOW()"]);
+
 
 
   const sql = `
