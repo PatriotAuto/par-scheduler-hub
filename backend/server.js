@@ -220,7 +220,7 @@ async function decodeVinWithCache(vin) {
 // Health + Debug
 // --------------------
 app.get("/health", async (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+  res.json({ ok: true });
 });
 
 app.get("/debug/db", async (req, res) => {
