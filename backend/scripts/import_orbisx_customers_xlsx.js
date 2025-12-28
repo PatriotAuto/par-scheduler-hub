@@ -5,7 +5,11 @@ const XLSX = require("xlsx");
 const { normalizeUSPhone } = require("../utils/phone");
 
 const DB_URL = process.env.DATABASE_URL || "";
-const needsSSL = DB_URL && !DB_URL.includes(".railway.internal") && !DB_URL.includes("railway.internal");
+const needsSSL =
+  DB_URL &&
+  !DB_URL.includes(".railway.internal") &&
+  !DB_URL.includes("railway.internal");
+
 const sslConfig = needsSSL ? { rejectUnauthorized: false } : false;
 
 const pool = new Pool({
@@ -16,23 +20,20 @@ const pool = new Pool({
 
 function usage() {
   console.log("Usage:");
-  console.log("  node scripts/import_orbisx_customers_xlsx.js \"/local/path/Patriot Auto Restyling Clients Dec 28th 2025.xlsx\"");
-  console.log("  DATABASE_URL=... npm run db:import:orbisx -- \"/local/path/file.xlsx\"");
-  console.log("  (On Railway one-off) npm run db:import:orbisx -- \"/app/file.xlsx\"");
+  console.log(
+    '  node scripts/import_orbisx_customers_xlsx.js "Patriot Auto Restyling Clients Dec 28th 2025.xlsx"'
+  );
 }
 
 function sanitizeText(value) {
   if (value === undefined || value === null) return null;
-  const trimmed = String(value).trim();
-  return trimmed.length ? trimmed : null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  return String(value).trim();
 }
 
 function parseDate(value) {
   if (value === undefined || value === null) return null;
-
-  // Treat empty strings / whitespace as null (prevents "" -> timestamptz errors)
   if (typeof value === "string" && value.trim() === "") return null;
-
   if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
 
   const parsed = new Date(value);
@@ -45,7 +46,10 @@ async function getLegacyPhoneColumn() {
     FROM information_schema.columns
     WHERE table_schema = 'par'
       AND table_name = 'customers'
-      AND column_name IN ('phone', 'phone_number', 'phonenumber', 'mobile', 'cell', 'primary_phone', 'primaryphone')
+      AND column_name IN (
+        'phone','phone_number','phonenumber',
+        'mobile','cell','primary_phone','primaryphone'
+      )
     ORDER BY
       CASE column_name
         WHEN 'phone' THEN 1
@@ -65,63 +69,44 @@ async function getLegacyPhoneColumn() {
 
 async function upsertCustomer(row, legacyPhoneColumn) {
   const legacyClientId = sanitizeText(row["Client ID"]);
-  if (!legacyClientId) {
-    return { skipped: true, reason: "missing_client_id" };
-  }
+  if (!legacyClientId) return { skipped: true };
 
-  const firstName = sanitizeText(row["First Name"]);
-  const lastName = sanitizeText(row["Last Name"]);
-  const name = sanitizeText(row["Name"]);
-  const email = sanitizeText(row["Email"]);
-  const website = sanitizeText(row["Website"]);
-  const company = sanitizeText(row["Company"]);
-  const address1 = sanitizeText(row["Address"]);
-  const address2 = sanitizeText(row["Address 2"]);
-  const city = sanitizeText(row["City"]);
-  const state = sanitizeText(row["State/Province"]);
-  const zip = sanitizeText(row["Zip/Postal Code"]);
-  const country = sanitizeText(row["Country"]);
-  const leadId = sanitizeText(row["Lead ID"]);
-  const primaryUserAssigned = sanitizeText(row["Primary User Assigned"]);
-  const tags = sanitizeText(row["Tags"]);
-  const source = sanitizeText(row["Source"]);
-  const pnl = sanitizeText(row["P&L"]);
-  const notes = sanitizeText(row["Notes"]);
-  const phoneRaw = row["Phone"] === undefined ? null : String(row["Phone"]);
-
-  const normalizedPhone = phoneRaw ? normalizeUSPhone(phoneRaw) : { valid: false, raw: phoneRaw, display: phoneRaw || null };
-  const phone_e164 = normalizedPhone.valid ? normalizedPhone.e164 : null;
-  const phone_display = normalizedPhone.valid ? normalizedPhone.display : normalizedPhone.display;
+  const phoneRaw = row["Phone"] !== undefined ? String(row["Phone"]) : null;
+  const normalizedPhone = phoneRaw
+    ? normalizeUSPhone(phoneRaw)
+    : { valid: false, display: null };
 
   const payload = {
     legacy_client_id: legacyClientId,
-    legacy_lead_id: leadId,
+    legacy_lead_id: sanitizeText(row["Lead ID"]),
     lead_created_at: parseDate(row["Lead Created Date"]),
     date_added: parseDate(row["Date Added"]),
-    website,
-    company,
-    business_name: company || sanitizeText(row["Business Name"]),
-    unsubscribed_email: row["Unsubscribed Email"] === true || String(row["Unsubscribed Email"] || "").toLowerCase() === "true",
-    primary_user_assigned: primaryUserAssigned,
+    website: sanitizeText(row["Website"]),
+    company: sanitizeText(row["Company"]),
+    business_name: sanitizeText(row["Company"]) || sanitizeText(row["Business Name"]),
+    unsubscribed_email:
+      row["Unsubscribed Email"] === true ||
+      String(row["Unsubscribed Email"] || "").toLowerCase() === "true",
+    primary_user_assigned: sanitizeText(row["Primary User Assigned"]),
     last_appointment: parseDate(row["Last Appointment"]),
     last_service: parseDate(row["Last Service"]),
-    tags,
-    source,
-    pnl,
-    notes,
-    first_name: firstName || (name ? name.split(" ")[0] : null),
-    last_name: lastName || (name ? name.split(" ").slice(1).join(" ") || null : null),
-    email,
-    address1,
-    address2,
-    city,
-    state,
-    zip,
-    country,
+    tags: sanitizeText(row["Tags"]),
+    source: sanitizeText(row["Source"]),
+    pnl: sanitizeText(row["P&L"]),
+    notes: sanitizeText(row["Notes"]),
+    first_name: sanitizeText(row["First Name"]),
+    last_name: sanitizeText(row["Last Name"]),
+    email: sanitizeText(row["Email"]),
+    address1: sanitizeText(row["Address"]),
+    address2: sanitizeText(row["Address 2"]),
+    city: sanitizeText(row["City"]),
+    state: sanitizeText(row["State/Province"]),
+    zip: sanitizeText(row["Zip/Postal Code"]),
+    country: sanitizeText(row["Country"]),
     phone_raw: phoneRaw,
-    phone_e164,
-    phone_display,
-    legacy_phone: phone_e164,
+    phone_e164: normalizedPhone.valid ? normalizedPhone.e164 : null,
+    phone_display: normalizedPhone.valid ? normalizedPhone.display : null,
+    legacy_phone: normalizedPhone.valid ? normalizedPhone.e164 : null,
   };
 
   const columns = [
@@ -155,38 +140,33 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     legacyPhoneColumn,
   ];
 
-let values = columns.map((col) => payload[col] ?? null);
-// Bulletproof: never send "" to Postgres (fixes timestamptz "" errors)
-values = values.map((v) => (typeof v === "string" && v.trim() === "" ? null : v));
+  let values = columns.map((c) => payload[c] ?? null);
+  values = values.map((v) =>
+    typeof v === "string" && v.trim() === "" ? null : v
+  );
 
-const placeholders = columns.map((_, idx) => `$${idx + 1}`);
+  const placeholders = columns.map((_, i) => `$${i + 1}`);
 
-
-    // IMPORTANT FIX:
-  // - Never update legacy_client_id (conflict key)
-  // - Always refer to incoming values via EXCLUDED."col"
-  // - Always refer to existing values via c."col" (table alias)
-  const dateCols = new Set(["lead_created_at", "date_added", "last_appointment", "last_service"]);
+  const dateCols = new Set([
+    "lead_created_at",
+    "date_added",
+    "last_appointment",
+    "last_service",
+  ]);
   const boolCols = new Set(["unsubscribed_email"]);
 
   const updateAssignments = columns
-    .filter((col) => String(col) !== "legacy_client_id")
-    .map((col) => {
-      // For non-text types, DO NOT use NULLIF(..., '') because it forces '' to be cast to that type.
-      if (dateCols.has(col) || boolCols.has(col)) {
-        return `"${col}" = COALESCE(EXCLUDED."${col}", c."${col}")`;
+    .filter((c) => c !== "legacy_client_id")
+    .map((c) => {
+      if (dateCols.has(c) || boolCols.has(c)) {
+        return `"${c}" = COALESCE(EXCLUDED."${c}", c."${c}")`;
       }
-
-      if (col === "phone_raw") {
-        return `"${col}" = COALESCE(EXCLUDED."${col}", c."${col}")`;
+      if (c === "phone_raw") {
+        return `"${c}" = COALESCE(EXCLUDED."${c}", c."${c}")`;
       }
-
-      // Text-ish columns: protect against empty-string overwriting good data
-      return `"${col}" = COALESCE(NULLIF(EXCLUDED."${col}", ''), c."${col}")`;
+      return `"${c}" = COALESCE(NULLIF(EXCLUDED."${c}", ''), c."${c}")`;
     })
     .concat(["updated_at = NOW()"]);
-
-
 
   const sql = `
     INSERT INTO par.customers AS c (${columns.map((c) => `"${c}"`).join(", ")})
@@ -194,176 +174,92 @@ const placeholders = columns.map((_, idx) => `$${idx + 1}`);
     ON CONFLICT (legacy_client_id) DO UPDATE SET
       ${updateAssignments.join(", ")}
     RETURNING c.id;
-
   `;
 
-   try {
-    const { rows } = await pool.query(sql, values);
-    return { skipped: false, customerId: rows[0].id, phoneValid: normalizedPhone.valid };
-  } catch (e) {
-    console.error("Customer UPSERT FAILED.");
-    console.error("Postgres message:", e.message || e);
-    console.error("Customer UPSERT SQL:\n", sql);
-    console.error("Customer UPSERT columns:", columns);
-    throw e;
-  }
-
+  const { rows } = await pool.query(sql, values);
+  return { customerId: rows[0].id, phoneValid: normalizedPhone.valid };
 }
 
 async function upsertVehicle(row, customerId) {
   const vin = sanitizeText(row["VIN"]);
-  if (!vin || vin.length !== 17) {
-    return { inserted: false, reason: "missing_or_invalid_vin" };
-  }
-
-  const year = parseInt(row["Year"], 10);
-  const make = sanitizeText(row["Make"]);
-  const model = sanitizeText(row["Model"]);
-  const trim = sanitizeText(row["Trim"]);
-  const odometer = row["Odometer"] ? parseInt(row["Odometer"], 10) : null;
-  const plate_number = sanitizeText(row["Plate"] || row["Plate Number"]);
-  const color = sanitizeText(row["Color"]);
-  const vehicle_notes = sanitizeText(row["Vehicle Notes"] || row["Notes"]);
-
-  const columns = [
-    "vin",
-    "customer_id",
-    "year",
-    "make",
-    "model",
-    "trim",
-    "odometer",
-    "plate_number",
-    "color",
-    "vehicle_notes",
-    "plate",
-    "mileage",
-    "notes",
-  ];
-
-  const values = [
-    vin.toUpperCase(),
-    customerId,
-    Number.isFinite(year) ? year : null,
-    make,
-    model,
-    trim,
-    Number.isFinite(odometer) ? odometer : null,
-    plate_number,
-    color,
-    vehicle_notes,
-    plate_number,
-    Number.isFinite(odometer) ? odometer : null,
-    vehicle_notes,
-  ];
-
-  const placeholders = columns.map((_, idx) => `$${idx + 1}`);
-  const updateAssignments = columns.map((col, idx) => {
-    const placeholder = `$${idx + 1}`;
-    if (col === "vin" || col === "customer_id") return null;
-    return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
-  }).filter(Boolean);
-  updateAssignments.push("updated_at = NOW()");
+  if (!vin || vin.length !== 17) return;
 
   const sql = `
-    INSERT INTO par.vehicles (${columns.join(", ")})
-    VALUES (${placeholders.join(", ")})
+    INSERT INTO par.vehicles (
+      vin, customer_id, year, make, model, trim,
+      odometer, plate_number, color, vehicle_notes
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     ON CONFLICT (vin) DO UPDATE SET
-      ${updateAssignments.join(", ")}
+      customer_id = EXCLUDED.customer_id,
+      year = COALESCE(EXCLUDED.year, vehicles.year),
+      make = COALESCE(EXCLUDED.make, vehicles.make),
+      model = COALESCE(EXCLUDED.model, vehicles.model),
+      trim = COALESCE(EXCLUDED.trim, vehicles.trim),
+      odometer = COALESCE(EXCLUDED.odometer, vehicles.odometer),
+      plate_number = COALESCE(EXCLUDED.plate_number, vehicles.plate_number),
+      color = COALESCE(EXCLUDED.color, vehicles.color),
+      vehicle_notes = COALESCE(EXCLUDED.vehicle_notes, vehicles.vehicle_notes),
+      updated_at = NOW();
   `;
 
-  await pool.query(sql, values);
-  return { inserted: true };
+  await pool.query(sql, [
+    vin.toUpperCase(),
+    customerId,
+    parseInt(row["Year"], 10) || null,
+    sanitizeText(row["Make"]),
+    sanitizeText(row["Model"]),
+    sanitizeText(row["Trim"]),
+    parseInt(row["Odometer"], 10) || null,
+    sanitizeText(row["Plate"]),
+    sanitizeText(row["Color"]),
+    sanitizeText(row["Vehicle Notes"]),
+  ]);
 }
 
 async function updateDealerFlags() {
-  const sql = `
-    WITH vehicle_counts AS (
-      SELECT customer_id, COUNT(*) AS vehicle_count
-      FROM par.vehicles
-      GROUP BY customer_id
-    )
+  await pool.query(`
     UPDATE par.customers c
     SET is_dealer = TRUE
-    FROM vehicle_counts vc
-    WHERE c.id = vc.customer_id
-      AND (vc.vehicle_count >= 10 OR c.company IS NOT NULL)
+    FROM (
+      SELECT customer_id
+      FROM par.vehicles
+      GROUP BY customer_id
+      HAVING COUNT(*) >= 10
+    ) v
+    WHERE c.id = v.customer_id
       AND c.is_dealer = FALSE;
-  `;
-  await pool.query(sql);
+  `);
 }
 
 async function main() {
   const filePath = process.argv[2];
-  if (!filePath) {
-    usage();
-    throw new Error("Missing XLSX file path argument.");
-  }
+  if (!filePath) usage();
 
   const resolved = path.resolve(filePath);
-  if (!fs.existsSync(resolved)) {
-    usage();
-    throw new Error(`File not found: ${resolved}`);
-  }
+  if (!fs.existsSync(resolved)) throw new Error("File not found");
 
-  console.log("Connecting to Postgres...", DB_URL ? "DATABASE_URL provided" : "DATABASE_URL missing!");
   const legacyPhoneColumn = await getLegacyPhoneColumn();
-  console.log("Legacy phone column:", legacyPhoneColumn);
-  console.log("Reading workbook:", resolved);
 
   const workbook = XLSX.readFile(resolved, { cellDates: true });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
-  console.log(`Rows detected in '${sheetName}':`, rows.length);
-
-  let customersProcessed = 0;
-  let customersSkipped = 0;
-  let vehiclesUpserted = 0;
-  let vehiclesSkipped = 0;
-  let phonesValid = 0;
-  let phonesInvalid = 0;
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {
+    defval: null,
+  });
 
   for (const row of rows) {
     const result = await upsertCustomer(row, legacyPhoneColumn);
-    if (result.skipped) {
-      customersSkipped += 1;
-      continue;
-    }
-
-    customersProcessed += 1;
-    if (result.phoneValid) {
-      phonesValid += 1;
-    } else {
-      phonesInvalid += 1;
-    }
-
-    const vehicleResult = await upsertVehicle(row, result.customerId);
-    if (vehicleResult.inserted) {
-      vehiclesUpserted += 1;
-    } else {
-      vehiclesSkipped += 1;
+    if (result?.customerId) {
+      await upsertVehicle(row, result.customerId);
     }
   }
 
   await updateDealerFlags();
-
-  console.log("Import complete.");
-  console.log({
-    customers_processed: customersProcessed,
-    customers_skipped_missing_id: customersSkipped,
-    vehicles_upserted: vehiclesUpserted,
-    vehicles_skipped_missing_vin: vehiclesSkipped,
-    phones_valid: phonesValid,
-    phones_invalid: phonesInvalid,
-  });
+  console.log("Import complete");
 }
 
 main()
-  .catch((err) => {
-    console.error("Import failed:", err.message || err);
-    process.exitCode = 1;
+  .catch((e) => {
+    console.error("Import failed:", e.message);
+    process.exit(1);
   })
-  .finally(async () => {
-    await pool.end();
-  });
+  .finally(() => pool.end());
