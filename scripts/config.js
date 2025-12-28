@@ -16,10 +16,13 @@ function resolveApiBaseUrl() {
   const hostname = window.location.hostname;
   const isLocal = ["localhost", "127.0.0.1"].includes(hostname);
 
-  // When served from the production domain, use a same-origin "/api" path so we
-  // avoid cross-origin requests that are blocked by CORS policy.
+  // In production we want to talk directly to the API domain. Some of the
+  // static hosting environments under *.patriotautorestyling.com (e.g.
+  // parhub.patriotautorestyling.com) don't proxy "/api" routes, which leads to
+  // 405 responses when we try to POST to endpoints like /auth/login. Always use
+  // the dedicated API host instead of relying on same-origin routing.
   if (!isLocal && hostname.endsWith("patriotautorestyling.com")) {
-    return `${window.location.origin}/api`;
+    return "https://api.patriotautorestyling.com";
   }
 
   return "https://api.patriotautorestyling.com";
