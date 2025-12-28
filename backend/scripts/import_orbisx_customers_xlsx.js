@@ -28,8 +28,13 @@ function sanitizeText(value) {
 }
 
 function parseDate(value) {
-  if (!value) return null;
+  if (value === undefined || value === null) return null;
+
+  // Treat empty strings / whitespace as null (prevents "" -> timestamptz errors)
+  if (typeof value === "string" && value.trim() === "") return null;
+
   if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
+
   const parsed = new Date(value);
   return isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
