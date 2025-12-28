@@ -16,9 +16,11 @@ const pool = new Pool({
 
 function usage() {
   console.log("Usage:");
-  console.log("  node scripts/import_orbisx_customers_xlsx.js \"/local/path/Patriot Auto Restyling Clients Dec 28th 2025.xlsx\"");
-  console.log("  DATABASE_URL=... npm run db:import:orbisx -- \"/local/path/file.xlsx\"");
-  console.log("  (On Railway one-off) npm run db:import:orbisx -- \"/app/file.xlsx\"");
+  console.log(
+    '  node scripts/import_orbisx_customers_xlsx.js "/local/path/Patriot Auto Restyling Clients Dec 28th 2025.xlsx"'
+  );
+  console.log('  DATABASE_URL=... npm run db:import:orbisx -- "/local/path/file.xlsx"');
+  console.log('  (On Railway one-off) npm run db:import:orbisx -- "/app/file.xlsx"');
 }
 
 function sanitizeText(value) {
@@ -84,7 +86,9 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const notes = sanitizeText(row["Notes"]);
   const phoneRaw = row["Phone"] === undefined ? null : String(row["Phone"]);
 
-  const normalizedPhone = phoneRaw ? normalizeUSPhone(phoneRaw) : { valid: false, raw: phoneRaw, display: phoneRaw || null };
+  const normalizedPhone = phoneRaw
+    ? normalizeUSPhone(phoneRaw)
+    : { valid: false, raw: phoneRaw, display: phoneRaw || null };
   const phone_e164 = normalizedPhone.valid ? normalizedPhone.e164 : null;
   const phone_display = normalizedPhone.valid ? normalizedPhone.display : normalizedPhone.display;
 
@@ -96,7 +100,8 @@ async function upsertCustomer(row, legacyPhoneColumn) {
     website,
     company,
     business_name: company || sanitizeText(row["Business Name"]),
-    unsubscribed_email: row["Unsubscribed Email"] === true || String(row["Unsubscribed Email"] || "").toLowerCase() === "true",
+    unsubscribed_email:
+      row["Unsubscribed Email"] === true || String(row["Unsubscribed Email"] || "").toLowerCase() === "true",
     primary_user_assigned: primaryUserAssigned,
     last_appointment: parseDate(row["Last Appointment"]),
     last_service: parseDate(row["Last Service"]),
@@ -153,22 +158,28 @@ async function upsertCustomer(row, legacyPhoneColumn) {
   const values = columns.map((col) => payload[col] ?? null);
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
 
+  // IMPORTANT FIX:
+  // - Alias target table as "c" so column references are never ambiguous.
+  // - Always refer to existing values as c."col"
+  // - Always refer to incoming values as EXCLUDED."col"
   const updateAssignments = columns
-    .filter((col) => col !== "legacy_client_id")
+    .filter((col) => col !== "legacy_client_id") // never update the conflict key
     .map((col) => {
       if (col === "phone_raw") {
-        return `"${col}" = COALESCE(EXCLUDED."${col}", par.customers."${col}")`;
+        // allow null/empty handling (keep existing if excluded is null)
+        return `"${col}" = COALESCE(EXCLUDED."${col}", c."${col}")`;
       }
-      return `"${col}" = COALESCE(NULLIF(EXCLUDED."${col}", ''), par.customers."${col}")`;
+      // avoid wiping good data with empty strings
+      return `"${col}" = COALESCE(NULLIF(EXCLUDED."${col}", ''), c."${col}")`;
     })
     .concat(["updated_at = NOW()"]);
 
   const sql = `
-    INSERT INTO par.customers (${columns.map((c) => `"${c}"`).join(", ")})
+    INSERT INTO par.customers AS c (${columns.map((c) => `"${c}"`).join(", ")})
     VALUES (${placeholders.join(", ")})
     ON CONFLICT (legacy_client_id) DO UPDATE SET
       ${updateAssignments.join(", ")}
-    RETURNING id;
+    RETURNING c.id;
   `;
 
   const { rows } = await pool.query(sql, values);
@@ -223,11 +234,13 @@ async function upsertVehicle(row, customerId) {
   ];
 
   const placeholders = columns.map((_, idx) => `$${idx + 1}`);
-  const updateAssignments = columns.map((col, idx) => {
-    const placeholder = `$${idx + 1}`;
-    if (col === "vin" || col === "customer_id") return null;
-    return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
-  }).filter(Boolean);
+  const updateAssignments = columns
+    .map((col, idx) => {
+      const placeholder = `$${idx + 1}`;
+      if (col === "vin" || col === "customer_id") return null;
+      return `${col} = COALESCE(NULLIF(${placeholder}, ''), ${col})`;
+    })
+    .filter(Boolean);
   updateAssignments.push("updated_at = NOW()");
 
   const sql = `
