@@ -1,3 +1,27 @@
+const SCI_NOTATION_REGEX = /e\+?\d+$/i;
+
+function toRawString(value) {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "number") {
+    try {
+      return String(BigInt(Math.trunc(value)));
+    } catch (err) {
+      // Fall back to toFixed when BigInt conversion fails (very large or special numbers)
+      return String(Number(value).toFixed(0));
+    }
+  }
+
+  const str = String(value).trim();
+  if (SCI_NOTATION_REGEX.test(str) && !str.includes(" ")) {
+    const asNumber = Number(str);
+    if (Number.isFinite(asNumber)) {
+      return String(asNumber.toFixed(0));
+    }
+  }
+
+  return str;
+}
+
 function stripNonDigits(value) {
   if (value === undefined || value === null) return "";
   return String(value).replace(/\D/g, "");
@@ -21,8 +45,8 @@ function formatE164ToDisplay(e164) {
 }
 
 function normalizeUSPhone(rawInput) {
-  const raw = rawInput === undefined || rawInput === null ? "" : String(rawInput).trim();
-  const digitsOnly = stripNonDigits(raw);
+  const rawString = toRawString(rawInput);
+  const digitsOnly = stripNonDigits(rawString);
 
   let normalizedDigits = digitsOnly;
   if (digitsOnly.length === 11 && digitsOnly.startsWith("1")) {
@@ -35,15 +59,15 @@ function normalizeUSPhone(rawInput) {
       valid: true,
       e164: `+1${normalizedDigits}`,
       display,
-      raw,
+      raw: rawString,
     };
   }
 
   return {
     valid: false,
     e164: null,
-    display: raw || null,
-    raw,
+    display: rawString || null,
+    raw: rawString,
   };
 }
 
