@@ -10,6 +10,7 @@
     activeAlpha: "All",
     activeCustomerId: null,
     vehicles: [],
+    customerHistory: [],
   };
   let vehicleDropdownsReady = null;
 
@@ -189,6 +190,17 @@
       .replace(/'/g, "&#039;");
   }
 
+  function formatDateLocal(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
   function normalizeVinInput(value) {
     return (value || "").toString().trim().toUpperCase();
   }
@@ -201,6 +213,74 @@
   function setVehicleFormStatus(message) {
     const el = $("vehicleFormStatus");
     if (el) el.textContent = message || "";
+  }
+
+  function setHistoryStatus(message) {
+    const el = $("historyStatus");
+    if (el) el.textContent = message || "";
+  }
+
+  function renderHistoryList(list) {
+    const container = $("historyList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const items = Array.isArray(list) ? list : [];
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "history-empty";
+      empty.textContent = "No history found.";
+      container.appendChild(empty);
+      return;
+    }
+
+    items.forEach((event) => {
+      const card = document.createElement("div");
+      card.className = "history-card";
+
+      const header = document.createElement("div");
+      header.className = "history-card-header";
+
+      const date = document.createElement("div");
+      date.className = "history-date";
+      date.textContent = formatDateLocal(event.event_date || event.created_at) || "";
+
+      const title = document.createElement("div");
+      title.className = "history-title";
+      title.textContent = event.title || "(No title)";
+
+      header.appendChild(date);
+      header.appendChild(title);
+
+      const description = document.createElement("div");
+      description.className = "history-description";
+      description.textContent = event.description || "";
+
+      const vehicleLine = document.createElement("div");
+      vehicleLine.className = "history-vehicle";
+      const vehiclePieces = [event.vehicle_year, event.vehicle_make, event.vehicle_model, event.vehicle_trim]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      if (vehiclePieces) {
+        const vin = event.vehicle_vin ? ` (VIN: ${event.vehicle_vin})` : "";
+        vehicleLine.textContent = `Vehicle: ${vehiclePieces}${vin}`;
+      } else if (event.vehicle_vin) {
+        vehicleLine.textContent = `Vehicle VIN: ${event.vehicle_vin}`;
+      }
+
+      const source = document.createElement("div");
+      source.className = "history-source";
+      source.textContent = event.source ? `Source: ${event.source}` : "";
+
+      card.appendChild(header);
+      if (description.textContent) card.appendChild(description);
+      if (vehicleLine.textContent) card.appendChild(vehicleLine);
+      if (source.textContent) card.appendChild(source);
+
+      container.appendChild(card);
+    });
   }
 
   function renderVehiclesList(list) {
@@ -553,6 +633,30 @@
     }
   }
 
+  async function loadHistoryForCustomer(customerId) {
+    if (!customerId) {
+      setHistoryStatus("Load a customer to view history.");
+      renderHistoryList([]);
+      return;
+    }
+
+    setHistoryStatus("Loading history…");
+    renderHistoryList([]);
+    try {
+      const url = buildApiUrl(`/api/v2/customers/${encodeURIComponent(customerId)}/events?limit=50`);
+      const payload = await fetchJsonDebug(url);
+      const data = payload?.data || payload || {};
+      const events = Array.isArray(data.events) ? data.events : [];
+      state.customerHistory = events;
+      renderHistoryList(events);
+      setHistoryStatus(events.length ? `${events.length} record(s)` : "No history found.");
+    } catch (err) {
+      console.error("Failed to load history:", err);
+      setHistoryStatus("Could not load history.");
+      renderHistoryList([]);
+    }
+  }
+
   async function openProfile(c) {
     const drawer = document.getElementById("profileDrawer");
     const nameEl = document.getElementById("profileName");
@@ -591,7 +695,10 @@
     drawer.classList.add("open");
     drawer.setAttribute("aria-hidden", "false");
     state.activeCustomerId = c.id || null;
-    await loadVehiclesForCustomer(state.activeCustomerId);
+    await Promise.all([
+      loadVehiclesForCustomer(state.activeCustomerId),
+      loadHistoryForCustomer(state.activeCustomerId),
+    ]);
 
     const copyPhone = document.getElementById("profileCopyPhone");
     const copyEmail = document.getElementById("profileCopyEmail");
@@ -613,8 +720,11 @@
     drawer.setAttribute("aria-hidden", "true");
     state.activeCustomerId = null;
     state.vehicles = [];
+    state.customerHistory = [];
     renderVehiclesList([]);
     setVehiclesStatus("Load a customer to view vehicles.");
+    renderHistoryList([]);
+    setHistoryStatus("Load a customer to view history.");
     stopVinScanner();
   }
 
