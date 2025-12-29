@@ -652,7 +652,10 @@
       setHistoryStatus(events.length ? `${events.length} record(s)` : "No history found.");
     } catch (err) {
       console.error("Failed to load history:", err);
-      setHistoryStatus("Could not load history.");
+      const unauthorized = err?.status === 401;
+      setHistoryStatus(
+        unauthorized ? "Session expired — please log in again." : "Could not load history."
+      );
       renderHistoryList([]);
     }
   }
@@ -864,7 +867,7 @@
     setError("");
 
     try {
-      const url = `${API_BASE_URL}/customers`;
+      const url = buildApiUrl(`/customers`);
       const payload = await fetchJsonDebug(url);
       console.log("Customers raw response:", payload);
 
