@@ -1,12 +1,12 @@
-// CSV-to-Postgres seeder for Railway-compatible environments.
-// Run with: npm run seed
+/* eslint-disable no-console */
 const fs = require("fs");
 const path = require("path");
-const { parse } = require("csv-parse/sync");
 const { Pool } = require("pg");
 
-const DATA_DIR = path.join(__dirname, "../backend/data");
-const FALLBACK_DATA_DIR = path.join(__dirname, "../data");
+const DATA_DIR = path.join(__dirname, "..", "data");
+
+// Map the CSV file to table name (snake_case).
+// If you rename a CSV later, update it here.
 const FILES = [
   { file: "Departments.csv", table: "departments" },
   { file: "Services.csv", table: "services" },
@@ -20,228 +20,220 @@ const FILES = [
   { file: "Appointments.csv", table: "appointments" },
 ];
 
-const BATCH_SIZE = 500;
-
-function qIdent(name) {
-  return '"' + String(name).replace(/"/g, '""') + '"';
+// --- helpers ---
+function listFilesCaseInsensitive(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".csv"));
 }
 
-function normalizeColName(name) {
-  return String(name || "")
-    .replace(/\uFEFF/g, "")
+function resolveCsvPath(dir, wantedName) {
+  const files = listFilesCaseInsensitive(dir);
+  const wanted = wantedName.toLowerCase();
+  const match = files.find((f) => f.toLowerCase() === wanted);
+  return match ? path.join(dir, match) : null;
+}
+
+function normalizeHeader(h) {
+  // keep simple: trim, replace spaces with underscores, remove weird quotes
+  return String(h || "")
     .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/^"+|"+$/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/[^\w]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
 }
 
-function dedupeNames(names) {
+function dedupeHeaders(headers) {
   const seen = new Map();
-  return names.map((n) => {
-    const base = n || "column";
-    const count = seen.get(base) || 0;
-    seen.set(base, count + 1);
-    if (count === 0) return base;
-    return `${base}_${count + 1}`;
+  return headers.map((h) => {
+    const base = normalizeHeader(h);
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    return count === 1 ? base : `${base}_${count}`;
   });
 }
 
-function inferColumnType(name) {
-  if (name === "id") return "TEXT";
+function parseCsvRaw(csvText) {
+  // Minimal CSV parser good for your exports (comma + quotes)
+  // If you later get super complex CSVs, we can switch to a library.
+  const rows = [];
+  let row = [];
+  let cur = "";
+  let inQuotes = false;
 
-  if (/(_at)$/.test(name)) return "TIMESTAMP";
-  if (name === "date" || /_date$/.test(name)) return "DATE";
-  if (/(_minutes|_minute|_mins|_duration)$/.test(name)) return "INTEGER";
-  if (/(price|amount)$/.test(name)) return "NUMERIC";
-  if (/^(is_|has_)/.test(name)) return "BOOLEAN";
+  for (let i = 0; i < csvText.length; i++) {
+    const ch = csvText[i];
+    const next = csvText[i + 1];
 
-  return "TEXT";
-}
-
-function getDataDir() {
-  if (fs.existsSync(DATA_DIR)) return DATA_DIR;
-  if (fs.existsSync(FALLBACK_DATA_DIR)) return FALLBACK_DATA_DIR;
-  throw new Error(`Data directory not found. Checked ${DATA_DIR} and ${FALLBACK_DATA_DIR}`);
-}
-
-function readCsv(filePath) {
-  const content = fs.readFileSync(filePath, "utf8");
-  const headerRow = parse(content, { bom: true, to_line: 1 })[0] || [];
-  const headers = headerRow.map((h) => String(h ?? "").trim());
-
-  const rows = parse(content, {
-    bom: true,
-    columns: headers,
-    from_line: 2,
-    skip_empty_lines: true,
-    relax_quotes: true,
-    trim: true,
-  });
-
-  return { headers, rows };
-}
-
-function buildColumns(headers) {
-  const prepared = headers.map((h, idx) => {
-    const raw = String(h ?? "").trim();
-    const normalized = normalizeColName(raw) || `column_${idx + 1}`;
-    return { raw, normalized };
-  });
-
-  const uniqueNames = dedupeNames(prepared.map((p) => p.normalized));
-  return prepared.map((p, idx) => ({
-    raw: p.raw,
-    name: uniqueNames[idx],
-    type: inferColumnType(uniqueNames[idx]),
-  }));
-}
-
-async function createTable(client, tableName, columns) {
-  const hasId = columns.some((c) => c.name === "id");
-  const definitions = [];
-
-  if (!hasId) {
-    definitions.push("id SERIAL PRIMARY KEY");
-  }
-
-  for (const col of columns) {
-    if (col.name === "id") {
-      definitions.push(`${qIdent(col.name)} TEXT PRIMARY KEY`);
-      continue;
+    if (inQuotes) {
+      if (ch === '"' && next === '"') {
+        cur += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        cur += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        row.push(cur);
+        cur = "";
+      } else if (ch === "\n") {
+        row.push(cur);
+        rows.push(row);
+        row = [];
+        cur = "";
+      } else if (ch === "\r") {
+        // ignore
+      } else {
+        cur += ch;
+      }
     }
-    definitions.push(`${qIdent(col.name)} ${col.type}`);
   }
 
-  const createSql = `CREATE TABLE IF NOT EXISTS ${qIdent(tableName)} (
-  ${definitions.join(",\n  ")}
+  // last cell
+  row.push(cur);
+  rows.push(row);
+
+  // remove trailing blank row if present
+  while (rows.length && rows[rows.length - 1].every((v) => String(v || "").trim() === "")) {
+    rows.pop();
+  }
+  return rows;
+}
+
+function isIdLikeColumn(colName) {
+  const c = String(colName || "").toLowerCase();
+  return c === "id" || c.endsWith("id");
+}
+
+function qIdent(s) {
+  // safe identifier quoting for Postgres
+  return `"${String(s).replace(/"/g, '""')}"`;
+}
+
+async function createTableFromHeaders(client, table, headers) {
+  if (!headers.length) return;
+
+  const pk = isIdLikeColumn(headers[0]) ? headers[0] : null;
+
+  const colsSql = headers.map((h) => {
+    // all TEXT for now (safe)
+    const base = `${qIdent(h)} TEXT`;
+    // If first col is id-like, set as primary key
+    if (pk && h === pk) return `${base} PRIMARY KEY`;
+    return base;
+  });
+
+  const sql = `CREATE TABLE IF NOT EXISTS ${qIdent(table)} (
+  ${colsSql.join(",\n  ")}
 );`;
-
-  await client.query(createSql);
+  await client.query(sql);
 }
 
-function toBoolean(value) {
-  const val = String(value).toLowerCase();
-  if (["true", "t", "1", "yes", "y"].includes(val)) return true;
-  if (["false", "f", "0", "no", "n"].includes(val)) return false;
-  return null;
+async function truncateTable(client, table) {
+  await client.query(`TRUNCATE TABLE ${qIdent(table)};`);
 }
 
-function isValidDate(value) {
-  return !Number.isNaN(Date.parse(value));
-}
+async function insertRows(client, table, headers, rows) {
+  if (!rows.length) return;
 
-function convertValue(value, type) {
-  if (value === undefined || value === null) return null;
-  const trimmed = typeof value === "string" ? value.trim() : value;
-  if (trimmed === "") return null;
+  const cols = headers.map(qIdent).join(", ");
+  const placeholders = headers.map((_, i) => `$${i + 1}`).join(", ");
+  const sql = `INSERT INTO ${qIdent(table)} (${cols}) VALUES (${placeholders});`;
 
-  switch (type) {
-    case "INTEGER": {
-      const intVal = parseInt(trimmed, 10);
-      return Number.isNaN(intVal) ? null : intVal;
+  // insert in batches
+  const BATCH = 500;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const chunk = rows.slice(i, i + BATCH);
+    // Use a transaction per chunk
+    await client.query("BEGIN");
+    try {
+      for (const r of chunk) {
+        const vals = headers.map((_, idx) => {
+          const v = r[idx] ?? "";
+          const t = String(v);
+          return t === "" ? null : t;
+        });
+        await client.query(sql, vals);
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
     }
-    case "NUMERIC": {
-      const numVal = parseFloat(trimmed);
-      return Number.isNaN(numVal) ? null : numVal;
-    }
-    case "BOOLEAN": {
-      return toBoolean(trimmed);
-    }
-    case "DATE":
-    case "TIMESTAMP": {
-      return isValidDate(trimmed) ? trimmed : null;
-    }
-    default:
-      return trimmed;
   }
 }
 
-async function insertRows(client, tableName, columns, rows) {
-  if (!columns.length) return 0;
+async function seedOne(client, csvPath, table) {
+  const raw = fs.readFileSync(csvPath, "utf8");
+  const parsed = parseCsvRaw(raw);
 
-  const columnList = columns.map((c) => qIdent(c.name)).join(", ");
-  let inserted = 0;
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    const placeholders = [];
-    const values = [];
-
-    batch.forEach((row, rowIdx) => {
-      const rowPlaceholders = columns.map((col, colIdx) => {
-        const valueIndex = rowIdx * columns.length + colIdx + 1;
-        values.push(convertValue(row[col.raw], col.type));
-        return `$${valueIndex}`;
-      });
-      placeholders.push(`(${rowPlaceholders.join(", ")})`);
-    });
-
-    const insertSql = `INSERT INTO ${qIdent(tableName)} (${columnList}) VALUES ${placeholders.join(", ")}`;
-    await client.query(insertSql, values);
-    inserted += batch.length;
-  }
-
-  return inserted;
-}
-
-async function seedFile(client, { file, table }) {
-  const dataDir = getDataDir();
-  const filePath = path.join(dataDir, file);
-
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Missing file: ${filePath}`);
-  }
-
-  console.log(`\nSeeding table ${table} from ${filePath}`);
-  const { headers, rows } = readCsv(filePath);
-
-  if (!headers.length) {
-    throw new Error(`No headers found in ${file}`);
-  }
-
-  const columns = buildColumns(headers);
-  await createTable(client, table, columns);
-
-  await client.query(`TRUNCATE TABLE ${qIdent(table)} RESTART IDENTITY;`);
-
-  if (!rows.length) {
-    console.log(`- ${table}: no data rows found, table truncated.`);
+  if (!parsed.length) {
+    console.log(`No rows in ${path.basename(csvPath)}; skipping`);
     return { table, inserted: 0 };
   }
 
-  const inserted = await insertRows(client, table, columns, rows);
-  console.log(`- ${table}: inserted ${inserted} rows.`);
+  const rawHeaders = parsed[0];
+  const headers = dedupeHeaders(rawHeaders);
 
-  return { table, inserted };
+  const dataRows = parsed.slice(1).filter((r) => r.some((v) => String(v || "").trim() !== ""));
+  // normalize row lengths
+  const rows = dataRows.map((r) => {
+    const out = headers.map((_, i) => (r[i] ?? ""));
+    return out;
+  });
+
+  await createTableFromHeaders(client, table, headers);
+  await truncateTable(client, table);
+
+  if (rows.length) {
+    await insertRows(client, table, headers, rows);
+  }
+
+  console.log(`Seeded ${table}: ${rows.length} rows`);
+  return { table, inserted: rows.length };
 }
 
+// ---- main ----
 async function main() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error("Missing DATABASE_URL env var");
+    process.exit(1);
+  }
+
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+    connectionString: url,
+    ssl: url ? { rejectUnauthorized: false } : false,
   });
 
   const client = await pool.connect();
-  const results = [];
-
   try {
+    console.log("Seeding from:", DATA_DIR);
+    const summary = [];
+
     for (const entry of FILES) {
-      const result = await seedFile(client, entry);
-      results.push(result);
+      const csvPath = resolveCsvPath(DATA_DIR, entry.file);
+      if (!csvPath) {
+        console.log(`Skipping missing file: ${entry.file}`);
+        continue;
+      }
+      summary.push(await seedOne(client, csvPath, entry.table));
     }
 
-    console.log("\nSeed summary:");
-    for (const { table, inserted } of results) {
-      console.log(`- ${table}: ${inserted} rows inserted`);
-    }
-    process.exit(0);
-  } catch (error) {
-    console.error("\nSeeding failed:", error.message);
-    process.exit(1);
+    console.log("Seed summary:", summary);
   } finally {
     client.release();
     await pool.end();
   }
 }
 
-main();
+main().catch((e) => {
+  console.error("Seeding failed:", e);
+  process.exit(1);
+});
