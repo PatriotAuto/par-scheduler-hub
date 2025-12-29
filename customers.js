@@ -81,6 +81,35 @@
     const asString = (v) =>
       v === undefined || v === null ? "" : String(v).trim();
 
+    const resolvePhoneDisplay = (customer) => {
+      const display = asString(customer.phone_display);
+      if (display) return display;
+
+      const e164 = asString(customer.phone_e164).replace(/^\+/, "");
+      if (e164) return e164;
+
+      const raw = asString(customer.phone_raw);
+      if (raw) return raw;
+
+      return "";
+    };
+
+    const resolvePhoneLink = (customer) => {
+      const e164 = asString(customer.phone_e164);
+      if (e164) {
+        const normalized = e164.startsWith("+") ? e164 : `+${e164}`;
+        return `tel:${normalized}`;
+      }
+
+      const rawDigits = asString(customer.phone_raw).replace(/\D/g, "");
+      if (rawDigits) {
+        const prefixed = rawDigits.startsWith("+") ? rawDigits : `+${rawDigits}`;
+        return `tel:${prefixed}`;
+      }
+
+      return "";
+    };
+
     const first = asString(
       pick(
         "firstname",
@@ -105,17 +134,8 @@
       asString(pick("name", "fullname", "full_name", "fullName")) ||
       `${first} ${last}`.trim();
 
-    const phoneRaw = pick(
-      "phone",
-      "phonenumber",
-      "phone_number",
-      "phoneNumber",
-      "mobile",
-      "cell",
-      "primaryphone",
-      "primary_phone"
-    );
-    const phone = normalizePhone(phoneRaw);
+    const phoneDisplay = resolvePhoneDisplay(c);
+    const phoneLink = resolvePhoneLink(c);
     const email = asString(
       pick("email", "emailaddress", "email_address", "emailAddress")
     );
@@ -170,7 +190,10 @@
       name: displayName,
       firstName: first,
       lastName: last,
-      phone,
+      phone: phoneDisplay,
+      phoneLink,
+      phoneE164: asString(c.phone_e164),
+      phoneRaw: asString(c.phone_raw),
       email,
       lastService,
       vehicle,
@@ -188,6 +211,18 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  function renderPhoneHtml(customer) {
+    const text = escapeHtml(customer?.phone);
+    if (!text) return "";
+
+    if (customer?.phoneLink) {
+      const href = escapeHtml(customer.phoneLink);
+      return `<a href="${href}" class="phone-link">${text}</a>`;
+    }
+
+    return text;
   }
 
   function formatDateLocal(value) {
@@ -421,7 +456,7 @@
 
       const phoneCell = document.createElement("td");
       phoneCell.className = "col-phone";
-      phoneCell.innerHTML = escapeHtml(cust.phone);
+      phoneCell.innerHTML = renderPhoneHtml(cust);
 
       const emailCell = document.createElement("td");
       emailCell.className = "col-email";
@@ -449,10 +484,13 @@
       if (cardsContainer) {
         const card = document.createElement("div");
         card.className = "customer-card";
+        const phoneMeta = renderPhoneHtml(cust);
+        const emailMeta = escapeHtml(cust.email);
+        const metaParts = [phoneMeta, emailMeta].filter(Boolean).join(" • ");
         card.innerHTML = `
           <div class="customer-card__name">${escapeHtml(cust.name)}</div>
           <div class="customer-card__meta">
-            ${escapeHtml([cust.phone, cust.email].filter(Boolean).join(" • "))}
+            ${metaParts}
           </div>
           ${
             cust.vehicle
@@ -669,13 +707,16 @@
     if (!drawer || !nameEl || !subEl || !bodyEl) return;
 
     nameEl.textContent = c.name || "(No name)";
-    subEl.textContent = [c.phone, c.email].filter(Boolean).join(" • ");
+    const subPhone = renderPhoneHtml(c);
+    const subEmail = escapeHtml(c.email);
+    const subParts = [subPhone, subEmail].filter(Boolean).join(" • ");
+    subEl.innerHTML = subParts;
 
     const rows = [
       ["Customer ID", c.id],
       ["First Name", c.firstName],
       ["Last Name", c.lastName],
-      ["Phone", c.phone],
+      ["Phone", renderPhoneHtml(c)],
       ["Email", c.email],
       ["Address", c.address],
       ["Vehicle", c.vehicle],
@@ -685,14 +726,15 @@
 
     bodyEl.innerHTML = rows
       .filter(([_, v]) => v && String(v).trim() !== "")
-      .map(
-        ([k, v]) => `
+      .map(([k, v]) => {
+        const valueHtml = k === "Phone" ? v : escapeHtml(String(v));
+        return `
       <div class="profile-row">
         <div class="profile-label">${escapeHtml(k)}</div>
-        <div>${escapeHtml(String(v))}</div>
+        <div>${valueHtml}</div>
       </div>
-    `
-      )
+    `;
+      })
       .join("");
 
     drawer.classList.add("open");

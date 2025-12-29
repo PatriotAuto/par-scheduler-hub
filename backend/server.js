@@ -4,7 +4,7 @@ const { Pool } = require("pg");
 const queryUtils = require("./db/query_utils");
 const schemaCache = require("./db/schema_cache");
 const { runMigrations } = require("./db/run_migrations");
-const { normalizeUSPhone, formatE164ToDisplay } = require("./utils/phone");
+const { normalizeUSPhone } = require("./utils/phone");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -130,22 +130,33 @@ function preparePhoneForWrite(input) {
 }
 
 function derivePhoneDisplay(customer = {}) {
-  if (customer.phone_display && String(customer.phone_display).trim()) {
-    return customer.phone_display;
+  const phoneDisplay = customer.phone_display && String(customer.phone_display).trim();
+  if (phoneDisplay) {
+    return phoneDisplay;
   }
 
-  const displayFromE164 = formatE164ToDisplay(customer.phone_e164);
-  if (displayFromE164) {
-    return displayFromE164;
+  const e164 = customer.phone_e164 && String(customer.phone_e164).trim();
+  if (e164) {
+    return e164.replace(/^\+/, "");
   }
 
-  return customer.phone || null;
+  const phoneRaw = customer.phone_raw && String(customer.phone_raw).trim();
+  if (phoneRaw) {
+    return phoneRaw;
+  }
+
+  return "";
 }
 
 function formatCustomerPhones(customer = {}) {
+  const phone_raw = customer.phone_raw || customer.phone || null;
+  const phone_e164 = customer.phone_e164 || null;
+
   return {
     ...customer,
-    phone_display: derivePhoneDisplay(customer),
+    phone_raw,
+    phone_e164,
+    phone_display: derivePhoneDisplay({ ...customer, phone_raw, phone_e164 }),
   };
 }
 
