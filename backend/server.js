@@ -512,6 +512,49 @@ apiV2.get("/customers/:id", async (req, res) => {
   }
 });
 
+apiV2.get("/customers/:id/events", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) {
+      return respondError(res, 400, "INVALID_ID");
+    }
+
+    let limit = parseInt(req.query.limit, 10);
+    if (!Number.isInteger(limit)) limit = 50;
+    limit = Math.min(Math.max(limit, 1), 200);
+
+    const { rows: events } = await pool.query(
+      `
+      SELECT
+        ce.id,
+        ce.legacy_event_id,
+        ce.customer_id,
+        ce.vehicle_vin,
+        ce.event_date,
+        ce.title,
+        ce.description,
+        ce.source,
+        ce.created_at,
+        v.year as vehicle_year,
+        v.make as vehicle_make,
+        v.model as vehicle_model,
+        v.trim as vehicle_trim
+      FROM par.customer_events ce
+      LEFT JOIN par.vehicles v
+        ON v.vin = ce.vehicle_vin
+      WHERE ce.customer_id = $1
+      ORDER BY ce.event_date DESC NULLS LAST, ce.created_at DESC
+      LIMIT $2;
+    `,
+      [id, limit]
+    );
+
+    return res.json({ ok: true, data: { customer_id: id, limit, events } });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
 apiV2.post("/customers", async (req, res) => {
   try {
     const body = req.body || {};
@@ -1110,6 +1153,7 @@ app.get("/__routes", (req, res) => {
       "/api/users (auth)",
       "/api/v2/customers (auth)",
       "/api/v2/customers/:id (auth)",
+      "/api/v2/customers/:id/events (auth)",
       "/api/v2/customers/:id/vehicles (auth)",
       "/api/v2/customers/:id/dealer-suggest (auth)",
       "/api/v2/vehicles/:vin (auth)",

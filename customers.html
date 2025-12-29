@@ -721,6 +721,20 @@
 .profile-label { opacity: 0.7; font-weight: 700; }
 .profile-actions { display: flex; gap: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.12); }
 
+.history-panel { padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.12); }
+.history-header { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+.history-title { font-size: 16px; font-weight: 800; }
+.history-status { font-size: 12px; color: var(--par-muted); }
+.history-list { display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow: auto; padding-right: 4px; }
+.history-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+.history-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; align-items: baseline; }
+.history-date { font-size: 12px; color: var(--par-muted); font-weight: 700; }
+.history-title { font-weight: 800; font-size: 14px; }
+.history-description { font-size: 13px; line-height: 1.5; opacity: 0.92; }
+.history-vehicle { font-size: 12px; color: #d1d5db; }
+.history-source { font-size: 11px; color: var(--par-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.history-empty { font-size: 13px; color: var(--par-muted); padding: 4px 0; }
+
 @media (max-width: 700px) {
   .alpha-wrap { align-items: flex-start; }
   .alpha-toggle { display: inline-flex; }
@@ -1344,6 +1358,14 @@
     </div>
 
     <div class="profile-body" id="profileBody"></div>
+
+    <div class="history-panel">
+      <div class="history-header">
+        <div class="history-title">History</div>
+        <div class="history-status" id="historyStatus">Load a customer to view history.</div>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
 
     <div class="vehicles-panel">
       <div class="vehicles-header">
