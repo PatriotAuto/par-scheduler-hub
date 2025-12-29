@@ -3,6 +3,7 @@ async function fetchJsonDebug(url, options = {}) {
   const token = typeof getStoredToken === "function" ? getStoredToken() : null;
   const res = await fetch(url, {
     ...options,
+    credentials: options.credentials || "include",
     headers: {
       "Accept": "application/json",
       ...(token && !(options.headers && options.headers.Authorization)
