@@ -11,6 +11,7 @@
     "seed": "node scripts/seed_from_csv.js",
     "db:schema": "node scripts/db_schema_report.js",
     "db:schema:json": "node scripts/db_schema_json.js",
+    "db:cleanup:phone_raw": "node scripts/cleanup_customer_phone_raw.js",
     "db:fix:phones": "node scripts/fix_phone_scientific_notation.js",
     "db:fix:phones:legacy": "node scripts/fix_customer_phones.js",
     "smoke:test": "node scripts/smoke_test_endpoints.js",
