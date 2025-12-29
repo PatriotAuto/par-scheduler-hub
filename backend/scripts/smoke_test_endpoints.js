@@ -1,6 +1,7 @@
 const BASE_URL = (process.env.BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 const TOKEN = process.env.API_TOKEN || "test-token";
 const SMOKE_CUSTOMER_ID = process.env.SMOKE_CUSTOMER_ID || 1;
+const SMOKE_CUSTOMER_LEGACY_ID = process.env.SMOKE_CUSTOMER_LEGACY_ID;
 
 const endpoints = [
   "/health",
@@ -40,6 +41,40 @@ async function checkCustomerEvents() {
   return ok;
 }
 
+async function checkLegacyCustomerRoutes() {
+  if (!SMOKE_CUSTOMER_LEGACY_ID) {
+    console.log("Skipping legacy customer checks (SMOKE_CUSTOMER_LEGACY_ID not set)");
+    return true;
+  }
+
+  const basePath = `/api/v2/customers/${SMOKE_CUSTOMER_LEGACY_ID}`;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${TOKEN}`,
+  };
+
+  const endpoints = [
+    basePath,
+    `${basePath}/events?limit=1`,
+  ];
+
+  const results = await Promise.all(
+    endpoints.map(async (path) => {
+      const res = await fetch(`${BASE_URL}${path}`, { headers });
+      const ok = res.status === 200;
+      if (!ok) {
+        const snippet = (await res.text()).slice(0, 120).replace(/\s+/g, " ").trim();
+        console.error(`${res.status} ${path} -> ${snippet}`);
+      } else {
+        console.log(`${res.status} ${path}`);
+      }
+      return ok;
+    })
+  );
+
+  return results.every(Boolean);
+}
+
 async function checkEndpoint(path) {
   const url = `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
   const headers = { "Content-Type": "application/json" };
@@ -65,6 +100,7 @@ async function main() {
   const results = await Promise.all([
     ...endpoints.map(checkEndpoint),
     checkCustomerEvents(),
+    checkLegacyCustomerRoutes(),
   ]);
   if (results.includes(false)) {
     process.exitCode = 1;
