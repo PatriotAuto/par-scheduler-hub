@@ -73,6 +73,21 @@
     return digits.length ? digits : s;
   }
 
+  function phoneText(c) {
+    const v = c.phone_display || c.phone_e164 || c.phone_raw || c.phone || "";
+    if (v === null || v === undefined) return "";
+    let s = String(v).trim();
+    if (!s) return "";
+    if (/[eE]\+?\d+/.test(s)) { const n = Number(s); if (Number.isFinite(n)) s = Math.trunc(n).toString(); }
+    const digits = s.replace(/\D/g,"");
+    if (digits.length === 11 && digits.startsWith("1")) {
+      const d = digits.slice(1);
+      return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+    }
+    if (digits.length === 10) return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+    return s;
+  }
+
   function normalizeCustomer(c) {
     if (!c || typeof c !== "object") return null;
 
@@ -221,7 +236,7 @@
   }
 
   function renderPhoneHtml(customer) {
-    const text = escapeHtml(customer?.phone);
+    const text = escapeHtml(phoneText(customer || {}));
     if (!text) return "";
 
     if (customer?.phoneLink) {
@@ -757,7 +772,8 @@
 
     if (copyPhone)
       copyPhone.onclick = async () => {
-        if (c.phone) await navigator.clipboard.writeText(c.phone);
+        const phoneValue = phoneText(c);
+        if (phoneValue) await navigator.clipboard.writeText(phoneValue);
       };
     if (copyEmail)
       copyEmail.onclick = async () => {
