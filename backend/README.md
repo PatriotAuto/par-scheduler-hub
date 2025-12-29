@@ -18,17 +18,21 @@ Patriot Scheduler Backend
  - Scripts:
    - `npm run migrate` – run migrations up (uses `DATABASE_URL`).
    - `npm run migrate:down` – roll back the last migration.
-   - `npm run db:verify` – print legacy vs. new customer/vehicle counts and exit non-zero on mismatch.
-   - `npm run db:fix:phones` – normalize customer phone fields (safe, does not drop/truncate).
-   - `npm run db:schema` – print the current database schema.
-   - `npm run db:schema:json` – output schema as JSON.
+  - `npm run db:verify` – print legacy vs. new customer/vehicle counts and exit non-zero on mismatch.
+  - `npm run db:cleanup:phone_raw` – clear placeholder/invalid `phone_raw` entries before normalization.
+  - `npm run db:fix:phones` – normalize customer phone fields (safe, does not drop/truncate).
+  - `npm run db:schema` – print the current database schema.
+  - `npm run db:schema:json` – output schema as JSON.
  - On Railway, run a one-off `npm run migrate` (or rely on app start) to apply migrations safely.
 
 ### Phone number cleanup (one-time)
 - Deploy the changes, then run the one-off cleanup on Railway or locally:
   ```bash
+  npm run db:cleanup:phone_raw
   npm run db:fix:phones
   ```
+- The cleanup script removes placeholder text (e.g., `null`, `n/a`, `-`, `.`) and numbers that are either too short (<10 digits)
+  or unrecognizably long (11+ digits not starting with 1).
 - The script normalizes parseable phone numbers into `phone_e164`, `phone_display`, and the legacy `phone` column while preserving the original value in `phone_raw`.
 
 ## OrbisX XLSX import (customers, vehicles, calendar history)
