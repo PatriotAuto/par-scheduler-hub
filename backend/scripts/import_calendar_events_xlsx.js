@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 const { Pool } = require("pg");
 const XLSX = require("xlsx");
 const { normalizeUSPhone } = require("../utils/phone");
@@ -15,9 +14,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 8000,
 });
 
+const IMPORT_TIMEZONE = "America/Indiana/Indianapolis";
+
 function usage() {
   console.log("Usage:");
-  console.log("  node scripts/import_calendar_events_xlsx.js \"/local/path/Patriot Auto Restyling Calendar Events Jan 1st 2025 to Dec 31st 2025.xlsx\"");
+  console.log(
+    "  node scripts/import_calendar_events_xlsx.js \"/local/path/Patriot Auto Restyling Calendar Events Jan 1st 2025 to Dec 31st 2025.xlsx\""
+  );
   console.log("  DATABASE_URL=... npm run db:import:calendar -- \"/local/path/file.xlsx\"");
   console.log("  (On Railway one-off) npm run db:import:calendar -- \"/app/file.xlsx\"");
 }
@@ -28,11 +31,13 @@ function sanitizeText(value) {
   return trimmed.length ? trimmed : null;
 }
 
-function parseDate(value) {
-  if (!value) return null;
-  if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
-  const parsed = new Date(value);
-  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+function selectColumn(row, candidates) {
+  for (const key of candidates) {
+    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== "") {
+      return row[key];
+    }
+  }
+  return null;
 }
 
 async function getLegacyPhoneColumn() {
@@ -59,36 +64,43 @@ async function getLegacyPhoneColumn() {
   return rows[0]?.column_name || "phone";
 }
 
-function deterministicEventId(eventDate, title, normalizedPhone, normalizedName) {
-  return crypto
-    .createHash("sha256")
-    .update(`${eventDate || ""}|${title || ""}|${normalizedPhone || ""}|${normalizedName || ""}`)
-    .digest("hex");
-}
-
-async function loadVehicles() {
-  const sql = `SELECT vin, customer_id FROM par.vehicles`;
-  const { rows } = await pool.query(sql);
-  const map = new Map();
-  rows.forEach((row) => map.set(String(row.vin).toUpperCase(), row));
-  return map;
-}
-
-async function loadCustomers(legacyPhoneColumn) {
+async function loadCustomerLookups(legacyPhoneColumn) {
   const sql = `
-    SELECT id, first_name, last_name, ${legacyPhoneColumn} AS legacy_phone, phone_e164
+    SELECT
+      id,
+      legacy_client_id,
+      email,
+      phone_e164,
+      phone_display,
+      phone_raw,
+      ${legacyPhoneColumn} AS legacy_phone,
+      first_name,
+      last_name
     FROM par.customers
   `;
   const { rows } = await pool.query(sql);
 
+  const byLegacyClientId = new Map();
+  const byEmail = new Map();
   const byPhone = new Map();
   const byName = new Map();
 
   for (const row of rows) {
-    const phoneCandidates = [];
-    if (row.phone_e164) phoneCandidates.push(row.phone_e164);
-    if (row.legacy_phone) phoneCandidates.push(String(row.legacy_phone));
+    if (row.legacy_client_id) {
+      const key = String(row.legacy_client_id).trim();
+      if (!byLegacyClientId.has(key)) byLegacyClientId.set(key, row);
+    }
 
+    if (row.email) {
+      const emailKey = String(row.email).trim().toLowerCase();
+      if (!byEmail.has(emailKey)) {
+        byEmail.set(emailKey, row);
+      } else {
+        byEmail.set(emailKey, null);
+      }
+    }
+
+    const phoneCandidates = [row.phone_e164, row.phone_display, row.phone_raw, row.legacy_phone];
     for (const candidate of phoneCandidates) {
       const normalized = normalizeUSPhone(candidate);
       if (!normalized.valid) continue;
@@ -96,7 +108,6 @@ async function loadCustomers(legacyPhoneColumn) {
       if (!byPhone.has(key)) {
         byPhone.set(key, row);
       } else {
-        // Multiple customers share phone; mark ambiguous
         byPhone.set(key, null);
       }
     }
@@ -112,107 +123,244 @@ async function loadCustomers(legacyPhoneColumn) {
     }
   }
 
-  return { byPhone, byName };
+  return { byLegacyClientId, byEmail, byPhone, byName };
 }
 
-function selectColumn(row, candidates) {
-  for (const key of candidates) {
-    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== "") {
-      return row[key];
+function extractVin(vehicleText) {
+  const text = sanitizeText(vehicleText);
+  if (!text) return null;
+  const match = /\(VIN:\s*([A-HJ-NPR-Z0-9]{17})\)/i.exec(text);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function parseDateParts(dateValue) {
+  if (!dateValue) return null;
+  if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+    return { year: dateValue.getFullYear(), month: dateValue.getMonth() + 1, day: dateValue.getDate() };
+  }
+
+  const asString = sanitizeText(dateValue);
+  if (!asString) return null;
+
+  let match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(asString);
+  if (!match) {
+    match = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/.exec(asString);
+    if (match) {
+      const year = Number(match[3].length === 2 ? `20${match[3]}` : match[3]);
+      return { year, month: Number(match[1]), day: Number(match[2]) };
     }
   }
+
+  if (match) {
+    return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+  }
+
+  const parsed = new Date(asString);
+  if (isNaN(parsed.getTime())) return null;
+  return { year: parsed.getFullYear(), month: parsed.getMonth() + 1, day: parsed.getDate() };
+}
+
+function parseTimeParts(timeValue) {
+  if (!timeValue) return null;
+  if (timeValue instanceof Date && !isNaN(timeValue.getTime())) {
+    return { hours: timeValue.getHours(), minutes: timeValue.getMinutes(), seconds: timeValue.getSeconds() };
+  }
+
+  const asString = sanitizeText(timeValue);
+  if (!asString) return null;
+
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i.exec(asString);
+  if (!match) return null;
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const seconds = 0;
+  const suffix = match[3] ? match[3].toLowerCase() : null;
+
+  if (suffix === "pm" && hours < 12) hours += 12;
+  if (suffix === "am" && hours === 12) hours = 0;
+
+  if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+    return { hours, minutes, seconds };
+  }
+
   return null;
 }
 
-async function resolveCustomerAndVehicle(row, vehiclesByVin, customersByPhone, customersByName) {
-  const vinRaw = selectColumn(row, ["VIN", "Vin", "vin"]);
-  const vin = vinRaw ? String(vinRaw).trim().toUpperCase() : null;
-  if (vin && vehiclesByVin.has(vin)) {
-    const vehicle = vehiclesByVin.get(vin);
-    return { customerId: vehicle.customer_id, vehicleVin: vehicle.vin };
+function getTimezoneOffset(date, timeZone) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const parts = dtf.formatToParts(date);
+  const values = {};
+  for (const { type, value } of parts) {
+    if (type !== "literal") values[type] = value;
+  }
+  const asUTC = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+  return (asUTC - date.getTime()) / 60000;
+}
+
+function combineDateAndTime(dateValue, timeValue) {
+  const dateParts = parseDateParts(dateValue);
+  if (!dateParts) return null;
+
+  const timeParts = parseTimeParts(timeValue) || { hours: 0, minutes: 0, seconds: 0 };
+  const utcGuess = new Date(Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day, timeParts.hours, timeParts.minutes, timeParts.seconds));
+  const offsetMinutes = getTimezoneOffset(utcGuess, IMPORT_TIMEZONE);
+  const zoned = new Date(utcGuess.getTime() - offsetMinutes * 60000);
+  return zoned.toISOString();
+}
+
+function buildDescription(row) {
+  const parts = [];
+
+  const primaryService = sanitizeText(row["Primary Service"]);
+  const allServices = sanitizeText(row["All Services/Packages/Variations"]);
+  const clientName = sanitizeText(row["Client"]);
+  const clientPhone = sanitizeText(row["Client Phone"]);
+  const clientEmail = sanitizeText(row["Client Email"]);
+  const vehicle = sanitizeText(row["Vehicle"]);
+  const primaryStaff = sanitizeText(row["Primary Staff"]);
+  const assignedStaff = sanitizeText(row["All Assigned Staff"]);
+  const bay = sanitizeText(row["Bay"]);
+  const color = sanitizeText(row["Color"]);
+  const notes = sanitizeText(row["Notes"]);
+  const basePrice = sanitizeText(row["Base Price"]);
+  const extrasPrice = sanitizeText(row["Extras Price"]);
+  const total = sanitizeText(row["Computed Total"]);
+  const completed = sanitizeText(row["Completed"]);
+  const urgent = sanitizeText(row["Urgent"]);
+
+  if (primaryService) parts.push(`Primary Service: ${primaryService}`);
+  if (allServices) parts.push(`All Services: ${allServices}`);
+  if (clientName) parts.push(`Client: ${clientName}`);
+  if (clientPhone || clientEmail) {
+    const contactPieces = [];
+    if (clientPhone) contactPieces.push(`Phone: ${clientPhone}`);
+    if (clientEmail) contactPieces.push(`Email: ${clientEmail}`);
+    parts.push(`Contact: ${contactPieces.join(" | ")}`);
+  }
+  if (vehicle) parts.push(`Vehicle: ${vehicle}`);
+  if (primaryStaff) parts.push(`Primary Staff: ${primaryStaff}`);
+  if (assignedStaff) parts.push(`Assigned Staff: ${assignedStaff}`);
+  if (bay) parts.push(`Bay: ${bay}`);
+  if (color) parts.push(`Color: ${color}`);
+  if (notes) parts.push(`Notes: ${notes}`);
+
+  const pricePieces = [];
+  if (basePrice) pricePieces.push(`Base: ${basePrice}`);
+  if (extrasPrice) pricePieces.push(`Extras: ${extrasPrice}`);
+  if (total) pricePieces.push(`Total: ${total}`);
+  if (pricePieces.length) parts.push(`Pricing: ${pricePieces.join(" | ")}`);
+
+  if (completed) parts.push(`Completed: ${completed}`);
+  if (urgent) parts.push(`Urgent: ${urgent}`);
+
+  return parts.join("\n");
+}
+
+function findCustomerId(row, lookups) {
+  const legacyClientId = sanitizeText(row["Client ID"]);
+  if (legacyClientId && lookups.byLegacyClientId.get(legacyClientId)) {
+    return lookups.byLegacyClientId.get(legacyClientId).id;
   }
 
-  const phoneRaw = selectColumn(row, ["Phone", "phone", "Customer Phone", "Customer Contact", "Contact"]);
+  const email = sanitizeText(row["Client Email"]);
+  if (email) {
+    const emailKey = email.toLowerCase();
+    const found = lookups.byEmail.get(emailKey);
+    if (found) return found.id;
+  }
+
+  const phoneRaw = selectColumn(row, ["Client Phone", "Phone", "Contact"]);
   if (phoneRaw) {
     const normalized = normalizeUSPhone(phoneRaw);
-    if (normalized.valid && customersByPhone.has(normalized.e164) && customersByPhone.get(normalized.e164)) {
-      return { customerId: customersByPhone.get(normalized.e164).id, vehicleVin: null };
+    if (normalized.valid) {
+      const found = lookups.byPhone.get(normalized.e164);
+      if (found) return found.id;
     }
   }
 
-  const nameRaw = selectColumn(row, ["Name", "Customer", "Client", "Customer Name", "Full Name", "Title", "Subject"]);
-  const normalizedName = sanitizeText(nameRaw);
-  if (normalizedName) {
-    const key = normalizedName.toLowerCase();
-    const customer = customersByName.get(key);
-    if (customer) {
-      return { customerId: customer.id, vehicleVin: null };
-    }
+  const clientName = sanitizeText(row["Client"]);
+  if (clientName) {
+    const found = lookups.byName.get(clientName.toLowerCase());
+    if (found) return found.id;
   }
 
-  return { customerId: null, vehicleVin: null };
+  return null;
 }
 
 async function importEvents(rows) {
   const legacyPhoneColumn = await getLegacyPhoneColumn();
-  const vehiclesByVin = await loadVehicles();
-  const { byPhone, byName } = await loadCustomers(legacyPhoneColumn);
+  const customerLookups = await loadCustomerLookups(legacyPhoneColumn);
 
-  let imported = 0;
-  let linkedVehicle = 0;
-  let linkedCustomerOnly = 0;
-  let unlinked = 0;
+  let processed = 0;
+  let inserted = 0;
+  let updated = 0;
+  let linkedCustomers = 0;
+  let vinsFound = 0;
 
   for (const row of rows) {
-    const eventDate = parseDate(selectColumn(row, ["Start", "Event Date", "Date", "Start Time", "start"]));
-    const title = sanitizeText(selectColumn(row, ["Title", "Subject", "Summary", "Event"]));
-    const description = sanitizeText(selectColumn(row, ["Description", "Notes", "Details", "Body"]));
-    const explicitEventId = sanitizeText(selectColumn(row, ["Event ID", "ID", "Legacy Event ID"]));
+    const legacyEventId = sanitizeText(row["Event ID"]);
+    if (!legacyEventId) continue;
 
-    if (!eventDate && !title && !description) {
-      continue;
-    }
+    const eventDate = combineDateAndTime(row["Event Date"], row["Start Time"]);
+    const title = sanitizeText(row["Title"]) || sanitizeText(row["Vehicle"]) || sanitizeText(row["Primary Service"]);
+    const description = buildDescription(row);
+    const vehicleVin = extractVin(row["Vehicle"]);
+    const customerId = findCustomerId(row, customerLookups);
 
-    const { customerId, vehicleVin } = await resolveCustomerAndVehicle(row, vehiclesByVin, byPhone, byName);
-
-    const phoneRaw = selectColumn(row, ["Phone", "Customer Phone", "Contact"]);
-    const normalizedPhone = phoneRaw ? normalizeUSPhone(phoneRaw) : { valid: false, e164: null };
-    const nameRaw = selectColumn(row, ["Name", "Customer", "Client", "Customer Name", "Full Name"]);
-    const normalizedName = sanitizeText(nameRaw);
-
-    const legacyEventId =
-      explicitEventId || deterministicEventId(eventDate, title, normalizedPhone.valid ? normalizedPhone.e164 : null, normalizedName);
+    processed += 1;
+    if (customerId) linkedCustomers += 1;
+    if (vehicleVin) vinsFound += 1;
 
     const insertSql = `
       INSERT INTO par.customer_events (
         legacy_event_id, customer_id, vehicle_vin, event_date, title, description, source
       )
       VALUES ($1, $2, $3, $4, $5, $6, 'calendar_import')
-      ON CONFLICT (legacy_event_id) DO NOTHING
-      RETURNING id, vehicle_vin, customer_id;
+      ON CONFLICT (legacy_event_id) DO UPDATE SET
+        customer_id = COALESCE(EXCLUDED.customer_id, par.customer_events.customer_id),
+        vehicle_vin = COALESCE(EXCLUDED.vehicle_vin, par.customer_events.vehicle_vin),
+        event_date = COALESCE(EXCLUDED.event_date, par.customer_events.event_date),
+        title = COALESCE(NULLIF(EXCLUDED.title,''), par.customer_events.title),
+        description = COALESCE(NULLIF(EXCLUDED.description,''), par.customer_events.description),
+        source = COALESCE(NULLIF(EXCLUDED.source,''), par.customer_events.source)
+      RETURNING (xmax = 0) AS inserted, customer_id, vehicle_vin;
     `;
 
     const params = [legacyEventId, customerId, vehicleVin, eventDate, title, description];
-    const { rows: inserted } = await pool.query(insertSql, params);
-    if (!inserted.length) {
-      continue;
-    }
+    const { rows: results } = await pool.query(insertSql, params);
+    if (!results.length) continue;
 
-    imported += 1;
-    if (inserted[0].vehicle_vin) {
-      linkedVehicle += 1;
-    } else if (inserted[0].customer_id) {
-      linkedCustomerOnly += 1;
+    if (results[0].inserted) {
+      inserted += 1;
     } else {
-      unlinked += 1;
+      updated += 1;
     }
   }
 
   console.log("Calendar import summary:", {
-    events_imported: imported,
-    linked_to_vehicle: linkedVehicle,
-    linked_to_customer_only: linkedCustomerOnly,
-    unlinked_events: unlinked,
+    rows_processed: processed,
+    linked_customers: linkedCustomers,
+    vin_found: vinsFound,
+    inserted,
+    updated,
   });
 }
 
