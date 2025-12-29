@@ -31,6 +31,37 @@ function sanitizeText(value) {
   return trimmed.length ? trimmed : null;
 }
 
+function normalizeCandidateVin(value) {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).replace(/[^0-9a-z]/gi, "").toUpperCase();
+  return normalized || null;
+}
+
+function isValidVin(value) {
+  const vin = normalizeCandidateVin(value);
+  return !!vin && vin.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(vin);
+}
+
+function extractVinFromText(text) {
+  const cleaned = sanitizeText(text);
+  if (!cleaned) return null;
+
+  const explicitMatch = /\(VIN:\s*([^\)]+)\)/i.exec(cleaned);
+  if (explicitMatch) {
+    const candidate = normalizeCandidateVin(explicitMatch[1]);
+    if (isValidVin(candidate)) return candidate;
+  }
+
+  const vinLikePattern = /(?:^|\b)([A-HJ-NPR-Z0-9][A-HJ-NPR-Z0-9\s\-]{16,})(?:\b|$)/gi;
+  let match;
+  while ((match = vinLikePattern.exec(cleaned))) {
+    const candidate = normalizeCandidateVin(match[1]);
+    if (isValidVin(candidate)) return candidate;
+  }
+
+  return null;
+}
+
 function selectColumn(row, candidates) {
   for (const key of candidates) {
     if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== "") {
@@ -126,17 +157,9 @@ async function loadCustomerLookups(legacyPhoneColumn) {
   return { byLegacyClientId, byEmail, byPhone, byName };
 }
 
-function extractVin(vehicleText) {
-  const text = sanitizeText(vehicleText);
-  if (!text) return null;
-  const match = /\(VIN:\s*([A-HJ-NPR-Z0-9]{17})\)/i.exec(text);
-  return match ? match[1].toUpperCase() : null;
-}
-
 function parseVehicleInfo(vehicleStr) {
   const text = sanitizeText(vehicleStr) || "";
-  const vinMatch = /\(VIN:\s*([A-HJ-NPR-Z0-9]{17})\)/i.exec(text);
-  const vin = vinMatch ? vinMatch[1].toUpperCase() : null;
+  const vin = extractVinFromText(text);
 
   const yearMatch = /^\s*(\d{4})\s+/.exec(text);
   if (!yearMatch) {
@@ -347,6 +370,7 @@ async function importEvents(rows) {
   let updated = 0;
   let linkedCustomers = 0;
   let vinsFound = 0;
+  const vinFoundBySource = { vehicle_col: 0, title: 0, notes: 0, other: 0 };
   let vehiclesCreatedOrUpdated = 0;
   let fkAvoidedCount = 0;
 
@@ -358,7 +382,30 @@ async function importEvents(rows) {
     const title = sanitizeText(row["Title"]) || sanitizeText(row["Vehicle"]) || sanitizeText(row["Primary Service"]);
     const description = buildDescription(row);
     const vehicleInfo = parseVehicleInfo(row["Vehicle"]);
-    const vehicleVin = vehicleInfo.vin;
+    const vinChecks = [
+      { value: row["Vehicle"], source: "vehicle_col" },
+      { value: row["Title"], source: "title" },
+      { value: row["Notes"], source: "notes" },
+      { value: row["All Services/Packages/Variations"], source: "other" },
+      { value: row["Client"], source: "other" },
+      { value: row["Address"], source: "other" },
+      { value: row["Client Phone"], source: "other" },
+    ];
+
+    let vehicleVin = null;
+    for (const check of vinChecks) {
+      const found = extractVinFromText(check.value);
+      if (found) {
+        vehicleVin = found;
+        vinFoundBySource[check.source] += 1;
+        break;
+      }
+    }
+
+    if (!vehicleVin && vehicleInfo.vin) {
+      vehicleVin = vehicleInfo.vin;
+      vinFoundBySource.vehicle_col += 1;
+    }
     const customerId = findCustomerId(row, customerLookups);
 
     processed += 1;
@@ -424,6 +471,7 @@ async function importEvents(rows) {
     rows_processed: processed,
     linked_customers: linkedCustomers,
     vin_found: vinsFound,
+    vin_found_by_source: vinFoundBySource,
     vehicles_created_or_updated: vehiclesCreatedOrUpdated,
     fk_avoided_count: fkAvoidedCount,
     inserted,
