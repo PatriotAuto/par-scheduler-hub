@@ -133,6 +133,39 @@ function extractVin(vehicleText) {
   return match ? match[1].toUpperCase() : null;
 }
 
+function parseVehicleInfo(vehicleStr) {
+  const text = sanitizeText(vehicleStr) || "";
+  const vinMatch = /\(VIN:\s*([A-HJ-NPR-Z0-9]{17})\)/i.exec(text);
+  const vin = vinMatch ? vinMatch[1].toUpperCase() : null;
+
+  const yearMatch = /^\s*(\d{4})\s+/.exec(text);
+  if (!yearMatch) {
+    return { vin, year: null, make: null, model: null, trim: null };
+  }
+
+  const year = Number(yearMatch[1]);
+  const afterYear = text.slice(yearMatch[0].length).trim();
+
+  const parenIndex = afterYear.indexOf("(");
+  const modelSection = parenIndex >= 0 ? afterYear.slice(0, parenIndex).trim() : afterYear;
+  const tokens = modelSection.split(/\s+/).filter(Boolean);
+
+  if (!tokens.length) {
+    return { vin, year, make: null, model: null, trim: null };
+  }
+
+  const make = tokens[0];
+  const remaining = tokens.slice(1);
+
+  const modelTokens = remaining.slice(0, 3);
+  const model = modelTokens.length ? modelTokens.join(" ") : null;
+
+  const trimTokens = remaining.slice(modelTokens.length);
+  const trim = trimTokens.length ? trimTokens.join(" ") : null;
+
+  return { vin, year, make, model, trim };
+}
+
 function parseDateParts(dateValue) {
   if (!dateValue) return null;
   if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
@@ -314,6 +347,8 @@ async function importEvents(rows) {
   let updated = 0;
   let linkedCustomers = 0;
   let vinsFound = 0;
+  let vehiclesCreatedOrUpdated = 0;
+  let fkAvoidedCount = 0;
 
   for (const row of rows) {
     const legacyEventId = sanitizeText(row["Event ID"]);
@@ -322,12 +357,42 @@ async function importEvents(rows) {
     const eventDate = combineDateAndTime(row["Event Date"], row["Start Time"]);
     const title = sanitizeText(row["Title"]) || sanitizeText(row["Vehicle"]) || sanitizeText(row["Primary Service"]);
     const description = buildDescription(row);
-    const vehicleVin = extractVin(row["Vehicle"]);
+    const vehicleInfo = parseVehicleInfo(row["Vehicle"]);
+    const vehicleVin = vehicleInfo.vin;
     const customerId = findCustomerId(row, customerLookups);
 
     processed += 1;
     if (customerId) linkedCustomers += 1;
     if (vehicleVin) vinsFound += 1;
+
+    if (vehicleVin) {
+      const vehicleSql = `
+        INSERT INTO par.vehicles (vin, customer_id, year, make, model, trim)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (vin) DO UPDATE SET
+          customer_id = COALESCE(EXCLUDED.customer_id, par.vehicles.customer_id),
+          year = COALESCE(EXCLUDED.year, par.vehicles.year),
+          make = COALESCE(NULLIF(EXCLUDED.make,''), par.vehicles.make),
+          model = COALESCE(NULLIF(EXCLUDED.model,''), par.vehicles.model),
+          trim = COALESCE(NULLIF(EXCLUDED.trim,''), par.vehicles.trim),
+          updated_at = NOW();
+      `;
+
+      const vehicleParams = [
+        vehicleVin,
+        customerId,
+        vehicleInfo.year,
+        vehicleInfo.make,
+        vehicleInfo.model,
+        vehicleInfo.trim,
+      ];
+
+      const { rowCount } = await pool.query(vehicleSql, vehicleParams);
+      if (rowCount) {
+        vehiclesCreatedOrUpdated += rowCount;
+        fkAvoidedCount += 1;
+      }
+    }
 
     const insertSql = `
       INSERT INTO par.customer_events (
@@ -359,6 +424,8 @@ async function importEvents(rows) {
     rows_processed: processed,
     linked_customers: linkedCustomers,
     vin_found: vinsFound,
+    vehicles_created_or_updated: vehiclesCreatedOrUpdated,
+    fk_avoided_count: fkAvoidedCount,
     inserted,
     updated,
   });
