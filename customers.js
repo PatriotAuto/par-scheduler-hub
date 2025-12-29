@@ -42,29 +42,35 @@
     return (value || "").toString().trim().toLowerCase();
   }
 
-  function normalizePhone(value) {
-    if (value === undefined || value === null) return "";
-
+  function formatPhoneForUI(value) {
+    if (value === null || value === undefined) return "";
     let s = String(value).trim();
     if (!s) return "";
 
-    if (/e\+?/i.test(s)) {
+    // Convert scientific notation like "1.26E+10" -> "12600000000"
+    if (/[eE]\+?\d+/.test(s)) {
       const n = Number(s);
-      if (!Number.isNaN(n)) {
-        s = n.toFixed(0);
-      }
+      if (Number.isFinite(n)) s = Math.trunc(n).toString();
     }
 
-    const digits = s.replace(/\D/g, "");
+    // Remove non-digits
+    let digits = s.replace(/\D/g, "");
 
+    // If 11 digits and starts with 1, drop leading 1 for display
+    let country = "";
     if (digits.length === 11 && digits.startsWith("1")) {
-      return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7, 11)}`;
-    }
-    if (digits.length === 10) {
-      return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+      country = "1";
+      digits = digits.slice(1);
     }
 
-    return digits || s;
+    // Format US 10-digit
+    if (digits.length === 10) {
+      const pretty = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+      return country ? `+${country} ${pretty}` : pretty;
+    }
+
+    // Otherwise return digits (or original if digits empty)
+    return digits.length ? digits : s;
   }
 
   function normalizeCustomer(c) {
@@ -82,16 +88,14 @@
       v === undefined || v === null ? "" : String(v).trim();
 
     const resolvePhoneDisplay = (customer) => {
-      const display = asString(customer.phone_display);
-      if (display) return display;
+      const phoneValue =
+        customer.phone_display ||
+        customer.phone_e164 ||
+        customer.phone_raw ||
+        customer.phone ||
+        "";
 
-      const e164 = asString(customer.phone_e164).replace(/^\+/, "");
-      if (e164) return e164;
-
-      const raw = asString(customer.phone_raw);
-      if (raw) return raw;
-
-      return "";
+      return formatPhoneForUI(phoneValue);
     };
 
     const resolvePhoneLink = (customer) => {
@@ -101,7 +105,10 @@
         return `tel:${normalized}`;
       }
 
-      const rawDigits = asString(customer.phone_raw).replace(/\D/g, "");
+      const rawDigits =
+        asString(customer.phone_raw).replace(/\D/g, "") ||
+        asString(customer.phone_display).replace(/\D/g, "") ||
+        asString(customer.phone).replace(/\D/g, "");
       if (rawDigits) {
         const prefixed = rawDigits.startsWith("+") ? rawDigits : `+${rawDigits}`;
         return `tel:${prefixed}`;
