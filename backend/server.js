@@ -102,6 +102,37 @@ function toIntOrNull(value) {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+async function resolveCustomerId(param) {
+  const raw = (param || "").toString().trim();
+  if (!raw) return null;
+
+  if (/^\d+$/.test(raw)) {
+    return BigInt(raw);
+  }
+
+  const cleaned = raw.replace(/^cust[_-]/i, "");
+
+  if (/^\d+$/.test(cleaned)) {
+    const { rows } = await pool.query(
+      "SELECT id FROM par.customers WHERE legacy_client_id = $1 LIMIT 1",
+      [cleaned]
+    );
+    if (rows.length) return rows[0].id;
+  }
+
+  const legacyCandidates = Array.from(new Set([raw, cleaned].filter(Boolean)));
+  if (!legacyCandidates.length) return null;
+
+  const placeholders = legacyCandidates.map((_, idx) => `$${idx + 1}`).join(" OR legacy_client_id = ");
+  const { rows: legacyRows } = await pool.query(
+    `SELECT id FROM par.customers WHERE legacy_client_id = ${placeholders} LIMIT 1`,
+    legacyCandidates
+  );
+  if (legacyRows.length) return legacyRows[0].id;
+
+  return null;
+}
+
 function preparePhoneForWrite(input) {
   if (input === undefined) {
     return { provided: false };
@@ -477,7 +508,11 @@ apiV2.get("/customers", async (req, res) => {
 
 apiV2.get("/customers/:id/dealer-suggest", async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = await resolveCustomerId(req.params.id);
+    if (id === null) {
+      return respondError(res, 404, "NOT_FOUND");
+    }
+
     const { rows: customerRows } = await pool.query(
       "SELECT id FROM par.customers WHERE id = $1",
       [id]
@@ -502,7 +537,10 @@ apiV2.get("/customers/:id/dealer-suggest", async (req, res) => {
 
 apiV2.get("/customers/:id", async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = await resolveCustomerId(req.params.id);
+    if (id === null) {
+      return respondError(res, 404, "NOT_FOUND");
+    }
     const { rows: customerRows } = await pool.query(
       "SELECT * FROM par.customers WHERE id = $1",
       [id]
@@ -525,9 +563,9 @@ apiV2.get("/customers/:id", async (req, res) => {
 
 apiV2.get("/customers/:id/events", async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!Number.isInteger(id)) {
-      return respondError(res, 400, "INVALID_ID");
+    const id = await resolveCustomerId(req.params.id);
+    if (id === null) {
+      return respondError(res, 404, "NOT_FOUND");
     }
 
     let limit = parseInt(req.query.limit, 10);
@@ -622,7 +660,10 @@ apiV2.post("/customers", async (req, res) => {
 
 apiV2.patch("/customers/:id", async (req, res) => {
   try {
-    const id = req.params.id;
+    const id = await resolveCustomerId(req.params.id);
+    if (id === null) {
+      return respondError(res, 404, "NOT_FOUND");
+    }
     const body = req.body || {};
     const updates = [];
     const params = [];
@@ -683,7 +724,10 @@ apiV2.patch("/customers/:id", async (req, res) => {
 
 apiV2.post("/customers/:id/vehicles", async (req, res) => {
   try {
-    const customerId = req.params.id;
+    const customerId = await resolveCustomerId(req.params.id);
+    if (customerId === null) {
+      return respondError(res, 404, "CUSTOMER_NOT_FOUND");
+    }
     const body = req.body || {};
 
     const { rowCount: customerExists } = await pool.query(
